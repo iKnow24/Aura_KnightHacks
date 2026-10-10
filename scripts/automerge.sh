@@ -57,7 +57,14 @@ while :; do
         gh pr edit "$child" --repo "$REPO" --base main && echo "Moved PR #$child onto main."
       done
       # --match-head-commit: if someone pushed while we tested, don't merge the untested commit.
-      if gh pr merge "$num" --repo "$REPO" --merge --match-head-commit "$sha"; then
+      # Retry: right after a PR is moved onto main, GitHub can briefly report "merge conflicts"
+      # before it has recomputed mergeability (our local merge above already proved it's clean).
+      merged=false
+      for wait in 0 10 20 40; do
+        sleep "$wait"
+        if gh pr merge "$num" --repo "$REPO" --merge --match-head-commit "$sha"; then merged=true; break; fi
+      done
+      if $merged; then
         echo "::notice::Merged PR #$num into main."
         gh api -X DELETE "repos/$REPO/git/refs/heads/$ref" >/dev/null 2>&1 || true
         progress=true; merged_any=true
