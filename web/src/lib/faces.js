@@ -12,9 +12,9 @@ let landmarker = null
 
 export async function loadFaces() {
   if (landmarker) return landmarker
-  const files = await FilesetResolver.forVisionTasks('/mediapipe/wasm')
+  const files = await FilesetResolver.forVisionTasks(`${import.meta.env.BASE_URL}mediapipe/wasm`)
   const options = (delegate) => ({
-    baseOptions: { modelAssetPath: '/mediapipe/face_landmarker.task', delegate },
+    baseOptions: { modelAssetPath: `${import.meta.env.BASE_URL}mediapipe/face_landmarker.task`, delegate },
     runningMode: 'VIDEO',
     numFaces: 3,
     outputFaceBlendshapes: true,

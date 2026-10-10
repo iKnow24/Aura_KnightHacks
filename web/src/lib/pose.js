@@ -8,9 +8,9 @@ let landmarker = null
 
 export async function loadPose() {
   if (landmarker) return landmarker
-  const files = await FilesetResolver.forVisionTasks('/mediapipe/wasm')
+  const files = await FilesetResolver.forVisionTasks(`${import.meta.env.BASE_URL}mediapipe/wasm`)
   const options = (delegate) => ({
-    baseOptions: { modelAssetPath: '/mediapipe/pose_landmarker_lite.task', delegate },
+    baseOptions: { modelAssetPath: `${import.meta.env.BASE_URL}mediapipe/pose_landmarker_lite.task`, delegate },
     runningMode: 'VIDEO',
     numPoses: 1,
   })

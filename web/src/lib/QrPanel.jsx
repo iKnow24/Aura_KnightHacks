@@ -17,7 +17,7 @@ export default function QrPanel() {
   const [codes, setCodes] = useState([])
   useEffect(() => {
     Promise.all(DEVICES.map(([label, path]) =>
-      QRCode.toDataURL(location.origin + path, { margin: 1, width: 240 }).then((src) => ({ label, path, src }))
+      QRCode.toDataURL(location.origin + import.meta.env.BASE_URL.replace(/\/$/, '') + path, { margin: 1, width: 240 }).then((src) => ({ label, path, src }))
     )).then(setCodes)
   }, [])
 

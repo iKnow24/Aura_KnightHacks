@@ -13,7 +13,7 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 //
 // Figure: three.js's example "Xbot" (Mixamo), trimmed to its idle/walk/run clips.
 // Cars and bikes are built here from simple shapes, all in one matte gray.
-const MODEL = '/models/walker.glb'
+const MODEL = `${import.meta.env.BASE_URL}models/walker.glb`
 const BG = '#111113'
 const GRAY = '#8e8e96'
 const ME = '#f4f4f5'
