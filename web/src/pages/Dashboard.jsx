@@ -5,6 +5,7 @@ import AlertIcon from '../lib/AlertIcon'
 import AskLumen from '../lib/AskLumen'
 import Conversation, { useCaptions } from '../lib/Conversation'
 import QrPanel from '../lib/QrPanel'
+import { Brackets, Sweep, Telemetry } from '../lib/Hud'
 import { Wordmark } from '../lib/Logo'
 import { getUser, signOut } from '../lib/user'
 import { alertText, SEVERITY_COLOR, ZONES, zoneLabel } from '../lib/zones'
@@ -72,7 +73,11 @@ export default function Dashboard() {
         {/* Floor plan. Skeletons and zone status only: no live video, for privacy. */}
         <div className="glass relative aspect-[4/3] overflow-hidden sm:aspect-[16/10] rounded-3xl">
           <div className="absolute inset-0 bg-[radial-gradient(rgb(255_255_255/0.08)_1px,transparent_1px)] [background-size:22px_22px]" />
+          <Sweep />
           <FloorPlan />
+          <Brackets inset={10} len={18} />
+          <Telemetry className="absolute bottom-5 left-7">Floor plan · skeletons only, no video</Telemetry>
+          <Telemetry className="absolute bottom-5 right-7 tabular">{Object.values(state.nodes).filter((n) => now - n.last_seen < 10).length} nodes live</Telemetry>
           {Object.entries(ZONES).filter(([, z]) => z.map !== false).map(([id, z]) => {
             const node = Object.values(state.nodes).find((n) => n.zone === id)
             const alive = node && now - node.last_seen < 10
@@ -80,7 +85,7 @@ export default function Dashboard() {
               <div key={id} className="absolute -translate-x-1/2 -translate-y-1/2 text-center" style={{ left: `${z.x}%`, top: `${z.y}%` }}>
                 <div className={`mx-auto mb-1.5 h-3 w-3 rounded-full ${alive ? 'bg-emerald-400 shadow-[0_0_16px_4px_rgb(52_211_153/0.5)]' : 'border border-zinc-600'}`} />
                 <div className="font-semibold">{z.label}</div>
-                <div className={`text-xs ${alive ? 'text-emerald-300' : 'text-zinc-500'}`}>{alive ? 'node live' : 'no node'}</div>
+                <div className={`font-mono text-[10px] uppercase tracking-[0.16em] ${alive ? 'text-emerald-300' : 'text-zinc-500'}`}>{alive ? 'node live' : 'no node'} · {String(z.x).padStart(2, '0')}/{String(z.y).padStart(2, '0')}</div>
               </div>
             )
           })}

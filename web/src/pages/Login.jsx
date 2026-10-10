@@ -3,7 +3,7 @@ import { ArrowRight, Smartphone } from 'lucide-react'
 import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import AlertIcon from '../lib/AlertIcon'
-import Logo from '../lib/Logo'
+import { Brackets, Reactor, Telemetry } from '../lib/Hud'
 import { getUser, signIn } from '../lib/user'
 
 // What Lumen does, shown instead of told: a few of the things it would have caught today.
@@ -30,6 +30,8 @@ export default function Login() {
 
   return (
     <main className="relative flex min-h-full flex-col items-center justify-center overflow-hidden px-4 py-10">
+      <Telemetry className="absolute left-4 top-[max(1rem,env(safe-area-inset-top))]">Lumen OS · v0.9</Telemetry>
+      <Telemetry className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))]">Audio → light</Telemetry>
       {/* Floating example alerts, hidden on small phones where they'd crowd the form. */}
       {DRIFT.map(([kind, text, room, color, pos], i) => (
         <motion.div key={kind} className="glass pointer-events-none absolute hidden items-center gap-3 rounded-full py-2 pl-2 pr-5 md:flex"
@@ -41,9 +43,8 @@ export default function Login() {
       ))}
 
       <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, ease: [0.2, 0.8, 0.2, 1] }}
-        className="relative mb-6">
-        <div className="absolute inset-0 -z-10 scale-150 rounded-full bg-brand opacity-25 blur-3xl" />
-        <Logo size={104} live />
+        className="relative mb-4">
+        <Reactor size={190} />
       </motion.div>
       <motion.h1 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
         className="text-6xl font-extrabold tracking-[-0.06em]">lumen</motion.h1>
@@ -52,6 +53,8 @@ export default function Login() {
 
       <motion.form onSubmit={submit} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35, type: 'spring', stiffness: 200, damping: 24 }}
         className="glass relative mt-8 w-full max-w-sm rounded-[28px] p-6">
+        <Brackets inset={-8} len={18} />
+        <Telemetry className="mb-4 flex justify-between"><span>Identify wearer</span><span>01 / 02</span></Telemetry>
         <label className="block text-sm font-medium text-zinc-300">Your first name</label>
         <input autoFocus value={name} onChange={(e) => setName(e.target.value)} className={field} placeholder="Sharan" />
         <p className="mt-1.5 text-xs text-zinc-500">Lumen lights up when someone calls this name.</p>
