@@ -26,8 +26,101 @@ const speakerColor = (name) => SPEAKER_COLORS[[...name].reduce((h, c) => (h * 31
 const HIDE_BAR_MS = 4000
 const TALKING = 0.04 // lip movement that counts as "this face is talking" (same as the headset)
 const SPEECH_LEVEL = 0.02 // mic loudness that counts as speech (Private engine)
-const NAME_RE = /\b(?:[Mm]y name is|[Mm]y name's|I'm|I am|[Cc]all me)\s+([A-Z][a-z]{2,})/
-const NOT_NAMES = new Set(['Going', 'Not', 'Just', 'Sure', 'Sorry', 'Good', 'Fine', 'Okay', 'So', 'Here', 'Really', 'Glad'])
+// "Hi, I'm Adam" / "my name is Adam". A capital letter is required after the weak cues ("I'm going"
+// isn't a name); after "my name is" the recognizer's lowercase is trusted.
+const NAME_RE = /\b(?:[Mm]y name's|[Nn]ame's|I'm|I am|[Cc]all me|[Tt]his is)\s+([A-Z][a-z]{2,})/
+const MY_NAME_IS = /\bmy name is\s+([a-z]{3,})/i
+const NOT_NAMES = new Set(['Going', 'Not', 'Just', 'Sure', 'Sorry', 'Good', 'Fine', 'Okay', 'So', 'Here', 'Really', 'Glad',
+  'Done', 'Back', 'Trying', 'Looking', 'Talking', 'Very', 'The', 'From', 'Your', 'What', 'Lumen'])
+export function nameIn(text) {
+  const m = text.match(MY_NAME_IS)?.[1] ?? text.match(NAME_RE)?.[1]
+  if (!m) return null
+  const name = m[0].toUpperCase() + m.slice(1).toLowerCase()
+  return NOT_NAMES.has(name) ? null : name
+}
+
+// Movie captions: how cinemas and streaming subtitles for deaf viewers (SDH) look. White sans,
+// soft black outline, centered at the bottom, two lines at most, NAME: when we know who's talking,
+// and [SOUNDS IN BRACKETS] for what you can't hear.
+const CINEMA_TEXT = {
+  fontFamily: 'Arial, Helvetica, sans-serif',
+  color: '#fff',
+  fontWeight: 600,
+  fontSize: 'clamp(20px, 5.6vw, 36px)',
+  lineHeight: 1.25,
+  textShadow: '0 0 3px #000, 0 0 6px #000, 1px 1px 2px #000, -1px -1px 2px #000',
+}
+const CINEMA_HOLD_S = 5 // a subtitle stays up this long after the last word, then clears
+const SOUND_CUE = {
+  smoke_alarm: 'ALARM BLARING', doorbell: 'DOORBELL RINGS', timer: 'TIMER BEEPING', kettle: 'KETTLE WHISTLING',
+  phone_ring: 'PHONE RINGING', knock: 'KNOCKING', alarm_clock: 'ALARM CLOCK RINGING', water_running: 'WATER RUNNING',
+  dog_bark: 'DOG BARKING', car_horn: 'CAR HORN HONKS', siren: 'SIREN WAILING', vehicle: 'CAR APPROACHING',
+  bike_bell: 'BIKE BELL RINGS', reversing: 'TRUCK REVERSING', glass_break: 'GLASS SHATTERS', baby_cry: 'BABY CRYING',
+  name_called: 'SOMEONE CALLS YOUR NAME', person_behind: 'FOOTSTEPS BEHIND YOU', vehicle_behind: 'VEHICLE BEHIND YOU',
+}
+
+function tail(text, maxChars) {
+  if (text.length <= maxChars) return text
+  const cut = text.slice(-maxChars)
+  return cut.slice(cut.indexOf(' ') + 1)
+}
+
+function CinemaCaptions({ lines, live, names, recent }) {
+  const [, tick] = useState(0)
+  useEffect(() => { const t = setInterval(() => tick((n) => n + 1), 1000); return () => clearInterval(t) }, [])
+  const last = lines[lines.length - 1]
+  const fresh = last && Date.now() / 1000 - last.ts < CINEMA_HOLD_S
+  const who = (l) => (l?.speaker ? names[l.speaker.id] : l?.zone && !ZONES[l.zone] ? l.zone : null)
+  const text = live || (fresh ? last.text : '')
+  const speaker = live ? null : who(last)
+  // About 2 lines' worth for this screen width, keeping the newest words.
+  const perLine = Math.max(28, Math.floor(window.innerWidth / 11.5))
+  const shown = tail(text, perLine * 2 - (speaker ? speaker.length + 2 : 0))
+  const cues = recent.filter((a) => Date.now() / 1000 - a.ts < 6 && SOUND_CUE[a.kind])
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-[11%] z-10 flex flex-col items-center gap-1 px-[6%] text-center">
+      <AnimatePresence>
+        {cues.slice(-1).map((a) => (
+          <motion.div key={a.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ ...CINEMA_TEXT, fontStyle: 'italic' }}>
+            [{SOUND_CUE[a.kind]}]
+          </motion.div>
+        ))}
+      </AnimatePresence>
+      <AnimatePresence mode="wait">
+        {shown && (
+          <motion.div key={live ? 'live' : last.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.12 }} style={CINEMA_TEXT} className="max-w-[36ch]">
+            {speaker && <span>{speaker.toUpperCase()}: </span>}{shown}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function NameTag({ person, name, talking, fresh }) {
+  // A "HELLO my name is" sticker once they've said their name; a quiet pill until then.
+  if (!name) {
+    return (
+      <div className="flex items-center gap-1.5 whitespace-nowrap rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold backdrop-blur"
+        style={{ boxShadow: talking ? `0 0 0 2px ${person.color}` : 'none' }}>
+        <span className="h-2 w-2 rounded-full" style={{ background: person.color }} />
+        Person {person.id}{talking && ' 🗣'}{person.facing && <span className="text-green-300"> · looking at you</span>}
+      </div>
+    )
+  }
+  return (
+    <motion.div initial={fresh ? { scale: 0, rotate: -12 } : false} animate={{ scale: talking ? 1.08 : 1, rotate: -3 }}
+      transition={{ type: 'spring', stiffness: 420, damping: 18 }}
+      className="overflow-hidden rounded-xl text-center shadow-2xl" style={{ boxShadow: talking ? `0 0 24px ${person.color}` : '0 8px 24px #0008' }}>
+      <div className="px-4 pb-0.5 pt-1 text-[9px] font-black uppercase tracking-[0.2em] text-white" style={{ background: person.color }}>
+        Hello, my name is
+      </div>
+      <div className="bg-white px-4 py-1 text-xl font-black leading-tight text-black">{name}</div>
+      {person.facing && <div className="bg-white pb-1 text-[10px] font-semibold text-green-600">looking at you</div>}
+    </motion.div>
+  )
+}
 const DOWN_BETA = 35 // phone tilted flatter than this = you're looking at the person, not the screen
 
 const SAMPLE = [
@@ -131,6 +224,9 @@ export default function Captions() {
   const downSince = useRef(null)
   const lastInterim = useRef(0)
   const [names, setNames] = useState({}) // face person id -> name they said ("I'm Dana")
+  const [freshName, setFreshName] = useState(null) // person id whose tag should pop in
+  const [look, setLook] = useState(() => { try { return localStorage.getItem('lumen_look') || 'panel' } catch { return 'panel' } })
+  useEffect(() => { try { localStorage.setItem('lumen_look', look) } catch { /* private mode */ } }, [look])
   const levelRef = useRef(0)
 
   const { state, connected } = useBrain('hud', push, (msg) => {
@@ -164,6 +260,8 @@ export default function Captions() {
     if (/\b(add|create|make)( a)? new mode\b/.test(t)) { setPicker(true); setAdding(true); return true }
     if (/\b(switch|change|show)( the)? modes?\b$|^(switch|change) mode/.test(t)) { setPicker(true); return true }
     if (picker && /\b(close|never mind|cancel)\b/.test(t)) { setPicker(false); setAdding(false); return true }
+    if (/\b(movie|cinema|subtitles?) (mode|captions|style|view)\b/.test(t)) { setLook('cinema'); flash('🎬 Movie captions'); return true }
+    if (/\b(normal|panel|transcript|regular) (mode|captions|style|view)\b/.test(t)) { setLook('panel'); flash('Transcript view'); return true }
     const said = t.match(/\b(?:switch to|go to|lumen|start|turn on)\s+(?:the\s+)?([a-z]+(?: [a-z]+)?)\s+mode\b/)?.[1]
       ?? (picker ? t.replace(/ mode$/, '') : null)
     if (said) {
@@ -187,8 +285,12 @@ export default function Captions() {
         const who = faces.claim()
         if (who) {
           line.speaker = who
-          const said = line.text.match(NAME_RE)?.[1]
-          if (said && !NOT_NAMES.has(said)) setNames((n) => ({ ...n, [who.id]: said }))
+          const said = nameIn(line.text)
+          if (said && names[who.id] !== said) {
+            setNames((n) => ({ ...n, [who.id]: said }))
+            setFreshName(who.id)
+            flash(`👋 Met ${said}`)
+          }
         }
       }
       if (mode === 'lecture') setSegments((s) => [...s, { text: line.text, ts: line.ts }])
@@ -307,14 +409,8 @@ export default function Captions() {
         const talking = p.talk > TALKING
         return (
           <motion.div key={p.id} className="pointer-events-none absolute z-[15] -translate-x-1/2 -translate-y-full"
-            animate={{ left, top: top - 8, scale: talking ? 1.08 : 1 }} transition={{ type: 'spring', stiffness: 300, damping: 30 }}>
-            <div className="flex items-center gap-1.5 whitespace-nowrap rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold backdrop-blur"
-              style={{ boxShadow: talking ? `0 0 0 2px ${p.color}` : 'none' }}>
-              <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
-              {names[p.id] ?? `Person ${p.id}`}
-              {talking && <span>🗣</span>}
-              {p.facing && <span className="text-green-300">· looking at you</span>}
-            </div>
+            animate={{ left, top: top - 8 }} transition={{ type: 'spring', stiffness: 300, damping: 30 }}>
+            <NameTag person={p} name={names[p.id]} talking={talking} fresh={freshName === p.id} />
           </motion.div>
         )
       })}
@@ -336,6 +432,9 @@ export default function Captions() {
         )}
       </AnimatePresence>
 
+      {look === 'cinema' ? (
+        <CinemaCaptions lines={captions.lines} live={live} names={names} recent={state.events} />
+      ) : (<>
       {/* Right: the see-through transcript. Scroll up for history; it stops following until you come back down. */}
       <section onClick={(e) => e.stopPropagation()}
         className={`absolute bottom-0 right-0 top-0 z-10 flex flex-col border-l border-white/10 bg-black/45 backdrop-blur-md ${camera ? 'w-[64%] rounded-l-3xl sm:w-[42%]' : 'w-full'}`}>
@@ -382,6 +481,7 @@ export default function Captions() {
           )}
         </AnimatePresence>
       </section>
+      </>)}
 
       {/* Left: mode picker. Opens by voice ("switch mode") or from the bar. */}
       <AnimatePresence>
@@ -429,6 +529,7 @@ export default function Captions() {
             <button onClick={() => setEngine(engine === 'instant' ? 'private' : 'instant')} disabled={mode === 'outside'}
               className="rounded-full bg-zinc-900 px-3 py-2 text-sm">{realEngine === 'instant' ? '⚡ Instant' : '🔒 Private'}</button>
             <button onClick={camera ? stopCamera : startCamera} className="rounded-full bg-zinc-900 px-3 py-2 text-sm">{camera ? '📷 On' : '📷 Off'}</button>
+            <button onClick={() => setLook(look === 'cinema' ? 'panel' : 'cinema')} className={`rounded-full px-3 py-2 text-sm ${look === 'cinema' ? 'bg-white text-black' : 'bg-zinc-900'}`}>🎬</button>
             <button onClick={download} className="rounded-full bg-zinc-900 px-3 py-2 text-sm">⬇︎</button>
             {mode === 'lecture' && (
               <>
