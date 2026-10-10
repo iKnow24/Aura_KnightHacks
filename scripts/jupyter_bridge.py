@@ -8,7 +8,7 @@ browser already talks to it fine through Jupyter. This script uses that same Jup
 
 So the AMD GPU still runs every model; your Mac only passes bytes along.
 
-On your Mac (one time):  python3 -m pip install aiohttp
+On your Mac (one time):  python3 -m pip install aiohttp truststore
 Run it:                  python3 scripts/jupyter_bridge.py JUPYTER_URL TOKEN
 Then in a second tab:    cloudflared tunnel --url http://localhost:5173
 
@@ -26,6 +26,13 @@ from datetime import datetime, timezone
 import aiohttp
 from aiohttp import web
 from multidict import CIMultiDict
+
+try:
+    import truststore  # trust the same certificates Safari does (python.org's Python ships with none)
+
+    truststore.inject_into_ssl()
+except ImportError:
+    pass
 
 # Runs inside a Python kernel on the box. Turns messages from this script into requests to Lumen there.
 KERNEL_CODE = r'''
