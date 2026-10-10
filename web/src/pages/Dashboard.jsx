@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { api, useBrain } from '../lib/useBrain'
 import AlertIcon from '../lib/AlertIcon'
 import AskLumen from '../lib/AskLumen'
+import { useCameraWall, useLaptopCameras } from '../lib/CameraWall'
 import History from '../lib/History'
 import Conversation, { useCaptions } from '../lib/Conversation'
 import QrPanel from '../lib/QrPanel'
@@ -10,6 +11,8 @@ import { Wordmark } from '../lib/Logo'
 import { getUser, signOut } from '../lib/user'
 // 3D view of the home (Gaussian splat scan). Three.js only loads when someone taps 3D.
 const HomeScan = lazy(() => import('../lib/HomeScan'))
+// The headset wearer as a 3D figure (bottom left). Also three.js, so also split out.
+const Avatar3D = lazy(() => import('../lib/Avatar3D'))
 import { alertText, SEVERITY_COLOR, ZONES, zoneLabel } from '../lib/zones'
 
 const FAKES = [
@@ -60,6 +63,9 @@ export default function Dashboard() {
     const timer = setInterval(() => setNow(Date.now() / 1000), 2000)
     return () => clearInterval(timer)
   }, [])
+  const laptop = useLaptopCameras()
+  const wall = useCameraWall({ nodes: state.nodes, previews, now, connected, cams: laptop.cams, camError: laptop.error,
+    onAskCameras: () => laptop.refresh(true) })
 
   const header = (
     <header className="mb-3 flex flex-wrap items-center gap-3">
@@ -101,124 +107,119 @@ export default function Dashboard() {
     )
   }
 
+  // Control center: main camera in the middle, a camera on each side, the headset wearer in 3D
+  // bottom left, the house plan bottom right. Messages and the timeline below.
   return (
-    <main className="grid min-h-full grid-cols-1 gap-4 overflow-x-hidden p-4 lg:grid-cols-[1fr_360px]">
-      <section className="min-w-0">
-        {header}
+    <main className="min-h-full overflow-x-hidden p-4">
+      {header}
+      {showQr && <QrPanel />}
 
-        {showQr && <QrPanel />}
-
-        {Object.values(previews).some((p) => connected && state.nodes[p.node_id] && now - p.ts < 5) && (
-          <section className="glass mb-4 rounded-xl p-4">
-            <h2 className="mb-2 font-semibold">Camera demo previews</h2>
-            <p className="mb-3 text-sm text-zinc-300">Updates once a second. Images are not saved.</p>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {Object.values(previews).filter((p) => connected && state.nodes[p.node_id] && now - p.ts < 5).map((p) => (
-                <figure key={p.node_id}>
-                  <img src={p.jpeg} alt={`${zoneLabel(p.zone)} camera preview`} className="aspect-[4/3] w-full rounded-lg bg-black object-contain" />
-                  <figcaption className="mt-1 text-sm">{zoneLabel(p.zone)} · {p.node_id}</figcaption>
-                </figure>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Scene JSON from each camera (server/app/detectors/scene.py): labels only, the photos are already gone. */}
-        {Object.values(vision).some((v) => now - v.ts < 15) && (
-          <section className="glass mb-4 rounded-xl p-4">
-            <h2 className="mb-2 font-semibold">What the cameras see</h2>
-            <ul className="space-y-1 text-sm">
-              {Object.values(vision).filter((v) => now - v.ts < 15).map((v) => (
-                <li key={v.node_id} className="flex flex-wrap gap-x-3">
-                  <span className="w-24 shrink-0 text-zinc-400">{zoneLabel(v.zone)}</span>
-                  <span className="min-w-0 flex-1">{v.summary}</span>
-                  {v.inference_ms != null && <span className="text-zinc-500">{Math.round(v.inference_ms)} ms · {v.device}</span>}
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {/* Floor plan. Skeletons and zone status only: no live video, for privacy. */}
-        <div className="glass relative aspect-[4/3] overflow-hidden sm:aspect-[16/10] rounded-xl">
-          <button onClick={() => setScan((v) => !v)} aria-pressed={scan}
-            className="glass absolute right-3 top-3 z-10 rounded-full px-3 py-1 text-xs font-semibold tracking-wide hover:border-white/20">
-            {scan ? 'PLAN' : '3D'}
-          </button>
-          {scan ? (
-            <Suspense fallback={null}>
-              <HomeScan ripples={ripples} onFail={() => setScan(false)}
-                live={new Set(Object.values(state.nodes).filter((n) => now - n.last_seen < 10).map((n) => n.zone))} />
-            </Suspense>
-          ) : <>
-          <FloorPlan />
-          {Object.entries(ZONES).filter(([, z]) => z.map !== false).map(([id, z]) => {
-            const alive = Object.values(state.nodes).some((n) => n.zone === id && now - n.last_seen < 10)
-            return (
-              <div key={id} className="absolute -translate-x-1/2 -translate-y-1/2 text-center" style={{ left: `${z.x}%`, top: `${z.y}%` }}>
-                <div className={`mx-auto mb-2 h-2 w-2 rounded-full ${alive ? 'live-dot bg-emerald-400' : 'border border-zinc-600'}`} />
-                <div className="text-sm font-medium">{z.label}</div>
-                <div className={`text-xs ${alive ? 'text-emerald-300' : 'text-zinc-500'}`}>{alive ? 'node live' : 'no node'}</div>
-              </div>
-            )
-          })}
-          <AnimatePresence>
-            {ripples.map((a) => {
-              const z = ZONES[a.zone]
-              if (!z || z.map === false) return null
+      <section className="grid gap-3 lg:h-[min(74vh,780px)] lg:grid-cols-[minmax(0,1fr)_minmax(0,2.3fr)_minmax(0,1fr)] lg:grid-rows-2">
+        <div className="min-h-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">{wall.center}</div>
+        <div className="min-h-0 lg:col-start-1 lg:row-start-1">{wall.left}</div>
+        <div className="min-h-0 lg:col-start-3 lg:row-start-1">{wall.right}</div>
+        <div className="min-h-0 lg:col-start-1 lg:row-start-2">
+          <Suspense fallback={<div className="glass h-full min-h-[200px] rounded-xl" />}><Avatar3D cams={laptop.cams} /></Suspense>
+        </div>
+        <div className="min-h-0 lg:col-start-3 lg:row-start-2">
+          {/* Floor plan. Skeletons and zone status only: no live video, for privacy. */}
+          <div className="glass relative aspect-[4/3] h-full overflow-hidden rounded-xl sm:aspect-[16/10] lg:aspect-auto">
+            <button onClick={() => setScan((v) => !v)} aria-pressed={scan}
+              className="glass absolute right-3 top-3 z-10 rounded-full px-3 py-1 text-xs font-semibold tracking-wide hover:border-white/20">
+              {scan ? 'PLAN' : '3D'}
+            </button>
+            {scan ? (
+              <Suspense fallback={null}>
+                <HomeScan ripples={ripples} onFail={() => setScan(false)}
+                  live={new Set(Object.values(state.nodes).filter((n) => now - n.last_seen < 10).map((n) => n.zone))} />
+              </Suspense>
+            ) : <>
+            <FloorPlan />
+            {Object.entries(ZONES).filter(([, z]) => z.map !== false).map(([id, z]) => {
+              const alive = Object.values(state.nodes).some((n) => n.zone === id && now - n.last_seen < 10)
               return (
-                <motion.div
-                  key={a.id}
-                  className="pointer-events-none absolute rounded-full border-4"
-                  style={{ left: `${z.x}%`, top: `${z.y}%`, borderColor: SEVERITY_COLOR[a.severity], width: 40, height: 40, marginLeft: -20, marginTop: -20 }}
-                  initial={{ scale: 0.5, opacity: 1 }}
-                  animate={{ scale: 6, opacity: 0 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 1.5, repeat: 2 }}
-                />
+                <div key={id} className="absolute -translate-x-1/2 -translate-y-1/2 text-center" style={{ left: `${z.x}%`, top: `${z.y}%` }}>
+                  <div className={`mx-auto mb-2 h-2 w-2 rounded-full ${alive ? 'live-dot bg-emerald-400' : 'border border-zinc-600'}`} />
+                  <div className="text-sm font-medium">{z.label}</div>
+                  <div className={`text-xs ${alive ? 'text-emerald-300' : 'text-zinc-500'}`}>{alive ? 'node live' : 'no node'}</div>
+                </div>
               )
             })}
-          </AnimatePresence>
-          </>}
+            <AnimatePresence>
+              {ripples.map((a) => {
+                const z = ZONES[a.zone]
+                if (!z || z.map === false) return null
+                return (
+                  <motion.div
+                    key={a.id}
+                    className="pointer-events-none absolute rounded-full border-4"
+                    style={{ left: `${z.x}%`, top: `${z.y}%`, borderColor: SEVERITY_COLOR[a.severity], width: 40, height: 40, marginLeft: -20, marginTop: -20 }}
+                    initial={{ scale: 0.5, opacity: 1 }}
+                    animate={{ scale: 6, opacity: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 1.5, repeat: 2 }}
+                  />
+                )
+              })}
+            </AnimatePresence>
+            </>}
+          </div>
         </div>
-
-        <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
-          <span className="shrink-0 self-center text-xs uppercase tracking-[0.2em] text-zinc-500">Demo alerts</span>
-          {FAKES.map(([kind, zone, severity]) => (
-            <button key={kind} onClick={() => api('/api/fake-alert', { kind, zone, severity })}
-              className="glass flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 py-1.5 text-sm hover:border-white/20">
-              <AlertIcon kind={kind} className="text-amber-300" /> {alertText(kind).text} <span className="text-zinc-500">{zoneLabel(zone)}</span>
-            </button>
-          ))}
-          <button onClick={() => api('/api/memory/seed', {}).then(captions.reload)} className="glass shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm hover:border-white/20">
-            Seed demo memory
-          </button>
-        </div>
-
-        <div className="mt-4"><AskLumen /></div>
       </section>
 
-      <aside className="min-w-0 space-y-4">
-        <Conversation lines={captions.lines} />
-        <div className="glass rounded-xl p-4">
-        <h2 className="mb-3 font-semibold">Timeline</h2>
-        <ul className="space-y-2">
-          {state.events.length === 0 && <li className="text-sm text-zinc-500">Quiet so far. Alerts land here with the time someone saw them.</li>}
-          {[...state.events].reverse().map((e) => (
-            <li key={e.id} className="flex gap-3 rounded-lg bg-zinc-900 p-2.5 text-sm">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-lg" style={{ background: `${SEVERITY_COLOR[e.severity]}26`, color: SEVERITY_COLOR[e.severity] }}><AlertIcon kind={e.kind} /></span>
-              <div className="min-w-0">
-              <div className="font-medium">{alertText(e.kind).text} <span className="text-zinc-400">· {zoneLabel(e.zone)}</span></div>
-              <div className="tabular text-xs text-zinc-500">
-                {new Date(e.ts * 1000).toLocaleTimeString()} · {e.source}{e.routed === false ? ' · logged only' : ''}
-                {e.acked && <span className="text-green-400"> · ✓ seen {new Date(e.acked.ts * 1000).toLocaleTimeString()}</span>}
-              </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-        </div>
-      </aside>
+      {/* Scene JSON from each camera (server/app/detectors/scene.py): labels only, the photos are already gone. */}
+      {Object.values(vision).some((v) => now - v.ts < 15) && (
+        <section className="glass mt-4 rounded-xl p-4">
+          <h2 className="mb-2 font-semibold">What the cameras see</h2>
+          <ul className="space-y-1 text-sm">
+            {Object.values(vision).filter((v) => now - v.ts < 15).map((v) => (
+              <li key={v.node_id} className="flex flex-wrap gap-x-3">
+                <span className="w-24 shrink-0 text-zinc-400">{zoneLabel(v.zone)}</span>
+                <span className="min-w-0 flex-1">{v.summary}</span>
+                {v.inference_ms != null && <span className="text-zinc-500">{Math.round(v.inference_ms)} ms · {v.device}</span>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
+        <span className="shrink-0 self-center text-xs uppercase tracking-[0.2em] text-zinc-500">Demo alerts</span>
+        {FAKES.map(([kind, zone, severity]) => (
+          <button key={kind} onClick={() => api('/api/fake-alert', { kind, zone, severity })}
+            className="glass flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 py-1.5 text-sm hover:border-white/20">
+            <AlertIcon kind={kind} className="text-amber-300" /> {alertText(kind).text} <span className="text-zinc-500">{zoneLabel(zone)}</span>
+          </button>
+        ))}
+        <button onClick={() => api('/api/memory/seed', {}).then(captions.reload)} className="glass shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm hover:border-white/20">
+          Seed demo memory
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <AskLumen className="h-[460px]" />
+        <aside className="min-w-0 space-y-4">
+          <Conversation lines={captions.lines} />
+          <div className="glass rounded-xl p-4">
+          <h2 className="mb-3 font-semibold">Timeline</h2>
+          <ul className="max-h-[420px] space-y-2 overflow-y-auto">
+            {state.events.length === 0 && <li className="text-sm text-zinc-500">Quiet so far. Alerts land here with the time someone saw them.</li>}
+            {[...state.events].reverse().map((e) => (
+              <li key={e.id} className="flex gap-3 rounded-lg bg-zinc-900 p-2.5 text-sm">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-lg" style={{ background: `${SEVERITY_COLOR[e.severity]}26`, color: SEVERITY_COLOR[e.severity] }}><AlertIcon kind={e.kind} /></span>
+                <div className="min-w-0">
+                <div className="font-medium">{alertText(e.kind).text} <span className="text-zinc-400">· {zoneLabel(e.zone)}</span></div>
+                <div className="tabular text-xs text-zinc-500">
+                  {new Date(e.ts * 1000).toLocaleTimeString()} · {e.source}{e.routed === false ? ' · logged only' : ''}
+                  {e.acked && <span className="text-green-400"> · ✓ seen {new Date(e.acked.ts * 1000).toLocaleTimeString()}</span>}
+                </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+          </div>
+        </aside>
+      </div>
     </main>
   )
 }

@@ -31,7 +31,15 @@ export function detectPose(video, timestampMs) {
   return person.map((p) => [round(p.x), round(p.y), round(p.visibility ?? 1)])
 }
 
-const round = (n) => Math.round(n * 1000) / 1000
+// Same, in meters around the hips ([[x, y, z, visibility] x 33]), for posing a 3D figure.
+// Used on the laptop only (dashboard avatar); nothing is sent anywhere.
+export function detectPoseWorld(video, timestampMs) {
+  if (!landmarker || video.readyState < 2) return null
+  const person = landmarker.detectForVideo(video, timestampMs).worldLandmarks?.[0]
+  return person ? person.map((p) => [p.x, p.y, p.z, p.visibility ?? 1]) : null
+}
+
+const round = (n) =>Math.round(n * 1000) / 1000
 
 // Skeleton lines for the on-screen preview (MediaPipe landmark indexes).
 export const BONES = [

@@ -23,7 +23,8 @@ export function useCaptions() {
 
 export default function Conversation({ lines }) {
   const end = useRef()
-  useEffect(() => end.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), [lines.length])
+  // Braces matter: newer browsers return a Promise from scrollIntoView, and React would call it as a cleanup.
+  useEffect(() => { end.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }, [lines.length])
   return (
     <section className="glass flex max-h-[420px] flex-col rounded-xl p-4">
       <h2 className="font-semibold">Conversation</h2>

@@ -81,8 +81,12 @@ setup.sh / run.sh       one-time box setup / start everything
   camera on top, transcript along the bottom (the 3D walking view is not mounted in portrait). Corner Room view
   shows the splat scan behind a tap toggle. `/headset` just redirects here; there is no Headset page any more.
 - `/strobe`: bedside flash. `/node?zone=...`: room sensor. `/rear`: Outside-mode rear camera. `/mic`: extra mic.
-- `/dashboard` (needs sign-in): caregiver view, alert timeline, Ask Lumen, History tab, 3D button showing the home
-  scan with rooms and alert ripples, fake-alert buttons (`POST /api/fake-alert`).
+- `/dashboard` (needs sign-in): the control center. Camera wall (main view in the middle, one camera each side;
+  click a side camera or press 1 / 2 to swap it in; sources are room phones' opt-in previews and this laptop's
+  webcams), the headset wearer as a 3D figure bottom left (laptop webcam + MediaPipe, `lib/Avatar3D.jsx`,
+  `lib/avatarRig.js`; drop a Blender/Mixamo `.glb` at `web/public/models/avatar.glb` to change the figure), floor
+  plan / 3D home scan bottom right, Messages (Ask Lumen chat), timeline, History tab, fake-alert buttons
+  (`POST /api/fake-alert`).
 
 ## Run and test
 
@@ -96,8 +100,9 @@ cd server && python -m pytest -q
 cd web && npm run build
 ```
 
-Env vars: `MODE`, `LUMEN_NAME`, `LUMEN_LLM` = `groq` (free default, keep it) | `claude` | `xai` | `off` with
-`GROQ_API_KEY` / `ANTHROPIC_API_KEY` / `XAI_API_KEY`; `WHISPER_PROVIDER=groq`; `EVENT_LOG_DIR`, `LUMEN_HOUSEHOLD`,
+Env vars: `MODE`, `LUMEN_NAME`, `LUMEN_LLM` = `groq` (free default, keep it) | `claude` | `xai` | `hf` | `off` with
+`GROQ_API_KEY` / `ANTHROPIC_API_KEY` / `XAI_API_KEY` / `HF_TOKEN` (Hugging Face Inference Providers;
+`LUMEN_LLM_MODEL` picks any HF chat model id); `WHISPER_PROVIDER=groq`; `EVENT_LOG_DIR`, `LUMEN_HOUSEHOLD`,
 `LUMEN_SYNC_KEY`; `DATABRICKS_HOST`, `DATABRICKS_TOKEN`, `DATABRICKS_WAREHOUSE_ID` for the History tab.
 
 ## Databricks (real data path)
