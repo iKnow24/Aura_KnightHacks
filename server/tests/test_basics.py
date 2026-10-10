@@ -55,3 +55,26 @@ def test_rear_scene_reaches_wearer_phone_as_rear_side():
         node.send_json({"type": "scene", "objects": [{"kind": "car", "bearing": -10, "dist": 6.5}], "fov": 52})
         msg = hud.receive_json()
         assert msg["type"] == "scene" and msg["side"] == "rear" and msg["objects"][0]["kind"] == "car"
+
+
+def test_whisper_loops_are_cut_to_one_copy():
+    from app.detectors.speech import clean
+    assert clean("I mean, " * 40) == "I mean,"
+    assert clean("What did its name mean? " * 20) == "What did its name mean?"
+    assert clean("No, no, no, it was") == "No, no, no, it was"  # people really say this
+    assert clean("It's the green ball, it's the green ball.") == "It's the green ball, it's the green ball."
+
+
+def test_partial_audio_only_once_someone_is_talking():
+    import numpy as np
+    from app.detectors.speech import SAMPLE_RATE, Segmenter
+    seg = Segmenter(threshold=0.01)
+    loud = np.full(SAMPLE_RATE // 4, 0.1, dtype=np.float32)
+    seg.feed(loud)
+    assert seg.so_far() is None  # a quarter second isn't enough yet
+    for _ in range(3):
+        seg.feed(loud)
+    assert len(seg.so_far()) == SAMPLE_RATE
+    for _ in range(4):
+        seg.feed(np.zeros(SAMPLE_RATE // 4, dtype=np.float32))
+    assert seg.done == 1 and seg.so_far() is None

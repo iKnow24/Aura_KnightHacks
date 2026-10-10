@@ -235,6 +235,7 @@ export default function Captions() {
 
   const { state, connected } = useBrain('hud', push, (msg) => {
     if (msg.type === 'caption') captions.addRemote(msg)
+    if (msg.type === 'caption_partial' && !ZONES[msg.zone]) captions.addPartial(msg) // room nodes only get finished lines
     if (msg.type === 'scene' && msg.side === 'rear') setRearScene({ ...msg, at: Date.now() })
     if (msg.type === 'ack') drop(msg.id)
   })
