@@ -1,5 +1,5 @@
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Component, lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
@@ -14,6 +14,8 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 // Figure: three.js's example "Xbot" (Mixamo), trimmed to its idle/walk/run clips.
 // Cars and bikes are built here from simple shapes, all in one matte gray.
 const MODEL = `${import.meta.env.BASE_URL}models/walker.glb`
+// Room view: a Gaussian splat scan of a real room instead of the street lines. Loaded only when on.
+const RoomSplat = lazy(() => import('./RoomSplat'))
 const BG = '#111113'
 const GRAY = '#8e8e96'
 const ME = '#f4f4f5'
@@ -61,15 +63,16 @@ function Shadow({ size = 1 }) {
   )
 }
 
-function Cone({ side, fov, live, radius }) {
+function Cone({ side, fov, live, radius, onTop }) {
   const mat = useRef()
   const span = (Math.min(fov, 120) * Math.PI) / 180
   const center = side === 'front' ? Math.PI / 2 : -Math.PI / 2
   useFrame((_, dt) => { if (mat.current) mat.current.opacity += ((live ? 0.16 : 0) - mat.current.opacity) * Math.min(1, dt * 3) })
   return (
-    <mesh rotation-x={-Math.PI / 2} position-y={0.02}>
+    <mesh rotation-x={-Math.PI / 2} position-y={0.02} renderOrder={onTop ? 10 : 0}>
       <circleGeometry args={[radius, 48, center - span / 2, span]} />
-      <meshBasicMaterial ref={mat} map={glowTexture()} transparent opacity={0} depthWrite={false} />
+      {/* In the Room view the scanned floor would hide the cone, so it's drawn over the room like a flashlight. */}
+      <meshBasicMaterial ref={mat} map={glowTexture()} transparent opacity={0} depthWrite={false} depthTest={!onTop} />
     </mesh>
   )
 }
@@ -326,18 +329,30 @@ function Aim() {
   return null
 }
 
-export default function WalkScene({ walk, front, rear }) {
+// If the splat code itself fails to load or draw, fall back to the street view instead of a blank corner.
+class Fallback extends Component {
+  componentDidCatch(e) { this.props.onFail(e) }
+  static getDerivedStateFromError() { return { failed: true } }
+  state = { failed: false }
+  render() { return this.state.failed ? null : this.props.children }
+}
+
+export default function WalkScene({ walk, front, rear, room, onRoomFail }) {
   const speed = walk.walking ? Math.max(1.0, walk.cadence * 0.7) : 0
   return (
-    <Canvas dpr={[1, 2]} camera={{ position: [0, 10.5, 2.6], fov: 50, near: 0.1, far: 60 }} gl={{ antialias: true }}>
+    <Canvas dpr={room ? [1, 1.5] : [1, 2]} camera={{ position: [0, 10.5, 2.6], fov: 50, near: 0.1, far: 60 }} gl={{ antialias: true }}>
       <color attach="background" args={[BG]} />
       <fog attach="fog" args={[BG, 14, 26]} />
       <hemisphereLight args={['#ffffff', '#202024', 1.6]} />
       <directionalLight position={[3, 8, 4]} intensity={1.4} />
       <Aim />
-      <Ground speed={speed} />
-      <Cone side="front" fov={front.fov} live={front.live} radius={9} />
-      <Cone side="rear" fov={rear.fov} live={rear.live} radius={7} />
+      {room ? (
+        <Fallback onFail={onRoomFail}>
+          <Suspense fallback={null}><RoomSplat onFail={onRoomFail} /></Suspense>
+        </Fallback>
+      ) : <Ground speed={speed} />}
+      <Cone side="front" fov={front.fov} live={front.live} radius={9} onTop={room} />
+      <Cone side="rear" fov={rear.fov} live={rear.live} radius={7} onTop={room} />
       <Suspense fallback={null}>
         <Me walking={walk.walking} cadence={walk.cadence} />
         <Surroundings front={front} rear={rear} />
