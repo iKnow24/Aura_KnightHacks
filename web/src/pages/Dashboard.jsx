@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useState } from 'react'
 import { api, useBrain } from '../lib/useBrain'
+import QrPanel from '../lib/QrPanel'
 import { ALERT_TEXT, SEVERITY_COLOR, ZONES } from '../lib/zones'
 
 const FAKES = [
@@ -12,6 +13,7 @@ const FAKES = [
 
 export default function Dashboard() {
   const [ripples, setRipples] = useState([])
+  const [showQr, setShowQr] = useState(false)
   const { state, connected } = useBrain('dashboard', (alert) => {
     setRipples((r) => [...r, alert])
     setTimeout(() => setRipples((r) => r.filter((x) => x.id !== alert.id)), 4000)
@@ -26,14 +28,19 @@ export default function Dashboard() {
           <span className={`text-sm ${connected ? 'text-green-400' : 'text-red-400'}`}>
             ● {connected ? 'brain connected' : 'brain offline'}
           </span>
+          <button onClick={() => setShowQr((v) => !v)} className="ml-auto rounded bg-zinc-800 px-3 py-1 text-sm hover:bg-zinc-700">
+            {showQr ? 'Hide' : 'Add phones'}
+          </button>
           <select
-            className="ml-auto rounded bg-zinc-900 px-2 py-1"
+            className=" rounded bg-zinc-900 px-2 py-1"
             value={state.mode}
             onChange={(e) => api('/api/mode', { mode: e.target.value })}
           >
             {Object.entries(state.modes).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
           </select>
         </header>
+
+        {showQr && <QrPanel />}
 
         {/* Floor plan. Skeletons and zone status only: no live video, for privacy. */}
         <div className="relative aspect-[16/10] rounded-2xl border border-zinc-800 bg-zinc-950">
