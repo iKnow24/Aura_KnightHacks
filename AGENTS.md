@@ -96,8 +96,9 @@ cd server && python -m pytest -q
 cd web && npm run build
 ```
 
-Env vars: `MODE`, `LUMEN_NAME`, `LUMEN_LLM` = `groq` (free default, keep it) | `claude` | `xai` | `off` with
-`GROQ_API_KEY` / `ANTHROPIC_API_KEY` / `XAI_API_KEY`; `WHISPER_PROVIDER=groq`; `EVENT_LOG_DIR`, `LUMEN_HOUSEHOLD`,
+Env vars: `MODE`, `LUMEN_NAME`, `LUMEN_LLM` = `groq` (free default, keep it) | `claude` | `xai` | `hf` | `off` with
+`GROQ_API_KEY` / `ANTHROPIC_API_KEY` / `XAI_API_KEY` / `HF_TOKEN` (Hugging Face Inference Providers;
+`LUMEN_LLM_MODEL` picks any HF chat model id); `WHISPER_PROVIDER=groq`; `EVENT_LOG_DIR`, `LUMEN_HOUSEHOLD`,
 `LUMEN_SYNC_KEY`; `DATABRICKS_HOST`, `DATABRICKS_TOKEN`, `DATABRICKS_WAREHOUSE_ID` for the History tab.
 
 ## Databricks (real data path)
