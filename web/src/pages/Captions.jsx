@@ -1,9 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import AlertStack, { useAlerts } from '../lib/AlertToast'
 import { detectFaces, FaceTracker, loadFaces, toScreen } from '../lib/faces'
 import { Camera, CameraOff, Clapperboard, Download, Ellipsis, Footprints, GraduationCap, House, Lock, Zap } from 'lucide-react'
-import { Brackets, FaceLock, Reactor, Telemetry } from '../lib/Hud'
 import Logo from '../lib/Logo'
 import Recap from '../lib/Recap'
 import { api, keepAwake, useBrain } from '../lib/useBrain'
@@ -387,14 +386,11 @@ export default function Captions() {
   if (!started) {
     return (
       <main className="relative grid h-full place-items-center overflow-hidden p-6 text-center">
-        <motion.div className="pointer-events-none absolute h-[480px] w-[480px] rounded-full bg-amber-500/15 blur-3xl"
-          animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 4, repeat: Infinity }} />
         <div className="relative">
-          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="mx-auto w-fit"><Reactor size={170} /></motion.div>
-          <Telemetry className="mt-2">Mic · camera · sound watch</Telemetry>
-          <h1 className="mt-4 text-4xl font-bold tracking-tight">Live captions</h1>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1 }} className="mx-auto w-fit"><Logo size={64} live /></motion.div>
+          <h1 className="mt-6 text-3xl font-semibold tracking-tight">Live captions</h1>
           <p className="mx-auto mt-2 max-w-xs text-zinc-400">Hold your phone up like a window. Words appear as they’re spoken, and Lumen watches the sounds around you.</p>
-          <button onClick={start} className="mt-8 rounded-full bg-amber-400 px-8 py-3 text-lg font-semibold text-black">Start</button>
+          <button onClick={start} className="mt-10 rounded-md bg-amber-400 px-12 py-3 font-semibold text-black">Start</button>
           {captions.lines.length > 0 && <p className="mt-3 text-xs text-zinc-500">{captions.lines.length} saved lines will be there when you start.</p>}
         </div>
       </main>
@@ -410,18 +406,13 @@ export default function Captions() {
         if (!v || !root) return null
         const { left, top } = toScreen(v, root, p.x, p.y)
         const talking = p.talk > TALKING
-        const chin = toScreen(v, root, p.x, p.y + p.size)
         return (
-          <Fragment key={p.id}>
-          <FaceLock left={left} top={(top + chin.top) / 2} size={chin.top - top} color={p.color} talking={talking} />
-          <motion.div className="pointer-events-none absolute z-[15] -translate-x-1/2 -translate-y-full"
+          <motion.div key={p.id} className="pointer-events-none absolute z-[15] -translate-x-1/2 -translate-y-full"
             animate={{ left, top: top - 8 }} transition={{ type: 'spring', stiffness: 300, damping: 30 }}>
             <NameTag person={p} name={names[p.id]} talking={talking} fresh={freshName === p.id} />
           </motion.div>
-          </Fragment>
         )
       })}
-      {camera && <Brackets inset={12} len={26} />}
       <AlertStack alerts={alerts} onAck={ack} />
 
       {/* Top-left: who you are and what mode. Always visible, quiet. */}

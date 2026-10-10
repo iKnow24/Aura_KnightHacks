@@ -1,38 +1,37 @@
 import { motion } from 'framer-motion'
-import { ArrowLeft, AudioLines, BedDouble, Glasses, LayoutDashboard, Mic, Radar, ScanLine } from 'lucide-react'
+import { ArrowLeft, AudioLines, ChevronRight, BedDouble, Glasses, LayoutDashboard, Mic, Radar, ScanLine } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Wordmark } from '../lib/Logo'
 
 const PAGES = [
-  ['/captions', 'Live captions', 'The wearer\'s phone. Words as they\'re spoken, Home / Lecture / Outside modes, alerts that grow until you tap them.', AudioLines, '#ff4f7b'],
-  ['/dashboard', 'Caregiver dashboard', 'Laptop or tablet. Floor plan, live alerts, Ask Lumen, mode switch. Needs sign in.', LayoutDashboard, '#8b6cff'],
-  ['/headset', 'Headset HUD', 'Phone in the AR headset. Camera passthrough with edge glow toward the alert.', Glasses, '#38bdf8'],
-  ['/node?zone=kitchen', 'Camera/mic node', 'Any spare phone. Change ?zone= to the room it sits in. Listens, tracks falls, remembers where things are.', ScanLine, '#34d399'],
-  ['/mic', 'Speaker mic', 'One phone in front of each person you talk to. Captions get labeled with their name.', Mic, '#ff8a3d'],
-  ['/rear', 'Rear guard', 'Outside mode. A phone on the back of your bag that warns you when someone or something comes up behind you.', Radar, '#facc15'],
-  ['/strobe', 'Bedside strobe', 'Android phone by the bed. Flashes and vibrates on critical alerts (Night mode).', BedDouble, '#f87171'],
+  ['/captions', 'Live captions', 'The wearer\'s phone. Words as they\'re spoken, Home / Lecture / Outside modes, alerts that grow until you tap them.', AudioLines],
+  ['/dashboard', 'Caregiver dashboard', 'Laptop or tablet. Floor plan, live alerts, Ask Lumen, mode switch. Needs sign in.', LayoutDashboard],
+  ['/headset', 'Headset HUD', 'Phone in the AR headset. Camera passthrough with edge glow toward the alert.', Glasses],
+  ['/node?zone=kitchen', 'Camera/mic node', 'Any spare phone. Change ?zone= to the room it sits in. Listens, tracks falls, remembers where things are.', ScanLine],
+  ['/mic', 'Speaker mic', 'One phone in front of each person you talk to. Captions get labeled with their name.', Mic],
+  ['/rear', 'Rear guard', 'Outside mode. A phone on the back of your bag that warns you when someone or something comes up behind you.', Radar],
+  ['/strobe', 'Bedside strobe', 'Android phone by the bed. Flashes and vibrates on critical alerts (Night mode).', BedDouble],
 ]
 
 export default function Home() {
   return (
-    <main className="mx-auto max-w-2xl px-4 pb-12 pt-[max(1.5rem,env(safe-area-inset-top))]">
+    <main className="mx-auto max-w-xl px-6 pb-16 pt-[max(2rem,env(safe-area-inset-top))]">
       <div className="flex items-center justify-between">
-        <Wordmark size={26} />
-        <Link to="/" className="flex items-center gap-1.5 text-sm text-zinc-400 transition hover:text-white"><ArrowLeft size={15} /> Caregiver sign in</Link>
+        <Wordmark size={13} />
+        <Link to="/" className="flex items-center gap-1.5 text-sm text-zinc-500 transition hover:text-white"><ArrowLeft size={15} /> Sign in</Link>
       </div>
-      <h1 className="mt-10 text-4xl font-extrabold tracking-[-0.04em]">What is this phone for?</h1>
-      <p className="mt-2 text-zinc-400">Every device is just a web page. Open one per phone and it becomes part of the house.</p>
-      <ul className="mt-8 grid gap-3 sm:grid-cols-2">
-        {PAGES.map(([to, title, desc, Icon, color], i) => (
-          <motion.li key={to} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-            <Link to={to} className="glass group flex h-full gap-4 rounded-3xl p-4 transition hover:-translate-y-0.5 hover:border-white/20">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl" style={{ background: `linear-gradient(140deg, ${color}40, ${color}10)`, color, boxShadow: `inset 0 1px 0 ${color}50` }}>
-                <Icon size={22} strokeWidth={2} />
+      <h1 className="mt-16 text-3xl font-semibold tracking-tight">What is this phone for?</h1>
+      <p className="mt-2 text-zinc-500">Every device is a web page. Open one per phone.</p>
+      <ul className="mt-10 divide-y divide-white/[0.07] border-y border-white/[0.07]">
+        {PAGES.map(([to, title, desc, Icon], i) => (
+          <motion.li key={to} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.04, duration: 0.6 }}>
+            <Link to={to} className="group flex items-center gap-5 py-5">
+              <Icon size={22} strokeWidth={1.6} className="shrink-0 text-zinc-400 transition group-hover:text-white" />
+              <span className="min-w-0 flex-1">
+                <span className="block font-medium">{title}</span>
+                <span className="mt-0.5 block text-sm leading-snug text-zinc-500">{desc}</span>
               </span>
-              <span>
-                <span className="block font-bold">{title}</span>
-                <span className="mt-0.5 block text-sm leading-snug text-zinc-400">{desc}</span>
-              </span>
+              <ChevronRight size={18} className="shrink-0 text-zinc-600 transition group-hover:translate-x-0.5 group-hover:text-white" />
             </Link>
           </motion.li>
         ))}

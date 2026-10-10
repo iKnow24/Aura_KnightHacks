@@ -40,8 +40,8 @@ export default function AskLumen() {
   }
 
   return (
-    <section className="glass rounded-3xl p-4">
-      <h2 className="font-bold">Ask <span className="text-gradient">Lumen</span></h2>
+    <section className="glass rounded-xl p-4">
+      <h2 className="font-semibold">Ask Lumen</h2>
       <form onSubmit={(e) => { e.preventDefault(); ask(q) }} className="mt-2 flex gap-2">
         <input
           value={q} onChange={(e) => setQ(e.target.value)} placeholder="Where are my keys?"

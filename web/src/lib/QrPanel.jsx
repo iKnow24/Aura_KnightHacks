@@ -22,7 +22,7 @@ export default function QrPanel() {
   }, [])
 
   return (
-    <div className="glass mb-4 rounded-3xl p-4">
+    <div className="glass mb-4 rounded-xl p-4">
       {location.protocol !== 'https:' && location.hostname !== 'localhost' && (
         <p className="mb-3 text-sm text-amber-400">Phones need https for camera and mic. Open this dashboard from the tunnel link.</p>
       )}

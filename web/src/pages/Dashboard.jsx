@@ -5,7 +5,6 @@ import AlertIcon from '../lib/AlertIcon'
 import AskLumen from '../lib/AskLumen'
 import Conversation, { useCaptions } from '../lib/Conversation'
 import QrPanel from '../lib/QrPanel'
-import { Brackets, Sweep, Telemetry } from '../lib/Hud'
 import { Wordmark } from '../lib/Logo'
 import { getUser, signOut } from '../lib/user'
 import { alertText, SEVERITY_COLOR, ZONES, zoneLabel } from '../lib/zones'
@@ -29,7 +28,7 @@ const ROOMS = [
 ]
 const FloorPlan = () => (
   <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden="true">
-    {ROOMS.map((d) => <path key={d} d={d} fill="rgb(255 255 255 / 0.025)" stroke="rgb(255 255 255 / 0.16)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />)}
+    {ROOMS.map((d) => <path key={d} d={d} fill="none" stroke="rgb(255 255 255 / 0.12)" strokeWidth="1" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />)}
   </svg>
 )
 
@@ -48,9 +47,9 @@ export default function Dashboard() {
     <main className="grid min-h-full grid-cols-1 gap-4 overflow-x-hidden p-4 lg:grid-cols-[1fr_360px]">
       <section className="min-w-0">
         <header className="mb-3 flex flex-wrap items-center gap-3">
-          <h1 className="flex items-center gap-3"><Wordmark size={24} /><span className="text-lg font-semibold text-zinc-400">{user?.household ?? 'Home'}</span></h1>
+          <h1 className="flex items-center gap-3"><Wordmark size={13} /><span className="text-sm text-zinc-500">{user?.household ?? 'Home'}</span></h1>
           <span className={`glass flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${connected ? 'text-emerald-300' : 'text-red-300'}`}>
-            <span className={`h-2 w-2 rounded-full ${connected ? 'bg-emerald-400 shadow-[0_0_10px_#34d399]' : 'bg-red-500'}`} />
+            <span className={`h-2 w-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-red-500'}`} />
             {connected ? 'Brain connected' : 'Brain offline'}
           </span>
           <button onClick={() => setShowQr((v) => !v)} className="glass ml-auto rounded-full px-4 py-1.5 text-sm font-medium hover:border-white/20">
@@ -71,21 +70,16 @@ export default function Dashboard() {
         {showQr && <QrPanel />}
 
         {/* Floor plan. Skeletons and zone status only: no live video, for privacy. */}
-        <div className="glass relative aspect-[4/3] overflow-hidden sm:aspect-[16/10] rounded-3xl">
-          <div className="absolute inset-0 bg-[radial-gradient(rgb(255_255_255/0.08)_1px,transparent_1px)] [background-size:22px_22px]" />
-          <Sweep />
+        <div className="glass relative aspect-[4/3] overflow-hidden sm:aspect-[16/10] rounded-xl">
           <FloorPlan />
-          <Brackets inset={10} len={18} />
-          <Telemetry className="absolute bottom-5 left-7">Floor plan · skeletons only, no video</Telemetry>
-          <Telemetry className="absolute bottom-5 right-7 tabular">{Object.values(state.nodes).filter((n) => now - n.last_seen < 10).length} nodes live</Telemetry>
           {Object.entries(ZONES).filter(([, z]) => z.map !== false).map(([id, z]) => {
             const node = Object.values(state.nodes).find((n) => n.zone === id)
             const alive = node && now - node.last_seen < 10
             return (
               <div key={id} className="absolute -translate-x-1/2 -translate-y-1/2 text-center" style={{ left: `${z.x}%`, top: `${z.y}%` }}>
-                <div className={`mx-auto mb-1.5 h-3 w-3 rounded-full ${alive ? 'bg-emerald-400 shadow-[0_0_16px_4px_rgb(52_211_153/0.5)]' : 'border border-zinc-600'}`} />
-                <div className="font-semibold">{z.label}</div>
-                <div className={`font-mono text-[10px] uppercase tracking-[0.16em] ${alive ? 'text-emerald-300' : 'text-zinc-500'}`}>{alive ? 'node live' : 'no node'} · {String(z.x).padStart(2, '0')}/{String(z.y).padStart(2, '0')}</div>
+                <div className={`mx-auto mb-2 h-2 w-2 rounded-full ${alive ? 'bg-emerald-400' : 'border border-zinc-600'}`} />
+                <div className="text-sm font-medium">{z.label}</div>
+                <div className={`text-xs ${alive ? 'text-emerald-300' : 'text-zinc-500'}`}>{alive ? 'node live' : 'no node'}</div>
               </div>
             )
           })}
@@ -109,7 +103,7 @@ export default function Dashboard() {
         </div>
 
         <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
-          <span className="shrink-0 self-center text-xs font-semibold uppercase tracking-widest text-zinc-500">Demo alerts</span>
+          <span className="shrink-0 self-center text-xs uppercase tracking-[0.2em] text-zinc-500">Demo alerts</span>
           {FAKES.map(([kind, zone, severity]) => (
             <button key={kind} onClick={() => api('/api/fake-alert', { kind, zone, severity })}
               className="glass flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 py-1.5 text-sm hover:border-white/20">
@@ -126,12 +120,12 @@ export default function Dashboard() {
 
       <aside className="min-w-0 space-y-4">
         <Conversation lines={captions.lines} />
-        <div className="glass rounded-3xl p-4">
-        <h2 className="mb-3 font-bold">Timeline</h2>
+        <div className="glass rounded-xl p-4">
+        <h2 className="mb-3 font-semibold">Timeline</h2>
         <ul className="space-y-2">
           {state.events.length === 0 && <li className="text-sm text-zinc-500">Quiet so far. Alerts land here with the time someone saw them.</li>}
           {[...state.events].reverse().map((e) => (
-            <li key={e.id} className="flex gap-3 rounded-2xl bg-zinc-900 p-2.5 text-sm">
+            <li key={e.id} className="flex gap-3 rounded-lg bg-zinc-900 p-2.5 text-sm">
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-lg" style={{ background: `${SEVERITY_COLOR[e.severity]}26`, color: SEVERITY_COLOR[e.severity] }}><AlertIcon kind={e.kind} /></span>
               <div className="min-w-0">
               <div className="font-medium">{alertText(e.kind).text} <span className="text-zinc-400">· {zoneLabel(e.zone)}</span></div>

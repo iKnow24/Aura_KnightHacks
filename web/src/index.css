@@ -1,38 +1,31 @@
 @import "@fontsource-variable/manrope";
-@import "@fontsource-variable/jetbrains-mono";
 @import "tailwindcss";
 
-/* Lumen design tokens.
-   The app keeps using Tailwind's zinc/amber class names; here they are re-pointed at the Lumen palette:
-   dark "zinc" fills become see-through white so every panel reads as frosted glass over the backdrop,
-   and amber-400 (the old accent) becomes the brand coral. Captions and alerts set their own solid
-   backgrounds where contrast matters more than looks. */
+/* Lumen design tokens. Deliberately quiet: near-black, neutral grays, white for the one primary
+   action, and color only where it means something (the logo, alert severity, live status).
+   The app keeps using Tailwind's zinc/amber class names; here they are re-pointed at this palette.
+   Dark "zinc" fills become see-through white so panels sit lightly over a camera view, and the old
+   amber accent becomes white. */
 @theme {
   --font-sans: "Manrope Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
 
-  --color-ink: #07070c;
-  --color-zinc-950: rgb(13 12 22 / 0.78);
-  --color-zinc-900: rgb(255 255 255 / 0.065);
-  --color-zinc-800: rgb(255 255 255 / 0.11);
-  --color-zinc-700: rgb(255 255 255 / 0.18);
-  --color-zinc-600: #6e6c80;
-  --color-zinc-500: #8d8ba0;
-  --color-zinc-400: #aeacbf;
-  --color-zinc-300: #d4d2e0;
-  --color-zinc-200: #ebe9f3;
+  --color-ink: #0b0b0c;
+  --color-zinc-950: rgb(17 17 19 / 0.86);
+  --color-zinc-900: rgb(255 255 255 / 0.05);
+  --color-zinc-800: rgb(255 255 255 / 0.09);
+  --color-zinc-700: rgb(255 255 255 / 0.15);
+  --color-zinc-600: #5f5f66;
+  --color-zinc-500: #85858c;
+  --color-zinc-400: #a5a5ad;
+  --color-zinc-300: #d0d0d5;
+  --color-zinc-200: #e8e8ec;
 
-  --color-amber-300: #ffc69e;
-  --color-amber-400: #ff8a5c;
-  --color-amber-600: #e8604a;
-
-  --color-brand-orange: #ff8a3d;
-  --color-brand-pink: #ff4f7b;
-  --color-brand-violet: #8b6cff;
+  --color-amber-300: #e4e4e8;
+  --color-amber-400: #f4f4f5;
+  --color-amber-600: #d4d4d8;
 }
 
 :root {
-  --brand-grad: linear-gradient(120deg, #ff8a3d 0%, #ff4f7b 52%, #8b6cff 100%);
   color-scheme: dark;
   -webkit-tap-highlight-color: transparent;
 }
@@ -41,79 +34,25 @@ html, body, #root { height: 100%; }
 
 body {
   background: var(--color-ink);
-  color: #f4f3fa;
-  font-feature-settings: "ss01", "cv11";
+  color: #f4f4f5;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Slow aurora behind every page. Pure CSS so it costs nothing on a phone; camera pages cover it. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: -20%;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(38% 32% at 18% 22%, rgb(255 138 61 / 0.20), transparent 70%),
-    radial-gradient(34% 30% at 82% 18%, rgb(139 108 255 / 0.22), transparent 70%),
-    radial-gradient(40% 36% at 60% 88%, rgb(255 79 123 / 0.16), transparent 70%);
-  filter: blur(20px);
-  animation: aurora 26s ease-in-out infinite alternate;
-}
-body::after {
-  /* Fine grain so the gradients don't band on cheap screens. */
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  opacity: 0.05;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-@keyframes aurora {
-  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
-  50% { transform: translate3d(3%, -2%, 0) rotate(8deg); }
-  100% { transform: translate3d(-3%, 3%, 0) rotate(-6deg); }
-}
-@media (prefers-reduced-motion: reduce) {
-  body::before { animation: none; }
-}
-
-/* Frosted glass panel: the one surface the whole app is built from. */
+/* A panel: barely-there fill, hairline edge, blur so it still works over a live camera. */
 @utility glass {
-  background: linear-gradient(180deg, rgb(255 255 255 / 0.085), rgb(255 255 255 / 0.03));
-  border: 1px solid rgb(255 255 255 / 0.10);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.10), 0 24px 60px -24px rgb(0 0 0 / 0.7);
-  backdrop-filter: blur(22px) saturate(150%);
-  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  background: rgb(255 255 255 / 0.04);
+  border: 1px solid rgb(255 255 255 / 0.07);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
-/* Darker glass for anything laid over a live camera, where text must stay readable on a bright scene. */
+/* Over a live camera, where text must stay readable on a bright scene (white text keeps ~6:1). */
 @utility glass-dark {
-  background: rgb(8 8 14 / 0.62);
-  border: 1px solid rgb(255 255 255 / 0.10);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
-  backdrop-filter: blur(26px) saturate(140%);
-  -webkit-backdrop-filter: blur(26px) saturate(140%);
+  background: rgb(10 10 11 / 0.66);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }
-@utility text-gradient {
-  background: var(--brand-grad);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-@utility bg-brand {
-  background: var(--brand-grad);
-}
-
-/* The old solid-amber buttons become the brand gradient with a soft glow. */
-.bg-amber-400 {
-  background-image: var(--brand-grad);
-  box-shadow: 0 10px 30px -10px rgb(255 79 123 / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.35);
-}
-.bg-amber-400.text-black { color: #12080c; }
 
 input, select, textarea { font: inherit; }
-select { color-scheme: dark; }
-:focus-visible { outline: 2px solid #ff8a5c; outline-offset: 2px; }
-
+:focus-visible { outline: 2px solid #f4f4f5; outline-offset: 2px; }
 .tabular { font-variant-numeric: tabular-nums; }
