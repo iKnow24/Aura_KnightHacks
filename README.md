@@ -7,6 +7,10 @@
   KnightHacks IX · UCF · October 2026
 </p>
 
+<p align="center">
+  <a href="https://github.com/iKnow24/Aura_KnightHacks/actions/workflows/ci.yml"><img src="https://github.com/iKnow24/Aura_KnightHacks/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+</p>
+
 ---
 
 ## The problem
@@ -31,7 +35,8 @@ your hand.
 - **Ask Lumen.** A memory of what the house heard: "Where are my keys?", "What happened while I was asleep?"
 - **Outside mode.** A second phone in your back pocket or bag watches behind you, and a 3D walking view shows
   cars and people coming up on either side.
-- **Caregiver dashboard.** A floor plan that lights up the room an alert came from, with a timeline.
+- **Caregiver dashboard.** A floor plan that lights up the room an alert came from, with a timeline, and a
+  History tab for the last two weeks.
 - **Change from normal.** Every alert and every tap is logged. A Databricks pipeline compares this week with
   the week before, for the same person, and tells the family when she's taking longer to notice alerts or
   missing more of them. It says "worth a call", never a diagnosis.
@@ -104,15 +109,20 @@ flowchart LR
 | **Bronze** | Every line, untouched | Replayable; a new day's file only processes that day |
 | **Silver** | One clean table per event type, with expectations that drop impossible rows | Bad data never reaches a caregiver |
 | **Gold** | Time to notice each alert, a daily summary, and this week vs. last week | What a family actually asks about |
-| **Caregiver view** | A one-page dashboard with an "Ask Genie" box | Plain answers, no SQL |
+| **Caregiver view** | The History tab in Lumen's own dashboard, plus a Databricks AI/BI dashboard with an "Ask Genie" box | Plain answers, no SQL |
 
 The headline table is `gold_change_from_normal`. A week is flagged when the median time to notice is more
-than 25% slower than the week before, or misses at least double (plus two). Here is what it sees on the two
-weeks of sample data in [`databricks/sample_data/`](databricks/sample_data/):
+than 25% slower than the week before, or misses at least double (plus two). Here is the History tab on the two
+weeks of sample data in [`databricks/sample_data/`](databricks/sample_data/): 6.0 s to notice becomes
+9.0 s, and misses go from 5 to 15 (2 to 7 at night).
 
 <p align="center">
-  <img src="docs/images/change-from-normal.svg" alt="Median seconds to notice an alert per day: about 6 seconds in week one, about 9 in week two, with misses going from 5 to 15 (2 to 7 at night)" width="100%">
+  <img src="docs/images/history.png" alt="History tab: Worth a call. Maria took 50% longer to notice alerts this week and missed 15 vs 5 the week before" width="100%">
 </p>
+
+The tab reads the Gold tables from Databricks when `DATABRICKS_HOST`, `DATABRICKS_TOKEN` and
+`DATABRICKS_WAREHOUSE_ID` are set ([`server/app/history.py`](server/app/history.py)). Otherwise it runs the
+same Gold logic in Python on the sample files, so the demo never waits on the network.
 
 That slowdown is **planted by our data generator** to show the feature; it is not a real person. The full
 setup, including the "a new week arrives" live demo, is in [`databricks/README.md`](databricks/README.md).
@@ -136,12 +146,13 @@ We'd rather you hear the limits from us.
 
 | Piece | Built | Tested |
 |---|---|---|
-| Smoke alarm detector, fall rules, mode routing, memory, event log | ✅ | ✅ 46 automated tests |
+| Smoke alarm detector, fall rules, mode routing, memory, event log | ✅ | ✅ 49 automated tests, run by CI on every PR |
 | Dashboard, captions, strobe, alerts, Ask Lumen | ✅ | ✅ in the browser, with demo alert buttons |
 | Clean UI with calm motion (page fade, panel rise, live pulses) | ✅ | ✅ in the browser |
 | AST sound AI, Whisper, OWLv2 on the AMD GPU | ✅ | ⚠️ written against the real models, not yet run end to end on the AMD box |
 | 3D walking view, back-phone detection | ✅ | ⚠️ not yet on a real phone; distance is a rough estimate, about ±30% |
-| Databricks pipeline, dashboard datasets, Genie setup | ✅ | ⚠️ the change-from-normal math is checked on the sample data above; not yet run on a Databricks workspace |
+| History tab | ✅ | ✅ on the sample data, offline; ⚠️ the live Databricks read is not yet tested |
+| Databricks pipeline, dashboard datasets, Genie setup | ✅ | ⚠️ not yet run on a Databricks workspace |
 | Household history | ⚠️ generated, not real | Two weeks of fake events with a planted slowdown |
 
 ## Run it
@@ -190,7 +201,10 @@ cd web && npm run build
 | `web/src/pages/` | One page per device: Dashboard, Captions, Node, Strobe, Rear, Mic, Headset |
 | `server/app/eventlog.py` | Daily event files for Databricks (opt-in) |
 | `databricks/` | Pipeline SQL, data generator, sample data, dashboard and Genie setup |
+| `server/app/history.py`, `web/src/lib/History.jsx` | The History tab |
 | `docs/demo.md` | The demo script and answers to judge questions |
+| `docs/shipping.md`, `scripts/` | How PRs get tested and merged into main |
+| `AGENTS.md` | Rules for AI coding agents (Codex, Cursor) working in this repo; `CLAUDE.md` for Claude Code |
 
 ## Team
 
