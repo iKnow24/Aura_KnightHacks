@@ -1,5 +1,6 @@
 import asyncio
 import json
+from collections import deque
 import os
 import time
 from contextlib import asynccontextmanager
@@ -12,7 +13,8 @@ from pydantic import BaseModel
 from .detectors import alarm_dsp
 from .detectors.ast_sound import SoundClassifier, loudness_rise, to_alerts
 from .detectors.fall import FallDetector
-from .detectors.items import ItemFinder, decode
+from .detectors import scene
+from .detectors.items import ItemFinder, decode, items_from_hits
 from .detectors.speech import Segmenter, Transcriber, mentions_name
 from .agent import answer
 from .llm import local as local_llm
@@ -60,6 +62,13 @@ transcriber = Transcriber()
 segmenters: dict[str, Segmenter] = {}
 item_finder = ItemFinder()
 items_busy: set[str] = set()
+
+# Scene JSON (detectors/scene.py): the latest one per camera for the dashboard, recent model
+# times for /api/vision, and each node's latest pose so a photo can say "standing" or "lying".
+latest_vision: dict[str, dict] = {}
+vision_ms: deque = deque(maxlen=500)
+last_pose: dict[str, tuple[float, list | None]] = {}
+last_phone_scene: dict[str, float] = {}
 
 
 async def emit_detected(kind: str, zone: str, severity: str, source: str, confidence: float = 1.0):
@@ -143,17 +152,44 @@ async def run_speech(zone: str, audio: np.ndarray):
         await emit_detected("name_called", zone, "warning", source="whisper")
 
 
+def pose_now(node_id: str) -> tuple[str | None, bool]:
+    """(posture, someone in view) from this node's pose stream, if it reported in the last 2 s."""
+    seen_at, landmarks = last_pose.get(node_id, (0, None))
+    if time.monotonic() - seen_at > 2:
+        return None, False
+    return scene.posture(landmarks), bool(landmarks)
+
+
 async def run_items(node_id: str, zone: str, jpeg: str):
+    """One OWLv2 pass per still: item sightings for Ask Lumen + one scene JSON line. The photo is dropped here."""
     items_busy.add(node_id)
     try:
-        hits = await asyncio.to_thread(lambda: item_finder.find(decode(jpeg)))
-        for h in hits:
+        prompts, thresholds, labels = scene.queries()
+
+        def look():
+            image = decode(jpeg)
+            hits, timing = item_finder.detect(image, prompts, thresholds)
+            return hits, timing, items_from_hits(image, hits), image.size
+
+        hits, timing, items, (width, height) = await asyncio.to_thread(look)
+        for h in items:
             memory.add_sighting(zone, h["item"], h["confidence"], h["thumb"])
             await hub.broadcast(["dashboard"], {"type": "sighting", "item": h["item"], "zone": zone, "ts": time.time()})
+        if timing:
+            await publish_vision(scene.build(node_id, zone, time.time(), hits, labels, width, height, timing,
+                                             *pose_now(node_id)))
     except Exception as e:  # a bad frame shouldn't kill the node socket
         print("item finder error:", e)
     finally:
         items_busy.discard(node_id)
+
+
+async def publish_vision(event: dict):
+    latest_vision[event["node_id"]] = event
+    if "inference_ms" in event:
+        vision_ms.append(event["inference_ms"])
+    eventlog.record(event)
+    await hub.broadcast(["dashboard"], event)
 
 
 # Rear-facing phone (Outside mode): the phone's own object detector says something behind
@@ -253,6 +289,16 @@ def get_eventlog_file(name: str, offset: int = 0, x_lumen_sync_key: str | None =
         raise HTTPException(404, "no such file")
 
 
+@app.get("/api/vision")
+def get_vision():
+    """Latest scene JSON per camera, and how fast the model has been (the AMD GPU number)."""
+    ms = sorted(vision_ms)
+    pick = lambda q: ms[min(len(ms) - 1, int(q * len(ms)))] if ms else None  # noqa: E731
+    return {"latest": list(latest_vision.values()),
+            "speed": {"frames": len(ms), "p50_ms": pick(0.5), "p95_ms": pick(0.95),
+                      "device": item_finder.device_name, "model": scene.MODEL_ID}}
+
+
 @app.get("/api/state")
 def state():
     return hub.state()
@@ -344,7 +390,8 @@ def get_memory():
 
 
 def model_status(model) -> str:
-    return "off" if model._failed else "ready" if model._pipe is not None else "loading"
+    loaded = getattr(model, "_pipe", None) or getattr(model, "_model", None)  # item finder holds _model
+    return "off" if model._failed else "ready" if loaded is not None else "loading"
 
 
 @app.post("/api/memory/seed")
@@ -417,7 +464,10 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
                         last_preview = time.monotonic()
                         await hub.broadcast(["dashboard"], {"type": "camera_preview", "node_id": node_id,
                                                             "zone": zone, "ts": time.time(), "jpeg": jpeg})
-                elif data.get("type") == "pose" and enabled("fall"):
+                elif data.get("type") == "pose":
+                    last_pose[node_id] = (time.monotonic(), data.get("landmarks"))  # posture for the scene JSON
+                    if not enabled("fall"):
+                        continue
                     stillness = MODES[hub.mode].get("fall_stillness_s", 8)
                     det = fall_detectors.setdefault(node_id, FallDetector(stillness))
                     det.stillness_s = stillness
@@ -430,6 +480,9 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
                     side = "rear" if zone == "behind" else "front"
                     await hub.broadcast(["hud"], {"type": "scene", "side": side, "objects": data.get("objects", [])[:10],
                                                   "fov": data.get("fov", 50), "ts": time.time()})
+                    if time.monotonic() - last_phone_scene.get(node_id, 0) >= scene.EVERY_S:
+                        last_phone_scene[node_id] = time.monotonic()
+                        await publish_vision(scene.from_phone(node_id, zone, time.time(), data.get("objects") or []))
                 elif data.get("type") == "caption_meta":
                     entry = memory.tag_speech(data["ts"], data.get("speaker"), bool(data.get("to_you")))
                     if entry:
@@ -442,5 +495,6 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
         hub.disconnect(ws, "node")
         if await hub.unregister_node(ws, node_id):
             # Do not join audio or pose from before a disconnect to a new session.
-            for cache in (audio_buffers, fall_detectors, ast_pending, segmenters):
+            for cache in (audio_buffers, fall_detectors, ast_pending, segmenters, latest_vision, last_pose,
+                          last_phone_scene):
                 cache.pop(node_id, None)

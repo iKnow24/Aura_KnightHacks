@@ -44,6 +44,7 @@ export default function Dashboard() {
   const [tab, setTab] = useState('live')
   const [scan, setScan] = useState(false)
   const [previews, setPreviews] = useState({})
+  const [vision, setVision] = useState({})
   const user = getUser()
   const captions = useCaptions()
   const { state, connected } = useBrain('dashboard', (alert) => {
@@ -51,6 +52,7 @@ export default function Dashboard() {
     setTimeout(() => setRipples((r) => r.filter((x) => x.id !== alert.id)), 4000)
   }, (msg) => {
     if (msg.type === 'caption') captions.add(msg)
+    if (msg.type === 'vision') setVision((v) => ({ ...v, [msg.node_id]: msg }))
     if (msg.type === 'camera_preview') setPreviews((previous) => {
       const fresh = Object.fromEntries(Object.entries(previous).filter(([, p]) => Date.now() / 1000 - p.ts < 5))
       return { ...fresh, [msg.node_id]: msg }
@@ -164,6 +166,22 @@ export default function Dashboard() {
           </div>
         </div>
       </section>
+
+      {/* Scene JSON from each camera (server/app/detectors/scene.py): labels only, the photos are already gone. */}
+      {Object.values(vision).some((v) => now - v.ts < 15) && (
+        <section className="glass mt-4 rounded-xl p-4">
+          <h2 className="mb-2 font-semibold">What the cameras see</h2>
+          <ul className="space-y-1 text-sm">
+            {Object.values(vision).filter((v) => now - v.ts < 15).map((v) => (
+              <li key={v.node_id} className="flex flex-wrap gap-x-3">
+                <span className="w-24 shrink-0 text-zinc-400">{zoneLabel(v.zone)}</span>
+                <span className="min-w-0 flex-1">{v.summary}</span>
+                {v.inference_ms != null && <span className="text-zinc-500">{Math.round(v.inference_ms)} ms · {v.device}</span>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
         <span className="shrink-0 self-center text-xs uppercase tracking-[0.2em] text-zinc-500">Demo alerts</span>

@@ -9,6 +9,7 @@ EVENT_LOG_DIR=/path/to/folder and the brain appends to <folder>/<YYYY-MM-DD>_<HH
   {"type": "caption_meta", "ts": <speech ts>, "speaker": 1, "to_you": true}
   {"type": "sighting", "item": "keys", "zone": "living", "confidence": 0.4, "ts": ...}
   {"type": "mode", "mode": "night", "ts": ...}
+  {"type": "vision", "zone": "kitchen", "people": 1, "posture": "standing", "objects": [...], "inference_ms": 92.4, ...}
 
 Every line also carries "household" (LUMEN_HOUSEHOLD, default "demo"). Image thumbnails are dropped.
 Those files are the Bronze input in databricks/ (same shape as the generated history).

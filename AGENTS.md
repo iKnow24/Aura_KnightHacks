@@ -49,7 +49,7 @@ server/                 FastAPI brain (Python), port 8000
   app/hub.py            sends alerts/captions to every screen
   app/modes.py          modes (watch, wearer, lecture, outside, night) are CONFIG here, not separate code
   app/detectors/        alarm_dsp (smoke alarm beeps), ast_sound (sound classifier), fall (pose rules),
-                        speech (Whisper), items (OWLv2 item finder)
+                        speech (Whisper), items + scene JSON (one OWLv2 pass per still, detectors/scene.py)
   app/agent.py, llm.py  "Ask Lumen" memory agent; LLM provider picked by env var
   app/memory.py         what was said / seen, for Ask Lumen
   app/eventlog.py       JSONL event log, one file per hour (feeds databricks/)

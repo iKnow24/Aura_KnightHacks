@@ -73,6 +73,9 @@ Nodes send `{"type": "snapshot", "ts": ..., "jpeg": "data:image/jpeg;base64,..."
 For an explicitly enabled camera demo, a room node can also send `{"type": "camera_preview", "ts": ..., "jpeg": "data:image/jpeg;base64,..."}` once per second.
 The brain forwards this only when `LUMEN_DEMO_PREVIEW=1`, to dashboard sockets only, with `node_id` and `zone` added.
 These full-frame previews are never stored in memory or the event log. Normal sensor operation keeps previews off.
+Every snapshot also becomes one scene JSON line (`server/app/detectors/scene.py`), sent to dashboards and written to the event log; the photo itself is dropped:
+`{"type": "vision", "node_id", "zone", "ts", "source": "owlv2" | "phone", "people", "posture": "standing" | "sitting" | "lying" | "upright" | null, "objects": [{"label", "score", "box": [l, t, r, b] 0-1}], "counts", "summary", "model", "device", "inference_ms", "total_ms"}`.
+Rear-phone `scene` messages are logged the same way (source `"phone"`, objects carry `bearing`/`dist`), at most every 5 s. Vision lines never fire alerts. `GET /api/vision` returns the latest line per camera and median/p95 model time.
 Node sockets also accept `{"type": "heartbeat"}`; dashboard state updates include current node connection status.
 Captions carry `"id"` and, when a louder speaker mic heard the same sentence, `"replaces": old_id`
 (see `server/app/speakers.py`). Browser captions are saved with `POST /api/speech {"text"}`.
