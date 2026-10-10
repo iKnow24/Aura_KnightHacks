@@ -1,0 +1,179 @@
+{
+ "household": "maria",
+ "source": "sample",
+ "note": null,
+ "days": [
+  {
+   "day": "2026-09-26",
+   "alerts": 11,
+   "missed_alerts": 0,
+   "night_alerts": 2,
+   "missed_at_night": 0,
+   "median_seconds_to_notice": 6.0
+  },
+  {
+   "day": "2026-09-27",
+   "alerts": 12,
+   "missed_alerts": 3,
+   "night_alerts": 3,
+   "missed_at_night": 2,
+   "median_seconds_to_notice": 8.3
+  },
+  {
+   "day": "2026-09-28",
+   "alerts": 13,
+   "missed_alerts": 0,
+   "night_alerts": 2,
+   "missed_at_night": 0,
+   "median_seconds_to_notice": 5.8
+  },
+  {
+   "day": "2026-09-29",
+   "alerts": 11,
+   "missed_alerts": 0,
+   "night_alerts": 1,
+   "missed_at_night": 0,
+   "median_seconds_to_notice": 5.0
+  },
+  {
+   "day": "2026-09-30",
+   "alerts": 13,
+   "missed_alerts": 2,
+   "night_alerts": 4,
+   "missed_at_night": 0,
+   "median_seconds_to_notice": 5.4
+  },
+  {
+   "day": "2026-10-01",
+   "alerts": 15,
+   "missed_alerts": 0,
+   "night_alerts": 3,
+   "missed_at_night": 0,
+   "median_seconds_to_notice": 6.6
+  },
+  {
+   "day": "2026-10-02",
+   "alerts": 14,
+   "missed_alerts": 0,
+   "night_alerts": 3,
+   "missed_at_night": 0,
+   "median_seconds_to_notice": 6.0
+  },
+  {
+   "day": "2026-10-03",
+   "alerts": 10,
+   "missed_alerts": 0,
+   "night_alerts": 2,
+   "missed_at_night": 0,
+   "median_seconds_to_notice": 9.4
+  },
+  {
+   "day": "2026-10-04",
+   "alerts": 12,
+   "missed_alerts": 1,
+   "night_alerts": 1,
+   "missed_at_night": 0,
+   "median_seconds_to_notice": 7.0
+  },
+  {
+   "day": "2026-10-05",
+   "alerts": 14,
+   "missed_alerts": 1,
+   "night_alerts": 5,
+   "missed_at_night": 1,
+   "median_seconds_to_notice": 9.3
+  },
+  {
+   "day": "2026-10-06",
+   "alerts": 14,
+   "missed_alerts": 2,
+   "night_alerts": 1,
+   "missed_at_night": 0,
+   "median_seconds_to_notice": 8.3
+  },
+  {
+   "day": "2026-10-07",
+   "alerts": 11,
+   "missed_alerts": 4,
+   "night_alerts": 2,
+   "missed_at_night": 1,
+   "median_seconds_to_notice": 7.0
+  },
+  {
+   "day": "2026-10-08",
+   "alerts": 11,
+   "missed_alerts": 3,
+   "night_alerts": 4,
+   "missed_at_night": 2,
+   "median_seconds_to_notice": 12.6
+  },
+  {
+   "day": "2026-10-09",
+   "alerts": 13,
+   "missed_alerts": 4,
+   "night_alerts": 4,
+   "missed_at_night": 3,
+   "median_seconds_to_notice": 12.7
+  }
+ ],
+ "status": {
+  "latest_day": "2026-10-09",
+  "median_seconds_this_week": 9.0,
+  "median_seconds_week_before": 6.0,
+  "pct_slower": 50,
+  "missed_this_week": 15,
+  "missed_week_before": 5,
+  "flagged": true
+ },
+ "missed": [
+  {
+   "time": "2026-10-09T23:39:00-04:00",
+   "kind": "phone_ring",
+   "zone": "bedroom",
+   "at_night": true
+  },
+  {
+   "time": "2026-10-09T13:36:40-04:00",
+   "kind": "name_called",
+   "zone": "kitchen",
+   "at_night": false
+  },
+  {
+   "time": "2026-10-09T05:04:00-04:00",
+   "kind": "knock",
+   "zone": "hallway",
+   "at_night": true
+  },
+  {
+   "time": "2026-10-09T02:25:00-04:00",
+   "kind": "car_alarm",
+   "zone": "outside",
+   "at_night": true
+  },
+  {
+   "time": "2026-10-08T23:33:00-04:00",
+   "kind": "phone_ring",
+   "zone": "bedroom",
+   "at_night": true
+  },
+  {
+   "time": "2026-10-08T17:06:16-04:00",
+   "kind": "name_called",
+   "zone": "kitchen",
+   "at_night": false
+  },
+  {
+   "time": "2026-10-08T01:43:00-04:00",
+   "kind": "knock",
+   "zone": "hallway",
+   "at_night": true
+  },
+  {
+   "time": "2026-10-07T16:07:09-04:00",
+   "kind": "phone_ring",
+   "zone": "living",
+   "at_night": false
+  }
+ ],
+ "dashboard_url": null
+}

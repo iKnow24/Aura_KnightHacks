@@ -1,0 +1,46 @@
+# Public demo site on GitHub Pages: the web app in demo mode (fake in-page brain, no server).
+# Real detection still needs the brain on AMD or a laptop; this is for judges and teammates to click around.
+# One-time setup: Settings > Pages > Source: GitHub Actions. Then every push to main redeploys.
+# Live at https://<owner>.github.io/<repo>/
+name: Demo site
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci --no-audit --no-fund
+        working-directory: web
+      - run: npx vite build
+        working-directory: web
+        env:
+          VITE_DEMO: "1"
+          BASE_PATH: /${{ github.event.repository.name }}/
+      # Pages has no "send every path to index.html" setting; its 404 page doing that lets /dashboard etc. load directly.
+      - run: cp web/dist/index.html web/dist/404.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+      - id: deployment
+        uses: actions/deploy-pages@v4
