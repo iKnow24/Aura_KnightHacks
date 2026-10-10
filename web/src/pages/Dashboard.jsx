@@ -70,7 +70,7 @@ export default function Dashboard() {
       >
         {Object.entries(state.modes).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
       </select>
-      <button onClick={() => { signOut(); location.href = '/' }} className="text-sm text-zinc-500 hover:text-zinc-300">
+      <button onClick={() => { signOut(); location.href = import.meta.env.BASE_URL }} className="text-sm text-zinc-500 hover:text-zinc-300">
         {user?.name} · Sign out
       </button>
     </header>
