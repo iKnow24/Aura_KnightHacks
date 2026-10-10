@@ -27,6 +27,7 @@ const MAIN_MODES = ['wearer', 'lecture', 'outside']
 const SPEAKER_COLORS = ['#fbbf24', '#38bdf8', '#a78bfa', '#34d399', '#f472b6', '#fb923c']
 const speakerColor = (name) => SPEAKER_COLORS[[...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 997, 7) % SPEAKER_COLORS.length]
 const HIDE_BAR_MS = 4000
+const FADE_TOP = 'linear-gradient(to bottom, transparent 0, #000 56px, #000 100%)' 
 const TALKING = 0.04 // lip movement that counts as "this face is talking" (same as the headset)
 const SPEECH_LEVEL = 0.02 // mic loudness that counts as speech (Private engine)
 // "Hi, I'm Adam" / "my name is Adam". A capital letter is required after the weak cues ("I'm going"
@@ -460,32 +461,42 @@ export default function Captions() {
       {/* Right (landscape) or bottom (portrait, so the camera keeps the top of the screen): the see-through transcript. Scroll up for history; it stops following until you come back down. */}
       <section onClick={(e) => e.stopPropagation()}
         className={`absolute bottom-0 right-0 top-0 z-10 flex flex-col glass-dark border-y-0 border-r-0 ${camera ? 'w-[64%] rounded-l-3xl sm:w-[42%] portrait:top-auto portrait:h-[42%] portrait:w-full! portrait:rounded-none portrait:rounded-t-3xl' : 'w-full'}`}>
-        <div ref={scroller} onScroll={onScroll} className="flex-1 overflow-y-auto px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
+        {/* The top few lines fade out, so old text never fights the newest line for attention. */}
+        <div ref={scroller} onScroll={onScroll} style={{ maskImage: FADE_TOP, WebkitMaskImage: FADE_TOP }}
+          className="flex-1 overflow-y-auto px-5 pb-16 pt-[max(1rem,env(safe-area-inset-top))]">
           {whisperOff && realEngine === 'private' && (
             <p className="mb-3 rounded-xl bg-amber-950/80 p-3 text-xs text-amber-200">Private captions need Whisper on the Lumen brain, and it isn’t running.{mode !== 'outside' && ' Switch to Instant.'}</p>
           )}
           {captions.error && <p className="mb-3 rounded-xl bg-red-950/80 p-3 text-xs text-red-200">{captions.error}</p>}
           {captions.lines.map((l, i) => {
-            const speaker = l.zone && !ZONES[l.zone]
+            const fromPhone = l.zone && !ZONES[l.zone]
             const missed = missedIndex >= 0 && i >= missedIndex
+            // The newest line is the one you're reading, so it stays white and bigger; the rest step back.
+            const newest = !live && i === captions.lines.length - 1
+            const who = l.speaker ? (names[l.speaker.id] ?? `Person ${l.speaker.id}`) : l.zone ? (fromPhone ? l.zone : zoneLabel(l.zone)) : null
+            const dot = l.speaker ? l.speaker.color : fromPhone ? speakerColor(l.zone) : '#71717a'
             return (
-              <motion.p id={`line-${l.id}`} key={l.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                className={`mb-2.5 text-[17px] font-medium leading-snug ${missed ? 'border-l-2 border-amber-400 pl-2' : ''}`}>
-                {l.speaker && (
-                  <span className="mr-1.5 align-middle text-xs font-semibold" style={{ color: l.speaker.color }}>
-                    {names[l.speaker.id] ?? `Person ${l.speaker.id}`}{l.speaker.toYou && <span className="text-green-300"> → you</span>}
-                  </span>
+              <motion.div id={`line-${l.id}`} key={l.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                className={`mb-3.5 ${missed ? 'border-l-2 border-white/70 pl-2.5' : ''}`}>
+                {who && (
+                  <div className="mb-0.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: dot }} />
+                    <span className="truncate">{who}</span>
+                    {l.speaker?.toYou && <span className="text-zinc-500">· to you</span>}
+                  </div>
                 )}
-                {!l.speaker && l.zone && (
-                  <span className="mr-1.5 align-middle text-xs font-semibold" style={{ color: speaker ? speakerColor(l.zone) : '#a1a1aa' }}>
-                    {speaker ? l.zone : zoneLabel(l.zone)}
-                  </span>
-                )}
-                {l.text}
-              </motion.p>
+                <p className={newest ? 'text-[21px] font-medium leading-[1.3] text-white' : 'text-[17px] font-normal leading-snug text-zinc-400'}>{l.text}</p>
+              </motion.div>
             )
           })}
-          {live && <p className="text-[17px] font-medium leading-snug text-amber-200/90"><Words text={live} /></p>}
+          {/* Words so far, still being said: full white with a blinking caret, so it reads as live. */}
+          {live && (
+            <p className="text-[21px] font-medium leading-[1.3] text-white">
+              <Words text={live} />
+              <motion.span className="ml-0.5 inline-block h-[0.95em] w-[2px] translate-y-[2px] bg-white"
+                animate={{ opacity: [1, 0.15, 1] }} transition={{ duration: 1.1, repeat: Infinity }} />
+            </p>
+          )}
           {!captions.lines.length && !live && (
             <p className="pt-10 text-center text-sm text-zinc-400">{captions.listening ? 'Listening… start talking.' : 'Starting the microphone…'}</p>
           )}
