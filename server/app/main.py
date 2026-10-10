@@ -358,6 +358,11 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
                         await emit_detected("fall", zone, "critical", source="fall")
                 elif data.get("type") == "approach":
                     await handle_approach(zone, data)
+                elif data.get("type") == "scene":
+                    # What a camera phone sees right now, for the walking-figure view. Not stored.
+                    side = "rear" if zone == "behind" else "front"
+                    await hub.broadcast(["hud"], {"type": "scene", "side": side, "objects": data.get("objects", [])[:10],
+                                                  "fov": data.get("fov", 50), "ts": time.time()})
                 elif data.get("type") == "caption_meta":
                     entry = memory.tag_speech(data["ts"], data.get("speaker"), bool(data.get("to_you")))
                     if entry:

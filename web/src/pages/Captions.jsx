@@ -5,9 +5,11 @@ import { detectFaces, FaceTracker, loadFaces, toScreen } from '../lib/faces'
 import { Camera, CameraOff, Clapperboard, Download, Ellipsis, Footprints, GraduationCap, House, Lock, Zap } from 'lucide-react'
 import Logo from '../lib/Logo'
 import Recap from '../lib/Recap'
+import Surround from '../lib/Surround'
 import { api, keepAwake, useBrain } from '../lib/useBrain'
 import { instantSupported, useLiveCaptions } from '../lib/useLiveCaptions'
 import { getUser } from '../lib/user'
+import { askMotion } from '../lib/walking'
 import { alertText, SEVERITY_COLOR, ZONES, zoneLabel } from '../lib/zones'
 
 // The wearer's phone, held up like a window: camera behind, a see-through captions panel on
@@ -204,6 +206,7 @@ export default function Captions() {
   const user = getUser()
   const { alerts, push, drop, ack } = useAlerts('wearer')
   const [started, setStarted] = useState(false)
+  const [rearScene, setRearScene] = useState(null) // what the bag phone's camera sees, for the walking view
   const [engine, setEngine] = useState(instantSupported ? 'instant' : 'private')
   const [camera, setCamera] = useState(null) // MediaStream or null
   const [bar, setBar] = useState(true)
@@ -232,6 +235,7 @@ export default function Captions() {
 
   const { state, connected } = useBrain('hud', push, (msg) => {
     if (msg.type === 'caption') captions.addRemote(msg)
+    if (msg.type === 'scene' && msg.side === 'rear') setRearScene({ ...msg, at: Date.now() })
     if (msg.type === 'ack') drop(msg.id)
   })
   const mode = state.modes[state.mode] ? state.mode : 'wearer'
@@ -340,6 +344,7 @@ export default function Captions() {
 
   const start = async () => {
     if (typeof DeviceOrientationEvent?.requestPermission === 'function') await DeviceOrientationEvent.requestPermission().catch(() => {})
+    await askMotion()
     await keepAwake()
     setStarted(true)
     startCamera()
@@ -423,6 +428,7 @@ export default function Captions() {
         {lookingDown && <span className="text-xs text-amber-300">· holding your place</span>}
       </div>
       {mode === 'outside' && <div className="absolute left-3 top-16 z-10"><Radar recent={recent} /></div>}
+      {camera && <Surround videoRef={videoRef} active={started} rear={rearScene} raised={bar} />}
 
       <AnimatePresence>
         {notice && (
