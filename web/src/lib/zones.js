@@ -2,10 +2,12 @@
 // x/y are 0-100 (percent of the dashboard map). bearing = degrees clockwise from
 // the wearer's "forward" when they stand in the living room facing the TV.
 export const ZONES = {
-  kitchen: { label: 'Kitchen', x: 20, y: 25, bearing: 300 },
-  living: { label: 'Living room', x: 55, y: 55, bearing: 0 },
-  bedroom: { label: 'Bedroom', x: 82, y: 25, bearing: 60 },
-  hallway: { label: 'Hallway', x: 50, y: 85, bearing: 180 },
+  // Demo setup: ONE room phone (the Mac webcam on /node?zone=living). The other rooms stay as labels so old
+  // alerts and seeded memory still read well, but map: false keeps them off the floor plan and the QR codes.
+  living: { label: 'Living room', x: 50, y: 50, bearing: 0 },
+  kitchen: { label: 'Kitchen', bearing: 300, map: false },
+  bedroom: { label: 'Bedroom', bearing: 60, map: false },
+  hallway: { label: 'Hallway', bearing: 180, map: false },
   // Not rooms: places relative to the wearer (Outside mode). map: false keeps them off the floor plan.
   behind: { label: 'Behind you', bearing: 180, map: false },
   wearer: { label: 'Near you', bearing: 0, map: false },

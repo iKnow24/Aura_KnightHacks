@@ -104,3 +104,17 @@ def test_phone_scene_is_logged_at_most_every_few_seconds(monkeypatch, tmp_path):
 
 def test_memory_page_reports_item_model_status():
     assert TestClient(main.app).get('/api/memory').json()['models']['items'] in ('off', 'loading', 'ready')
+
+
+def test_look_endpoint_returns_scene_json_with_headset(monkeypatch, tmp_path):
+    monkeypatch.setenv('EVENT_LOG_DIR', str(tmp_path))
+    hit = {'label': scene.SCENE['headset'][0], 'score': 0.4, 'box': {'xmin': 10, 'ymin': 5, 'xmax': 30, 'ymax': 20}}
+    monkeypatch.setattr(main.item_finder, 'detect', lambda image, p, t: ([hit], {'inference_ms': 9.0, 'device': 'Test GPU'}))
+    monkeypatch.setattr(main.item_finder, '_failed', False)
+    monkeypatch.setattr(main, 'decode', lambda jpeg: SimpleNamespace(size=(64, 48)))
+    client = TestClient(main.app)
+    seen = client.post('/api/look', json={'jpeg': 'data:image/jpeg;base64,AA=='}).json()
+    assert seen['objects'][0]['label'] == 'headset' and seen['zone'] == 'living'
+    assert client.post('/api/look', json={'jpeg': 'not a photo'}).status_code == 400
+    monkeypatch.setattr(main.item_finder, '_failed', True)
+    assert client.post('/api/look', json={'jpeg': 'data:image/jpeg;base64,AA=='}).status_code == 503

@@ -76,6 +76,7 @@ These full-frame previews are never stored in memory or the event log. Normal se
 Every snapshot also becomes one scene JSON line (`server/app/detectors/scene.py`), sent to dashboards and written to the event log; the photo itself is dropped:
 `{"type": "vision", "node_id", "zone", "ts", "source": "owlv2" | "phone", "people", "posture": "standing" | "sitting" | "lying" | "upright" | null, "objects": [{"label", "score", "box": [l, t, r, b] 0-1}], "counts", "summary", "model", "device", "inference_ms", "total_ms"}`.
 Rear-phone `scene` messages are logged the same way (source `"phone"`, objects carry `bearing`/`dist`), at most every 5 s. Vision lines never fire alerts. `GET /api/vision` returns the latest line per camera and median/p95 model time.
+The dashboard's main laptop camera calls `POST /api/look {"jpeg", "zone"}` about once a second and gets the same vision JSON back (node_id `dashboard-camera`); it outlines the `headset` box, i.e. the demo wearer.
 Node sockets also accept `{"type": "heartbeat"}`; dashboard state updates include current node connection status.
 Captions carry `"id"` and, when a louder speaker mic heard the same sentence, `"replaces": old_id`
 (see `server/app/speakers.py`). Browser captions are saved with `POST /api/speech {"text"}`.

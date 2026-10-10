@@ -73,7 +73,7 @@ function Tile({ slot, source, sources, onChoose, onPromote, preview, empty }) {
   return (
     <figure ref={box} className={`glass group relative h-full min-h-0 overflow-hidden rounded-xl bg-black ${main ? 'min-h-[240px]' : 'min-h-[150px]'}`}>
       {!source ? empty
-        : source.deviceId ? <LaptopFeed deviceId={source.deviceId} label={source.label} />
+        : source.deviceId ? <LaptopFeed deviceId={source.deviceId} label={source.label} look={main} />
         : <PhoneFeed preview={preview} label={source.label} />}
       {onPromote && (
         <button onClick={onPromote} className="absolute inset-0 z-[1] cursor-pointer" aria-label={`Show ${source.label} in the main view`} />
@@ -105,9 +105,10 @@ function PhoneFeed({ preview, label }) {
   )
 }
 
-function LaptopFeed({ deviceId, label }) {
+function LaptopFeed({ deviceId, label, look }) {
   const video = useRef()
   const [error, setError] = useState(null)
+  const seen = useSeen(video, look)
   useEffect(() => {
     let live = true
     openCamera(deviceId).then((stream) => {
@@ -118,7 +119,62 @@ function LaptopFeed({ deviceId, label }) {
     return () => { live = false }
   }, [deviceId])
   if (error) return <p className="absolute inset-0 grid place-items-center p-4 text-center text-sm text-zinc-400">{label}: {error}</p>
-  return <video ref={video} playsInline muted aria-label={`${label} camera`} className="absolute inset-0 h-full w-full object-contain" />
+  return <>
+    <video ref={video} playsInline muted aria-label={`${label} camera`} className="absolute inset-0 h-full w-full object-contain" />
+    {seen && <Highlights seen={seen} />}
+  </>
+}
+
+// Main laptop camera only: about once a second, send one small still to the brain (POST /api/look, OWLv2 on the
+// AMD GPU) and get back what's in it. The brain drops the photo and keeps the scene JSON. Stops quietly if the
+// brain has no vision model.
+const LOOK_MS = 1000
+function useSeen(video, on) {
+  const [seen, setSeen] = useState(null)
+  useEffect(() => {
+    if (!on) return
+    let live = true, busy = false
+    const timer = setInterval(async () => {
+      const v = video.current
+      if (busy || !v?.videoWidth) return
+      busy = true
+      try {
+        const c = document.createElement('canvas')
+        c.width = 640
+        c.height = Math.round((640 * v.videoHeight) / v.videoWidth)
+        c.getContext('2d').drawImage(v, 0, 0, c.width, c.height)
+        const r = await fetch('/api/look', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jpeg: c.toDataURL('image/jpeg', 0.6) }) })
+        if (r.status === 503 || r.status === 404) clearInterval(timer)  // no vision model / demo site
+        if (r.ok && live) setSeen({ ...(await r.json()), aspect: c.width / c.height })
+      } catch { /* brain offline: try again next tick */ } finally { busy = false }
+    }, LOOK_MS)
+    return () => { live = false; clearInterval(timer); setSeen(null) }
+  }, [on])
+  return seen
+}
+
+// Boxes drawn in the same space as the video (object-contain), so they line up at any tile size.
+// The white headset gets the bright outline: that's the person the demo is about.
+function Highlights({ seen }) {
+  const h = 1000 / seen.aspect
+  const shown = (seen.objects || []).filter((o) => o.box && (o.label === 'headset' || o.label === 'person'))
+  return (
+    <svg viewBox={`0 0 1000 ${h}`} preserveAspectRatio="xMidYMid meet" className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true">
+      {shown.map((o, i) => {
+        const [l, t, r, b] = o.box
+        const hero = o.label === 'headset'
+        return (
+          <g key={i}>
+            <rect x={l * 1000} y={t * h} width={(r - l) * 1000} height={(b - t) * h} rx="8" fill="none"
+              stroke={hero ? '#fff' : 'rgb(255 255 255 / 0.35)'} strokeWidth={hero ? 4 : 2} vectorEffect="non-scaling-stroke"
+              style={hero ? { filter: 'drop-shadow(0 0 6px rgb(255 255 255 / 0.8))' } : undefined} />
+            {hero && <text x={l * 1000 + 6} y={Math.max(30, t * h - 8)} fill="#fff" fontSize="26" fontWeight="600">Headset · {Math.round(o.score * 100)}%</text>}
+          </g>
+        )
+      })}
+    </svg>
+  )
 }
 
 function Empty({ slot, anySources, hasCams, camError, onAskCameras }) {

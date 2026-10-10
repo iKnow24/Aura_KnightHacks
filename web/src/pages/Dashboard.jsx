@@ -16,21 +16,18 @@ const Avatar3D = lazy(() => import('../lib/Avatar3D'))
 import { alertText, SEVERITY_COLOR, ZONES, zoneLabel } from '../lib/zones'
 
 const FAKES = [
-  ['smoke_alarm', 'kitchen', 'critical'],
-  ['doorbell', 'hallway', 'warning'],
-  ['name_called', 'kitchen', 'warning'],
-  ['fall', 'bedroom', 'critical'],
-  ['timer', 'kitchen', 'warning'],
+  ['smoke_alarm', 'living', 'critical'],
+  ['doorbell', 'living', 'warning'],
+  ['name_called', 'living', 'warning'],
+  ['fall', 'living', 'critical'],
+  ['timer', 'living', 'warning'],
   ['car_horn', 'wearer', 'critical'],
   ['person_behind', 'behind', 'warning'],
 ]
 
 // Room outlines behind the zone labels, drawn in the same 0-100 space as ZONES x/y.
 const ROOMS = [
-  'M3 5 H38 V46 H3 Z', // kitchen
-  'M66 5 H97 V46 H66 Z', // bedroom
-  'M38 5 H66 V46 H97 V74 H3 V46 H38 Z', // living room
-  'M30 74 H70 V96 H30 Z', // hallway
+  'M8 8 H92 V92 H8 Z', // living room (the one room phone for the demo)
 ]
 const FloorPlan = () => (
   <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden="true">
