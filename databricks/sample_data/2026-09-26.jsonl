@@ -1,0 +1,52 @@
+{"type": "mode", "mode": "watch", "ts": 1790420400.0, "household": "maria"}
+{"type": "alert", "id": "1790423124.000", "kind": "alarm_clock", "zone": "bedroom", "severity": "warning", "source": "ast", "confidence": 0.96, "ts": 1790423124.0, "household": "maria"}
+{"type": "ack", "id": "1790423124.000", "by": "wearer", "ts": 1790423134.1710212, "household": "maria"}
+{"type": "sighting", "item": "wallet", "zone": "kitchen", "confidence": 0.4, "ts": 1790424360.0, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Did you take the blue pill this morning?", "ts": 1790425913.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790425913.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Did you take the blue pill this morning?", "ts": 1790428269.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790428269.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "alert", "id": "1790432080.000", "kind": "phone_ring", "zone": "living", "severity": "warning", "source": "ast", "confidence": 0.88, "ts": 1790432080.0, "household": "maria"}
+{"type": "ack", "id": "1790432080.000", "by": "wearer", "ts": 1790432086.622135, "household": "maria"}
+{"type": "alert", "id": "1790436341.000", "kind": "doorbell", "zone": "hallway", "severity": "warning", "source": "ast", "confidence": 0.71, "ts": 1790436341.0, "household": "maria"}
+{"type": "ack", "id": "1790436341.000", "by": "wearer", "ts": 1790436343.8313644, "household": "maria"}
+{"type": "sighting", "item": "glasses", "zone": "bedroom", "confidence": 0.36, "ts": 1790436480.0, "household": "maria"}
+{"type": "alert", "id": "1790436644.000", "kind": "kettle", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.89, "ts": 1790436644.0, "household": "maria"}
+{"type": "ack", "id": "1790436644.000", "by": "wearer", "ts": 1790436662.6475952, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Can you grab milk if you go out?", "ts": 1790438409.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790438409.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "alert", "id": "1790438555.000", "kind": "phone_ring", "zone": "living", "severity": "warning", "source": "ast", "confidence": 0.95, "ts": 1790438555.0, "household": "maria"}
+{"type": "ack", "id": "1790438555.000", "by": "wearer", "ts": 1790438559.3949678, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Call me when you wake up.", "ts": 1790438927.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790438927.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "alert", "id": "1790441062.000", "kind": "kettle", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.87, "ts": 1790441062.0, "household": "maria"}
+{"type": "ack", "id": "1790441062.000", "by": "wearer", "ts": 1790441071.7147305, "household": "maria"}
+{"type": "alert", "id": "1790444152.000", "kind": "phone_ring", "zone": "living", "severity": "warning", "source": "ast", "confidence": 0.9, "ts": 1790444152.0, "household": "maria"}
+{"type": "ack", "id": "1790444152.000", "by": "wearer", "ts": 1790444158.4201689, "household": "maria"}
+{"type": "sighting", "item": "keys", "zone": "kitchen", "confidence": 0.54, "ts": 1790447100.0, "household": "maria"}
+{"type": "alert", "id": "1790451484.000", "kind": "timer", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.73, "ts": 1790451484.0, "household": "maria"}
+{"type": "ack", "id": "1790451484.000", "by": "wearer", "ts": 1790451499.1650565, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Your appointment moved to Thursday at 2.", "ts": 1790453876.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790453876.0, "speaker": 2, "to_you": true, "household": "maria"}
+{"type": "alert", "id": "1790455504.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.86, "ts": 1790455504.0, "household": "maria"}
+{"type": "ack", "id": "1790455504.000", "by": "wearer", "ts": 1790455509.9646392, "household": "maria"}
+{"type": "alert", "id": "1790457182.000", "kind": "doorbell", "zone": "hallway", "severity": "warning", "source": "ast", "confidence": 0.72, "ts": 1790457182.0, "household": "maria"}
+{"type": "ack", "id": "1790457182.000", "by": "wearer", "ts": 1790457185.8413422, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Can you grab milk if you go out?", "ts": 1790458580.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790458580.0, "speaker": 1, "to_you": false, "household": "maria"}
+{"type": "sighting", "item": "glasses", "zone": "living", "confidence": 0.33, "ts": 1790461500.0, "household": "maria"}
+{"type": "alert", "id": "1790461562.000", "kind": "timer", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.98, "ts": 1790461562.0, "household": "maria"}
+{"type": "ack", "id": "1790461562.000", "by": "wearer", "ts": 1790461576.842338, "household": "maria"}
+{"type": "sighting", "item": "keys", "zone": "kitchen", "confidence": 0.59, "ts": 1790462580.0, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Can you grab milk if you go out?", "ts": 1790463384.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790463384.0, "speaker": 1, "to_you": false, "household": "maria"}
+{"type": "alert", "id": "1790466555.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.72, "ts": 1790466555.0, "household": "maria"}
+{"type": "ack", "id": "1790466555.000", "by": "wearer", "ts": 1790466560.9656436, "household": "maria"}
+{"type": "alert", "id": "1790468429.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.87, "ts": 1790468429.0, "household": "maria"}
+{"type": "ack", "id": "1790468429.000", "by": "wearer", "ts": 1790468431.8292143, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Your appointment moved to Thursday at 2.", "ts": 1790472665.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790472665.0, "speaker": 2, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Your appointment moved to Thursday at 2.", "ts": 1790472917.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790472917.0, "speaker": 2, "to_you": true, "household": "maria"}
+{"type": "sighting", "item": "keys", "zone": "kitchen", "confidence": 0.32, "ts": 1790473740.0, "household": "maria"}
+{"type": "mode", "mode": "night", "ts": 1790476200.0, "household": "maria"}

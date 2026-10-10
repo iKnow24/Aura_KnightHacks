@@ -1,0 +1,49 @@
+{"type": "mode", "mode": "watch", "ts": 1790852400.0, "household": "maria"}
+{"type": "alert", "id": "1790854332.000", "kind": "alarm_clock", "zone": "bedroom", "severity": "warning", "source": "ast", "confidence": 0.81, "ts": 1790854332.0, "household": "maria"}
+{"type": "ack", "id": "1790854332.000", "by": "wearer", "ts": 1790854336.8967128, "household": "maria"}
+{"type": "sighting", "item": "wallet", "zone": "hallway", "confidence": 0.37, "ts": 1790856720.0, "household": "maria"}
+{"type": "sighting", "item": "glasses", "zone": "living", "confidence": 0.6, "ts": 1790859600.0, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Your appointment moved to Thursday at 2.", "ts": 1790859856.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790859856.0, "speaker": 2, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Did you take the blue pill this morning?", "ts": 1790861191.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790861191.0, "speaker": 1, "to_you": false, "household": "maria"}
+{"type": "alert", "id": "1790861889.000", "kind": "doorbell", "zone": "hallway", "severity": "warning", "source": "ast", "confidence": 0.97, "ts": 1790861889.0, "household": "maria"}
+{"type": "ack", "id": "1790861889.000", "by": "wearer", "ts": 1790861893.7904375, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Your appointment moved to Thursday at 2.", "ts": 1790864048.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790864048.0, "speaker": 2, "to_you": true, "household": "maria"}
+{"type": "alert", "id": "1790865571.000", "kind": "doorbell", "zone": "hallway", "severity": "warning", "source": "ast", "confidence": 0.88, "ts": 1790865571.0, "household": "maria"}
+{"type": "ack", "id": "1790865571.000", "by": "wearer", "ts": 1790865576.2750103, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Did you take the blue pill this morning?", "ts": 1790867709.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790867709.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Your package is on the porch.", "ts": 1790868004.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790868004.0, "speaker": 3, "to_you": true, "household": "maria"}
+{"type": "alert", "id": "1790869964.000", "kind": "kettle", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.92, "ts": 1790869964.0, "household": "maria"}
+{"type": "ack", "id": "1790869964.000", "by": "wearer", "ts": 1790869973.8704119, "household": "maria"}
+{"type": "alert", "id": "1790870512.000", "kind": "timer", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.77, "ts": 1790870512.0, "household": "maria"}
+{"type": "ack", "id": "1790870512.000", "by": "wearer", "ts": 1790870522.675284, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Can you grab milk if you go out?", "ts": 1790871456.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790871456.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "sighting", "item": "wallet", "zone": "kitchen", "confidence": 0.55, "ts": 1790874120.0, "household": "maria"}
+{"type": "alert", "id": "1790876342.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.78, "ts": 1790876342.0, "household": "maria"}
+{"type": "ack", "id": "1790876342.000", "by": "wearer", "ts": 1790876346.9341445, "household": "maria"}
+{"type": "alert", "id": "1790878139.000", "kind": "kettle", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.84, "ts": 1790878139.0, "household": "maria"}
+{"type": "alert", "id": "1790881806.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.7, "ts": 1790881806.0, "household": "maria"}
+{"type": "ack", "id": "1790881806.000", "by": "wearer", "ts": 1790881810.2235184, "household": "maria"}
+{"type": "alert", "id": "1790888265.000", "kind": "phone_ring", "zone": "living", "severity": "warning", "source": "ast", "confidence": 0.96, "ts": 1790888265.0, "household": "maria"}
+{"type": "ack", "id": "1790888265.000", "by": "wearer", "ts": 1790888270.1034276, "household": "maria"}
+{"type": "alert", "id": "1790888308.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.76, "ts": 1790888308.0, "household": "maria"}
+{"type": "ack", "id": "1790888308.000", "by": "wearer", "ts": 1790888312.16129, "household": "maria"}
+{"type": "alert", "id": "1790891249.000", "kind": "phone_ring", "zone": "living", "severity": "warning", "source": "ast", "confidence": 0.71, "ts": 1790891249.0, "household": "maria"}
+{"type": "ack", "id": "1790891249.000", "by": "wearer", "ts": 1790891254.1660063, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Your package is on the porch.", "ts": 1790892947.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790892947.0, "speaker": 3, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Call me when you wake up.", "ts": 1790894887.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790894887.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "sighting", "item": "keys", "zone": "kitchen", "confidence": 0.46, "ts": 1790895060.0, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Can you grab milk if you go out?", "ts": 1790896572.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790896572.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "alert", "id": "1790900702.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.81, "ts": 1790900702.0, "household": "maria"}
+{"type": "ack", "id": "1790900702.000", "by": "wearer", "ts": 1790900708.8192663, "household": "maria"}
+{"type": "alert", "id": "1790903992.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.93, "ts": 1790903992.0, "household": "maria"}
+{"type": "ack", "id": "1790903992.000", "by": "wearer", "ts": 1790903999.3065684, "household": "maria"}
+{"type": "mode", "mode": "night", "ts": 1790908200.0, "household": "maria"}

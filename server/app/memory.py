@@ -13,6 +13,8 @@ It lives in RAM on purpose: restart the brain and the house forgets. That's the 
 """
 import time
 
+from .eventlog import record
+
 MAX_ENTRIES = 2000
 
 
@@ -23,6 +25,7 @@ class Memory:
     def add(self, entry: dict) -> dict:
         entry.setdefault("ts", time.time())
         self.entries.append(entry)
+        record(entry)
         del self.entries[:-MAX_ENTRIES]
         return entry
 
@@ -45,6 +48,7 @@ class Memory:
         for e in reversed(self.entries):
             if e["type"] == "speech" and abs(e["ts"] - ts) < 0.001:
                 e.update(speaker=speaker, to_you=to_you)
+                record({"type": "caption_meta", "ts": ts, "speaker": speaker, "to_you": to_you})
                 return e
         return None
 
