@@ -1,0 +1,14 @@
+---
+description: Lumen project rules for Cursor's agent
+alwaysApply: true
+---
+
+Read `AGENTS.md` at the repo root before making changes and follow it. The short version:
+
+- Never push to `main`; work on a branch and open a PR.
+- Before saying you're done, run `cd server && python -m pytest -q` and `cd web && npm run build`.
+- The alert JSON in `docs/agent-line.md` is a contract; don't change it unless asked.
+- No LLM decides whether a safety alert fires. No face recognition of strangers. No live video leaves a phone.
+- Captions and alerts stay large, plain and high contrast. Black/gray/white design; the Eclipse logo is the only color.
+- Never use `sudo` or reinstall `torch` on the AMD box. Never commit API keys.
+- Keep changes small and explain them in plain words.

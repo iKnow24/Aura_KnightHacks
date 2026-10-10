@@ -9,6 +9,7 @@ node_modules/
 dist/
 # Models and recordings (too big for git)
 models/
+!web/public/models/
 *.wav
 *.mp3
 *.pt
@@ -17,3 +18,5 @@ models/
 .DS_Store
 .vscode/
 .idea/
+web/public/mediapipe/wasm/
+event_log/
