@@ -1,0 +1,57 @@
+{"type": "mode", "mode": "watch", "ts": 1791025200.0, "household": "maria"}
+{"type": "alert", "id": "1791027934.000", "kind": "alarm_clock", "zone": "bedroom", "severity": "warning", "source": "ast", "confidence": 0.7, "ts": 1791027934.0, "household": "maria"}
+{"type": "ack", "id": "1791027934.000", "by": "wearer", "ts": 1791027943.4031317, "household": "maria"}
+{"type": "alert", "id": "1791028836.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.8, "ts": 1791028836.0, "household": "maria"}
+{"type": "ack", "id": "1791028836.000", "by": "wearer", "ts": 1791028841.7254, "household": "maria"}
+{"type": "alert", "id": "1791032391.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.77, "ts": 1791032391.0, "household": "maria"}
+{"type": "ack", "id": "1791032391.000", "by": "wearer", "ts": 1791032393.7859738, "household": "maria"}
+{"type": "alert", "id": "1791033310.000", "kind": "kettle", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.72, "ts": 1791033310.0, "household": "maria"}
+{"type": "ack", "id": "1791033310.000", "by": "wearer", "ts": 1791033317.3033714, "household": "maria"}
+{"type": "sighting", "item": "wallet", "zone": "kitchen", "confidence": 0.31, "ts": 1791034740.0, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "The plumber is coming Tuesday at ten.", "ts": 1791035792.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791035792.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "sighting", "item": "wallet", "zone": "kitchen", "confidence": 0.47, "ts": 1791036540.0, "household": "maria"}
+{"type": "sighting", "item": "wallet", "zone": "kitchen", "confidence": 0.4, "ts": 1791038640.0, "household": "maria"}
+{"type": "alert", "id": "1791042573.000", "kind": "knock", "zone": "hallway", "severity": "warning", "source": "ast", "confidence": 0.71, "ts": 1791042573.0, "household": "maria"}
+{"type": "ack", "id": "1791042573.000", "by": "wearer", "ts": 1791042585.743304, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Your appointment moved to Thursday at 2.", "ts": 1791042827.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791042827.0, "speaker": 2, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Dinner's ready, come eat!", "ts": 1791044081.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791044081.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "alert", "id": "1791045655.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.87, "ts": 1791045655.0, "household": "maria"}
+{"type": "ack", "id": "1791045655.000", "by": "wearer", "ts": 1791045662.7281113, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Your appointment moved to Thursday at 2.", "ts": 1791045719.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791045719.0, "speaker": 2, "to_you": false, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "I'm making soup, want some?", "ts": 1791049095.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791049095.0, "speaker": 3, "to_you": true, "household": "maria"}
+{"type": "sighting", "item": "glasses", "zone": "living", "confidence": 0.54, "ts": 1791052740.0, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "I refilled your pill organizer for the week.", "ts": 1791053030.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791053030.0, "speaker": 5, "to_you": false, "household": "maria"}
+{"type": "sighting", "item": "keys", "zone": "hallway", "confidence": 0.56, "ts": 1791053160.0, "household": "maria"}
+{"type": "alert", "id": "1791054640.000", "kind": "doorbell", "zone": "hallway", "severity": "warning", "source": "ast", "confidence": 0.97, "ts": 1791054640.0, "household": "maria"}
+{"type": "ack", "id": "1791054640.000", "by": "wearer", "ts": 1791054649.5285158, "household": "maria"}
+{"type": "alert", "id": "1791056501.000", "kind": "kettle", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.82, "ts": 1791056501.0, "household": "maria"}
+{"type": "ack", "id": "1791056501.000", "by": "wearer", "ts": 1791056514.2936747, "household": "maria"}
+{"type": "alert", "id": "1791059037.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.71, "ts": 1791059037.0, "household": "maria"}
+{"type": "ack", "id": "1791059037.000", "by": "wearer", "ts": 1791059044.2288642, "household": "maria"}
+{"type": "sighting", "item": "keys", "zone": "living", "confidence": 0.44, "ts": 1791060240.0, "household": "maria"}
+{"type": "alert", "id": "1791062377.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.74, "ts": 1791062377.0, "household": "maria"}
+{"type": "ack", "id": "1791062377.000", "by": "wearer", "ts": 1791062385.9213922, "household": "maria"}
+{"type": "alert", "id": "1791064276.000", "kind": "timer", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.98, "ts": 1791064276.0, "household": "maria"}
+{"type": "ack", "id": "1791064276.000", "by": "wearer", "ts": 1791064291.7005432, "household": "maria"}
+{"type": "alert", "id": "1791067496.000", "kind": "phone_ring", "zone": "living", "severity": "warning", "source": "ast", "confidence": 0.96, "ts": 1791067496.0, "household": "maria"}
+{"type": "ack", "id": "1791067496.000", "by": "wearer", "ts": 1791067503.998588, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Your appointment moved to Thursday at 2.", "ts": 1791068597.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791068597.0, "speaker": 2, "to_you": true, "household": "maria"}
+{"type": "alert", "id": "1791071191.000", "kind": "timer", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.77, "ts": 1791071191.0, "household": "maria"}
+{"type": "ack", "id": "1791071191.000", "by": "wearer", "ts": 1791071197.2263231, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "I put your glasses on the nightstand.", "ts": 1791071900.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791071900.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Your blood test results came back normal.", "ts": 1791071984.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791071984.0, "speaker": 2, "to_you": false, "household": "maria"}
+{"type": "alert", "id": "1791075083.000", "kind": "phone_ring", "zone": "living", "severity": "warning", "source": "ast", "confidence": 0.78, "ts": 1791075083.0, "household": "maria"}
+{"type": "ack", "id": "1791075083.000", "by": "wearer", "ts": 1791075090.2457922, "household": "maria"}
+{"type": "alert", "id": "1791075928.000", "kind": "phone_ring", "zone": "living", "severity": "warning", "source": "ast", "confidence": 0.77, "ts": 1791075928.0, "household": "maria"}
+{"type": "ack", "id": "1791075928.000", "by": "wearer", "ts": 1791075938.9086034, "household": "maria"}
+{"type": "sighting", "item": "keys", "zone": "kitchen", "confidence": 0.59, "ts": 1791077640.0, "household": "maria"}
+{"type": "mode", "mode": "night", "ts": 1791081000.0, "household": "maria"}

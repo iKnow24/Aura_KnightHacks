@@ -1,0 +1,56 @@
+{"type": "alert", "id": "1790662380.000", "kind": "smoke_alarm", "zone": "kitchen", "severity": "critical", "source": "ast", "confidence": 0.88, "ts": 1790662380.0, "household": "maria"}
+{"type": "ack", "id": "1790662380.000", "by": "wearer", "ts": 1790662392.118502, "household": "maria"}
+{"type": "mode", "mode": "watch", "ts": 1790679600.0, "household": "maria"}
+{"type": "alert", "id": "1790682864.000", "kind": "alarm_clock", "zone": "bedroom", "severity": "warning", "source": "ast", "confidence": 0.72, "ts": 1790682864.0, "household": "maria"}
+{"type": "ack", "id": "1790682864.000", "by": "wearer", "ts": 1790682869.0506694, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "I'm making soup, want some?", "ts": 1790683800.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790683800.0, "speaker": 3, "to_you": false, "household": "maria"}
+{"type": "alert", "id": "1790686079.000", "kind": "kettle", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.85, "ts": 1790686079.0, "household": "maria"}
+{"type": "ack", "id": "1790686079.000", "by": "wearer", "ts": 1790686092.6888413, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "The plumber is coming Tuesday at ten.", "ts": 1790689025.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790689025.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Time for your walk, Maria.", "ts": 1790690430.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790690430.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "I'm going to soccer practice, bye!", "ts": 1790695145.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790695145.0, "speaker": 4, "to_you": false, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Your package is on the porch.", "ts": 1790695917.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790695917.0, "speaker": 3, "to_you": false, "household": "maria"}
+{"type": "sighting", "item": "glasses", "zone": "bedroom", "confidence": 0.58, "ts": 1790696700.0, "household": "maria"}
+{"type": "alert", "id": "1790697662.000", "kind": "timer", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.74, "ts": 1790697662.0, "household": "maria"}
+{"type": "ack", "id": "1790697662.000", "by": "wearer", "ts": 1790697675.548671, "household": "maria"}
+{"type": "sighting", "item": "glasses", "zone": "bedroom", "confidence": 0.57, "ts": 1790698560.0, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Grandma, look at this video!", "ts": 1790698988.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790698988.0, "speaker": 4, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Grandma, can I use the laptop?", "ts": 1790699053.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790699053.0, "speaker": 4, "to_you": false, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Mom, I'm heading out, back around six.", "ts": 1790699344.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790699344.0, "speaker": 1, "to_you": false, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "I fixed the TV remote.", "ts": 1790700333.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790700333.0, "speaker": 4, "to_you": true, "household": "maria"}
+{"type": "sighting", "item": "keys", "zone": "living", "confidence": 0.4, "ts": 1790701620.0, "household": "maria"}
+{"type": "alert", "id": "1790705811.000", "kind": "kettle", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.72, "ts": 1790705811.0, "household": "maria"}
+{"type": "ack", "id": "1790705811.000", "by": "wearer", "ts": 1790705825.9942107, "household": "maria"}
+{"type": "sighting", "item": "wallet", "zone": "kitchen", "confidence": 0.41, "ts": 1790707680.0, "household": "maria"}
+{"type": "alert", "id": "1790708958.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.91, "ts": 1790708958.0, "household": "maria"}
+{"type": "ack", "id": "1790708958.000", "by": "wearer", "ts": 1790708971.5132997, "household": "maria"}
+{"type": "alert", "id": "1790710622.000", "kind": "phone_ring", "zone": "living", "severity": "warning", "source": "ast", "confidence": 0.81, "ts": 1790710622.0, "household": "maria"}
+{"type": "ack", "id": "1790710622.000", "by": "wearer", "ts": 1790710628.6932557, "household": "maria"}
+{"type": "alert", "id": "1790710995.000", "kind": "kettle", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.84, "ts": 1790710995.0, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Grandma, can I use the laptop?", "ts": 1790711347.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790711347.0, "speaker": 4, "to_you": false, "household": "maria"}
+{"type": "alert", "id": "1790713052.000", "kind": "doorbell", "zone": "hallway", "severity": "warning", "source": "ast", "confidence": 0.89, "ts": 1790713052.0, "household": "maria"}
+{"type": "ack", "id": "1790713052.000", "by": "wearer", "ts": 1790713059.586135, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Lunch is soup and a sandwich today.", "ts": 1790713076.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790713076.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Your appointment moved to Thursday at 2.", "ts": 1790719604.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1790719604.0, "speaker": 2, "to_you": true, "household": "maria"}
+{"type": "alert", "id": "1790722665.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.93, "ts": 1790722665.0, "household": "maria"}
+{"type": "ack", "id": "1790722665.000", "by": "wearer", "ts": 1790722677.4567015, "household": "maria"}
+{"type": "sighting", "item": "keys", "zone": "living", "confidence": 0.42, "ts": 1790723340.0, "household": "maria"}
+{"type": "alert", "id": "1790725491.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.85, "ts": 1790725491.0, "household": "maria"}
+{"type": "ack", "id": "1790725491.000", "by": "wearer", "ts": 1790725500.4322743, "household": "maria"}
+{"type": "sighting", "item": "keys", "zone": "living", "confidence": 0.3, "ts": 1790727660.0, "household": "maria"}
+{"type": "sighting", "item": "wallet", "zone": "kitchen", "confidence": 0.42, "ts": 1790732220.0, "household": "maria"}
+{"type": "alert", "id": "1790733061.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.94, "ts": 1790733061.0, "household": "maria"}
+{"type": "ack", "id": "1790733061.000", "by": "wearer", "ts": 1790733076.612921, "household": "maria"}
+{"type": "mode", "mode": "night", "ts": 1790735400.0, "household": "maria"}

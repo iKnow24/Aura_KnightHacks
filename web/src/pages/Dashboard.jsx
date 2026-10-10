@@ -49,7 +49,7 @@ export default function Dashboard() {
         <header className="mb-3 flex flex-wrap items-center gap-3">
           <h1 className="flex items-center gap-3"><Wordmark size={13} /><span className="text-sm text-zinc-500">{user?.household ?? 'Home'}</span></h1>
           <span className={`glass flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${connected ? 'text-emerald-300' : 'text-red-300'}`}>
-            <span className={`h-2 w-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-red-500'}`} />
+            <span className={`h-2 w-2 rounded-full ${connected ? 'live-dot bg-emerald-400' : 'bg-red-500'}`} />
             {connected ? 'Brain connected' : 'Brain offline'}
           </span>
           <button onClick={() => setShowQr((v) => !v)} className="glass ml-auto rounded-full px-4 py-1.5 text-sm font-medium hover:border-white/20">
@@ -77,7 +77,7 @@ export default function Dashboard() {
             const alive = node && now - node.last_seen < 10
             return (
               <div key={id} className="absolute -translate-x-1/2 -translate-y-1/2 text-center" style={{ left: `${z.x}%`, top: `${z.y}%` }}>
-                <div className={`mx-auto mb-2 h-2 w-2 rounded-full ${alive ? 'bg-emerald-400' : 'border border-zinc-600'}`} />
+                <div className={`mx-auto mb-2 h-2 w-2 rounded-full ${alive ? 'live-dot bg-emerald-400' : 'border border-zinc-600'}`} />
                 <div className="text-sm font-medium">{z.label}</div>
                 <div className={`text-xs ${alive ? 'text-emerald-300' : 'text-zinc-500'}`}>{alive ? 'node live' : 'no node'}</div>
               </div>

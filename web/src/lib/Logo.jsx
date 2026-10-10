@@ -25,10 +25,14 @@ export default function Logo({ size = 28, color, live = false, className = '' })
       </defs>
       <motion.g style={{ transformOrigin: '32px 32px' }}
         animate={spin ? { rotate: 360 } : undefined}
-        transition={spin ? { duration: 24, ease: 'linear', repeat: Infinity } : undefined}>
-        <circle cx="32" cy="32" r="21" fill={paint} mask={`url(#m${id})`} />
-        <circle cx="32" cy="32" r="20.2" stroke={paint} strokeWidth="1.6" opacity=".9" />
-        <circle cx="50.2" cy="21.3" r="3" fill={color ? '#fff' : '#FFE3B8'} />
+        transition={spin ? { delay: 1.8, duration: 24, ease: 'linear', repeat: Infinity } : undefined}>
+        {/* Live: the thin ring draws itself, the crescent fades in behind it, then the bead lights up. */}
+        <motion.circle cx="32" cy="32" r="21" fill={paint} mask={`url(#m${id})`}
+          initial={spin ? { opacity: 0 } : false} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 1.2 }} />
+        <motion.circle cx="32" cy="32" r="20.2" stroke={paint} strokeWidth="1.6" opacity=".9" style={{ rotate: -60, transformOrigin: '32px 32px' }}
+          initial={spin ? { pathLength: 0 } : false} animate={{ pathLength: 1 }} transition={{ duration: 1.4, ease: [0.2, 0.7, 0.2, 1] }} />
+        <motion.circle cx="50.2" cy="21.3" r="3" fill={color ? '#fff' : '#FFE3B8'} style={{ transformOrigin: '50.2px 21.3px' }}
+          initial={spin ? { scale: 0 } : false} animate={spin ? { scale: [0, 1.6, 1] } : { scale: 1 }} transition={{ delay: 1.2, duration: 0.7 }} />
       </motion.g>
     </svg>
   )

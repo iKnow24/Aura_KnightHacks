@@ -1,0 +1,56 @@
+{"type": "mode", "mode": "watch", "ts": 1791457200.0, "household": "maria"}
+{"type": "alert", "id": "1791458333.000", "kind": "alarm_clock", "zone": "bedroom", "severity": "warning", "source": "ast", "confidence": 0.89, "ts": 1791458333.0, "household": "maria"}
+{"type": "ack", "id": "1791458333.000", "by": "wearer", "ts": 1791458338.6190784, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Your package is on the porch.", "ts": 1791461444.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791461444.0, "speaker": 3, "to_you": true, "household": "maria"}
+{"type": "alert", "id": "1791463486.000", "kind": "kettle", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.85, "ts": 1791463486.0, "household": "maria"}
+{"type": "ack", "id": "1791463486.000", "by": "wearer", "ts": 1791463523.4206614, "household": "maria"}
+{"type": "sighting", "item": "wallet", "zone": "kitchen", "confidence": 0.42, "ts": 1791463740.0, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "I'm going to soccer practice, bye!", "ts": 1791468075.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791468075.0, "speaker": 4, "to_you": false, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Did you sleep okay last night?", "ts": 1791468137.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791468137.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "sighting", "item": "keys", "zone": "hallway", "confidence": 0.34, "ts": 1791470040.0, "household": "maria"}
+{"type": "sighting", "item": "glasses", "zone": "bedroom", "confidence": 0.56, "ts": 1791470520.0, "household": "maria"}
+{"type": "sighting", "item": "glasses", "zone": "living", "confidence": 0.52, "ts": 1791471120.0, "household": "maria"}
+{"type": "alert", "id": "1791473885.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.94, "ts": 1791473885.0, "household": "maria"}
+{"type": "ack", "id": "1791473885.000", "by": "wearer", "ts": 1791473905.2528796, "household": "maria"}
+{"type": "sighting", "item": "wallet", "zone": "hallway", "confidence": 0.4, "ts": 1791474780.0, "household": "maria"}
+{"type": "alert", "id": "1791475584.000", "kind": "phone_ring", "zone": "living", "severity": "warning", "source": "ast", "confidence": 0.78, "ts": 1791475584.0, "household": "maria"}
+{"type": "ack", "id": "1791475584.000", "by": "wearer", "ts": 1791475592.3222024, "household": "maria"}
+{"type": "sighting", "item": "keys", "zone": "kitchen", "confidence": 0.45, "ts": 1791475620.0, "household": "maria"}
+{"type": "alert", "id": "1791477371.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.74, "ts": 1791477371.0, "household": "maria"}
+{"type": "ack", "id": "1791477371.000", "by": "wearer", "ts": 1791477390.8010836, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Did you take the blue pill this morning?", "ts": 1791478506.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791478506.0, "speaker": 1, "to_you": false, "household": "maria"}
+{"type": "alert", "id": "1791480666.000", "kind": "doorbell", "zone": "hallway", "severity": "warning", "source": "ast", "confidence": 0.79, "ts": 1791480666.0, "household": "maria"}
+{"type": "ack", "id": "1791480666.000", "by": "wearer", "ts": 1791480677.3186038, "household": "maria"}
+{"type": "alert", "id": "1791482836.000", "kind": "knock", "zone": "hallway", "severity": "warning", "source": "ast", "confidence": 0.92, "ts": 1791482836.0, "household": "maria"}
+{"type": "ack", "id": "1791482836.000", "by": "wearer", "ts": 1791482844.9418242, "household": "maria"}
+{"type": "alert", "id": "1791482919.000", "kind": "timer", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.89, "ts": 1791482919.0, "household": "maria"}
+{"type": "ack", "id": "1791482919.000", "by": "wearer", "ts": 1791482932.6192956, "household": "maria"}
+{"type": "sighting", "item": "glasses", "zone": "bedroom", "confidence": 0.58, "ts": 1791485040.0, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Did you sleep okay last night?", "ts": 1791486382.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791486382.0, "speaker": 5, "to_you": false, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "I fixed the TV remote.", "ts": 1791487921.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791487921.0, "speaker": 4, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Grandma, can I use the laptop?", "ts": 1791489847.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791489847.0, "speaker": 4, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Your appointment moved to Thursday at 2.", "ts": 1791492721.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791492721.0, "speaker": 2, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Don't forget your sweater, it's cold out.", "ts": 1791493870.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791493870.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Let's check your blood pressure.", "ts": 1791498989.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791498989.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Did you sleep okay last night?", "ts": 1791501136.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791501136.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "alert", "id": "1791507213.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.78, "ts": 1791507213.0, "household": "maria"}
+{"type": "ack", "id": "1791507213.000", "by": "wearer", "ts": 1791507218.2680962, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Let's check your blood pressure.", "ts": 1791507622.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791507622.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Did you sleep okay last night?", "ts": 1791509076.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791509076.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Don't forget your sweater, it's cold out.", "ts": 1791510835.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1791510835.0, "speaker": 1, "to_you": false, "household": "maria"}
+{"type": "mode", "mode": "night", "ts": 1791513000.0, "household": "maria"}
+{"type": "alert", "id": "1791517320.000", "kind": "doorbell", "zone": "hallway", "severity": "warning", "source": "ast", "confidence": 0.78, "ts": 1791517320.0, "household": "maria"}
