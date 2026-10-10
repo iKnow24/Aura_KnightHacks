@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import AlertStack, { useAlerts } from '../lib/AlertToast'
 import { detectFaces, FaceTracker, loadFaces, toScreen } from '../lib/faces'
+import { Camera, CameraOff, Clapperboard, Download, Ellipsis, Footprints, GraduationCap, House, Lock, Zap } from 'lucide-react'
 import Logo from '../lib/Logo'
 import Recap from '../lib/Recap'
 import { api, keepAwake, useBrain } from '../lib/useBrain'
@@ -388,7 +389,7 @@ export default function Captions() {
         <motion.div className="pointer-events-none absolute h-[480px] w-[480px] rounded-full bg-amber-500/15 blur-3xl"
           animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 4, repeat: Infinity }} />
         <div className="relative">
-          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="mx-auto w-fit"><Logo size={72} /></motion.div>
+          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="mx-auto w-fit"><Logo size={84} live /></motion.div>
           <h1 className="mt-4 text-4xl font-bold tracking-tight">Live captions</h1>
           <p className="mx-auto mt-2 max-w-xs text-zinc-400">Hold your phone up like a window. Words appear as they’re spoken, and Lumen watches the sounds around you.</p>
           <button onClick={start} className="mt-8 rounded-full bg-amber-400 px-8 py-3 text-lg font-semibold text-black">Start</button>
@@ -417,7 +418,7 @@ export default function Captions() {
       <AlertStack alerts={alerts} onAck={ack} />
 
       {/* Top-left: who you are and what mode. Always visible, quiet. */}
-      <div className="absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-10 flex max-w-[33%] items-center gap-2 overflow-hidden whitespace-nowrap rounded-full bg-black/40 px-3 py-1.5 text-sm backdrop-blur">
+      <div className="absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-10 flex max-w-[33%] items-center gap-2 overflow-hidden whitespace-nowrap glass-dark rounded-full px-3 py-1.5 text-sm">
         <Logo size={18} />
         <span className="truncate font-medium">{modeLabel}</span>
         <span className={`h-1.5 w-1.5 rounded-full ${connected ? 'bg-green-400' : 'bg-red-500'}`} />
@@ -428,7 +429,7 @@ export default function Captions() {
       <AnimatePresence>
         {notice && (
           <motion.div key={notice} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}
-            className="absolute left-3 top-[45%] z-20 max-w-[34%] rounded-2xl bg-black/70 p-3 text-sm backdrop-blur">{notice}</motion.div>
+            className="absolute left-3 top-[45%] z-20 max-w-[34%] glass-dark rounded-2xl p-3 text-sm">{notice}</motion.div>
         )}
       </AnimatePresence>
 
@@ -437,7 +438,7 @@ export default function Captions() {
       ) : (<>
       {/* Right: the see-through transcript. Scroll up for history; it stops following until you come back down. */}
       <section onClick={(e) => e.stopPropagation()}
-        className={`absolute bottom-0 right-0 top-0 z-10 flex flex-col border-l border-white/10 bg-black/45 backdrop-blur-md ${camera ? 'w-[64%] rounded-l-3xl sm:w-[42%]' : 'w-full'}`}>
+        className={`absolute bottom-0 right-0 top-0 z-10 flex flex-col glass-dark border-y-0 border-r-0 ${camera ? 'w-[64%] rounded-l-3xl sm:w-[42%]' : 'w-full'}`}>
         <div ref={scroller} onScroll={onScroll} className="flex-1 overflow-y-auto px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
           {whisperOff && realEngine === 'private' && (
             <p className="mb-3 rounded-xl bg-amber-950/80 p-3 text-xs text-amber-200">Private captions need Whisper on the Lumen brain, and it isn’t running.{mode !== 'outside' && ' Switch to Instant.'}</p>
@@ -488,7 +489,7 @@ export default function Captions() {
         {picker && (
           <motion.aside onClick={(e) => e.stopPropagation()} initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
             transition={{ type: 'spring', stiffness: 380, damping: 34 }}
-            className="absolute bottom-0 left-0 top-0 z-30 flex w-[72%] max-w-sm flex-col gap-2 bg-zinc-950/90 p-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-xl">
+            className="absolute bottom-0 left-0 top-0 z-30 flex w-[72%] max-w-sm flex-col gap-2 glass-dark p-4 pt-[max(1rem,env(safe-area-inset-top))]">
             <div className="text-xs uppercase tracking-widest text-amber-400">Modes</div>
             <p className="text-xs text-zinc-500">Say a mode’s name, or tap it.</p>
             {Object.entries(state.modes).filter(([k]) => k !== 'watch').map(([k, label]) => (
@@ -517,20 +518,20 @@ export default function Captions() {
         {bar && (
           <motion.footer onClick={(e) => { e.stopPropagation(); showBar() }} initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }}
             transition={{ type: 'spring', stiffness: 400, damping: 36 }}
-            className="absolute inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 flex flex-wrap items-center gap-2 rounded-3xl bg-zinc-950/85 p-2 backdrop-blur-xl">
+            className="absolute inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 flex flex-wrap items-center gap-2 glass-dark rounded-[28px] p-2">
             <div className="flex rounded-full bg-zinc-900 p-1">
               {MAIN_MODES.map((k) => (
                 <button key={k} onClick={() => switchMode(k)} className={`rounded-full px-3 py-1.5 text-sm ${mode === k ? 'bg-amber-400 font-semibold text-black' : 'text-zinc-400'}`}>
-                  {{ wearer: '🏠', lecture: '🎓', outside: '🚶' }[k]}
+                  {{ wearer: <House size={18} />, lecture: <GraduationCap size={18} />, outside: <Footprints size={18} /> }[k]}
                 </button>
               ))}
-              <button onClick={() => setPicker(true)} className="rounded-full px-3 py-1.5 text-sm text-zinc-400">⋯</button>
+              <button onClick={() => setPicker(true)} className="rounded-full px-3 py-1.5 text-sm text-zinc-400"><Ellipsis size={18} /></button>
             </div>
             <button onClick={() => setEngine(engine === 'instant' ? 'private' : 'instant')} disabled={mode === 'outside'}
-              className="rounded-full bg-zinc-900 px-3 py-2 text-sm">{realEngine === 'instant' ? '⚡ Instant' : '🔒 Private'}</button>
-            <button onClick={camera ? stopCamera : startCamera} className="rounded-full bg-zinc-900 px-3 py-2 text-sm">{camera ? '📷 On' : '📷 Off'}</button>
-            <button onClick={() => setLook(look === 'cinema' ? 'panel' : 'cinema')} className={`rounded-full px-3 py-2 text-sm ${look === 'cinema' ? 'bg-white text-black' : 'bg-zinc-900'}`}>🎬</button>
-            <button onClick={download} className="rounded-full bg-zinc-900 px-3 py-2 text-sm">⬇︎</button>
+              className="flex items-center gap-1.5 rounded-full bg-zinc-900 px-3 py-2 text-sm">{realEngine === 'instant' ? <><Zap size={15} /> Instant</> : <><Lock size={15} /> Private</>}</button>
+            <button onClick={camera ? stopCamera : startCamera} className="flex items-center gap-1.5 rounded-full bg-zinc-900 px-3 py-2 text-sm">{camera ? <><Camera size={15} /> On</> : <><CameraOff size={15} /> Off</>}</button>
+            <button onClick={() => setLook(look === 'cinema' ? 'panel' : 'cinema')} className={`rounded-full px-3 py-2 text-sm ${look === 'cinema' ? 'bg-white text-black' : 'bg-zinc-900'}`}><Clapperboard size={16} /></button>
+            <button onClick={download} className="rounded-full bg-zinc-900 px-3 py-2 text-sm"><Download size={16} /></button>
             {mode === 'lecture' && (
               <>
                 <button onClick={playSample} className="rounded-full bg-zinc-900 px-3 py-2 text-sm">Sample</button>

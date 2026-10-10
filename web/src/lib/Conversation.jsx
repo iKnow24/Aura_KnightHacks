@@ -25,8 +25,8 @@ export default function Conversation({ lines }) {
   const end = useRef()
   useEffect(() => end.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), [lines.length])
   return (
-    <section className="flex max-h-[420px] flex-col rounded-2xl border border-zinc-800 p-4">
-      <h2 className="font-semibold">Conversation</h2>
+    <section className="glass flex max-h-[420px] flex-col rounded-3xl p-4">
+      <h2 className="font-bold">Conversation</h2>
       <div className="mt-2 flex-1 space-y-3 overflow-y-auto pr-1">
         {lines.length === 0 && <p className="text-zinc-500">Nothing heard yet. Captions appear here as people talk.</p>}
         <AnimatePresence initial={false}>

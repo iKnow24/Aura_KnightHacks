@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import { Mic } from 'lucide-react'
 import { useState } from 'react'
 import { ALERT_TEXT, ZONES } from './zones'
 
@@ -39,8 +40,8 @@ export default function AskLumen() {
   }
 
   return (
-    <section className="rounded-2xl border border-zinc-800 p-4">
-      <h2 className="font-semibold">Ask Lumen</h2>
+    <section className="glass rounded-3xl p-4">
+      <h2 className="font-bold">Ask <span className="text-gradient">Lumen</span></h2>
       <form onSubmit={(e) => { e.preventDefault(); ask(q) }} className="mt-2 flex gap-2">
         <input
           value={q} onChange={(e) => setQ(e.target.value)} placeholder="Where are my keys?"
@@ -48,7 +49,7 @@ export default function AskLumen() {
         />
         {Speech && (
           <button type="button" onClick={listen} title="Ask by voice"
-            className={`rounded-lg px-3 ${listening ? 'animate-pulse bg-red-500' : 'bg-zinc-800 hover:bg-zinc-700'}`}>🎙️</button>
+            className={`rounded-lg px-3 ${listening ? 'animate-pulse bg-red-500' : 'bg-zinc-800 hover:bg-zinc-700'}`}><Mic size={18} /></button>
         )}
         <button disabled={busy} className="rounded-lg bg-amber-400 px-4 font-semibold text-black disabled:opacity-50">
           {busy ? '…' : 'Ask'}
@@ -63,7 +64,7 @@ export default function AskLumen() {
       <AnimatePresence mode="wait">
         {result && (
           <motion.div key={result.question + result.answer} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className="mt-4 rounded-xl bg-zinc-900 p-4">
+            className="mt-4 rounded-2xl bg-zinc-900 p-4">
             <div className="text-lg leading-snug">{result.answer}</div>
             {result.evidence?.length > 0 && (
               <ul className="mt-3 space-y-2">
