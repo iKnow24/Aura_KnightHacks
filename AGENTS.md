@@ -35,10 +35,11 @@ Devices on stage:
 | Device | Page | Job |
 | --- | --- | --- |
 | Wearer's phone (hand-held or in headset) | `/captions` | captions, alerts, Room view |
-| Kitchen / hallway phones | `/node?zone=kitchen` | listen + pose; one still every 5 s |
+| Mac webcam (or a spare phone) | `/node?zone=kitchen` | listen + pose; one still every 5 s |
 | Bedroom phone (Android) | `/strobe` | tap to arm, flashes on alerts |
 | Laptop | `/dashboard` | caregiver view, mode switch, fake alerts |
 | Optional | `/rear`, `/mic` | bag-mounted rear camera (Outside mode), extra mic |
+| Projector | `scrcpy` on the Mac | mirrors the Android phone's screen |
 
 ## Repo map
 
@@ -155,5 +156,4 @@ Setup steps: `databricks/REAL_DATA.md`.
   `web/public/splats/`.
 - Untested: fall detection on a real person, the 3D walking view on real phones, the Databricks pipeline and
   `databricks_sync.py` on a real workspace (unit tests use a fake Databricks). GPU vs CPU number not recorded yet.
-- `docs/demo.md` still mentions `/headset` and `Headset.jsx`; read those as `/captions` and `Captions.jsx`.
 - GitHub Pages demo site needs Settings > Pages > Source: GitHub Actions. README still needs teammate names.
