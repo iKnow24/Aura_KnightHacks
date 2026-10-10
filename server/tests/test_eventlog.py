@@ -16,7 +16,7 @@ def test_off_by_default(tmp_path, monkeypatch):
     assert not list(tmp_path.iterdir())
 
 
-def test_alert_ack_speech_and_mode_land_in_daily_file(tmp_path, monkeypatch):
+def test_alert_ack_speech_and_mode_land_in_hourly_file(tmp_path, monkeypatch):
     monkeypatch.setenv("EVENT_LOG_DIR", str(tmp_path))
     monkeypatch.setenv("LUMEN_HOUSEHOLD", "maria")
     hub, memory = Hub("watch"), Memory()
@@ -35,3 +35,11 @@ def test_alert_ack_speech_and_mode_land_in_daily_file(tmp_path, monkeypatch):
     assert all(e["household"] == "maria" for e in got)
     assert got[1]["id"] == got[0]["id"]
     assert "thumb" not in got[-1]
+
+
+def test_one_file_per_hour(tmp_path, monkeypatch):
+    # Auto Loader reads a file name once, so a finished hour must never be appended to again.
+    monkeypatch.setenv("EVENT_LOG_DIR", str(tmp_path))
+    record({"type": "speech", "text": "a", "ts": 1760000000.0})
+    record({"type": "speech", "text": "b", "ts": 1760000000.0 + 3600})
+    assert len(list(tmp_path.glob("*.jsonl"))) == 2
