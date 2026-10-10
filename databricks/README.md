@@ -56,31 +56,45 @@ the first 13 days, run the pipeline, then upload the last day and run again: onl
 `pipeline/lumen_pipeline.sql` (paste it in, or import this repo as a Git folder). Under
 **Settings → Configuration** add `spark.sql.session.timeZone` = `America/New_York`. Run it.
 
-## 4. Genie space
+## 4. Genie agent
 
-**+ New → Genie space**, add all `gold_*` tables plus `silver_speech`. Paste into **Instructions**:
-
-```
-This is one hearing-impaired person's home, watched by Lumen. household = the person.
-"Noticed" means she tapped the alert. missed = not tapped within 5 minutes.
-Night is 10 PM to 7 AM. Ignore severity 'info' (kettle, timer) when judging how she is doing.
-For "is she doing worse" questions, use gold_change_from_normal for the latest day.
-Never call anything a diagnosis; say "a change from her usual".
-```
-
-Sample questions (also add them as **benchmarks**):
-- Is Mom slower to notice things this week than last week?
-- How many alerts did she miss at night this week?
-- Which kind of alert does she miss most?
-- Who talked to her most yesterday?
-- Where were her keys last seen?
+Follow `genie_setup.md`: instructions, three example queries, one filter, and benchmarks, all
+ready to paste.
 
 ## 5. Dashboard (one page)
 
-- Line: `gold_daily.median_seconds_to_notice` by `day`
-- Bars: `gold_daily.missed_alerts` and `missed_at_night` by `day`
-- Counter: latest `gold_change_from_normal.pct_slower`, red when `flagged`
-- Table: `gold_alert_response` where `missed`, newest first
+**+ New → Dashboard**, name it "How is Mom doing?". In the **Data** tab add the five datasets in
+`dashboard_datasets.sql` (one block each). Then on the canvas:
+
+| Widget | Dataset | Setup |
+|---|---|---|
+| Counter: "Slower than usual" | status | value `pct_slower`, title it "% slower than last week" |
+| Counter: "Missed this week" | status | value `missed_this_week` |
+| Text: status line | status | `status` column |
+| Line chart | daily | x `day`, y `median_seconds_to_notice` |
+| Bar chart | daily | x `day`, y `missed_alerts` and `missed_at_night` |
+| Bar chart | by_kind | x `kind`, y `missed_pct` |
+| Table | missed | all columns |
+| Bar chart | people | x `speaker`, y `lines` |
+
+Shortcut from the workshop: with nothing selected, open **Genie Code** in the dashboard editor and
+paste: *"Build a caregiver page: two counters from status, a line of median_seconds_to_notice by
+day and bars of missed_alerts by day from daily, a bar of missed_pct by kind, and the missed
+table."* Review what it makes.
+
+Then **Settings → Enable Genie → Link existing Genie agent**, paste your agent's URL, and
+**Publish**. The caregiver gets charts on top and an "Ask Genie" box on the same page.
+
+## 6. The live demo: "a new week arrives"
+
+1. Before judging: upload only the **first 7 files** (2026-09-26 to 2026-10-02) to the volume, run
+   the pipeline, refresh the dashboard. It reads **"Normal for her."**
+2. In front of the judge: upload the **other 7 files** to the volume.
+3. Pipeline → **Run** (or a Job: **Create → Job**, task 1 = pipeline, task 2 = Dashboard refresh,
+   **Run now**). Auto Loader reads only the 7 new files.
+4. Refresh the dashboard: it flips to **"Worth a call: slower than her usual"**, about 51% slower,
+   8 missed vs 2.
+5. Ask Genie on the dashboard: *"Is Mom doing okay this week?"*
 
 ## Stretch: Ask Lumen calls Genie
 
