@@ -42,7 +42,21 @@ function useHeading() {
   return { heading: (heading - offset + 360) % 360, start, recenter }
 }
 
-function Eye({ stream, alert, sector, people, bubbles, speaking, rooms, stereo }) {
+// Captions: plain white on dark glass, one thin ring, no color except a small dot for who's talking.
+const CAPTION = 'rounded-2xl bg-black/75 px-3.5 py-2 text-lg font-medium leading-snug tracking-tight text-white ring-1 ring-white/10 backdrop-blur-md'
+
+const Dot = ({ color }) => <span className="mr-2 inline-block h-2 w-2 rounded-full align-middle" style={{ background: color ?? '#a1a1aa' }} />
+
+// Words fade in one after another. Keyed by position, so when a partial line grows only the new words animate.
+function Words({ text }) {
+  return text.split(/\s+/).filter(Boolean).map((w, i) => (
+    <motion.span key={i} className="mr-[0.27em] inline-block"
+      initial={{ opacity: 0, y: 3, filter: 'blur(3px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      transition={{ delay: Math.min(i * 0.04, 0.5), duration: 0.22 }}>{w}</motion.span>
+  ))
+}
+
+function Eye({ stream, alert, sector, people, bubbles, speaking, rooms, partial, stereo }) {
   const ref = useRef()
   const box = useRef()
   useEffect(() => { if (ref.current && stream) ref.current.srcObject = stream }, [stream])
@@ -53,36 +67,43 @@ function Eye({ stream, alert, sector, people, bubbles, speaking, rooms, stereo }
     <div ref={box} className={stereo ? 'relative aspect-square h-[86%] max-w-[94%] overflow-hidden rounded-[28px]' : 'relative h-full w-full overflow-hidden'}>
       <video ref={ref} autoPlay playsInline muted className="h-full w-full object-cover" />
 
-      {/* "…" over a face whose lips move while the mic hears speech: instant feedback before the words arrive. */}
-      {speaking && people.filter((p) => p.talk > TALKING && !placed.some((b) => b.person === p)).map((p) => (
-        <motion.div key={`dots-${p.id}`} className="absolute -translate-x-1/2 -translate-y-full rounded-full px-3 py-1 text-xl font-bold"
-          style={{ ...at(p), background: '#000c', border: `2px solid ${p.color}`, color: p.color, marginTop: -8 }}
-          animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1, repeat: Infinity }}>•••</motion.div>
+      {/* Over a face whose lips move while the mic hears speech: the words so far in grey (from the brain's
+          caption_partial), or "•••" before any words arrive. The finished caption replaces it. */}
+      {speaking && people.filter((p) => p.talk > TALKING && !placed.some((b) => b.person === p)).slice(0, partial ? 1 : 9).map((p) => (
+        <motion.div key={`live-${p.id}`} className={`absolute w-max max-w-[80%] -translate-x-1/2 -translate-y-full ${CAPTION} text-zinc-400`}
+          style={{ ...at(p), marginTop: -8 }}
+          animate={partial ? { opacity: 1 } : { opacity: [0.4, 1, 0.4] }} transition={partial ? {} : { duration: 1, repeat: Infinity }}>
+          <Dot color={p.color} />{partial ? <Words text={partial} /> : '•••'}
+        </motion.div>
       ))}
 
       <AnimatePresence>
         {placed.filter((b) => b.person).map((b) => (
           <motion.div key={b.id} layout
-            className="absolute w-max max-w-[80%] -translate-x-1/2 -translate-y-full rounded-2xl px-3 py-2 text-lg font-semibold leading-snug text-white"
-            style={{ ...at(b.person), marginTop: -8, background: '#000d', border: `3px solid ${b.color}`,
-              boxShadow: b.toYou ? `0 0 24px ${b.color}` : 'none' }}
-            initial={{ opacity: 0, y: 10, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0 }}>
-            {b.toYou && <span className="mr-2 rounded-full px-2 text-xs font-bold text-black" style={{ background: b.color }}>TO YOU</span>}
-            {b.text}
+            className={`absolute w-max max-w-[80%] -translate-x-1/2 -translate-y-full ${CAPTION} ${b.toYou ? 'ring-white/60' : ''}`}
+            style={{ ...at(b.person), marginTop: -8 }}
+            initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+            {b.toYou && <span className="mr-2 rounded-full bg-white px-2 py-0.5 align-middle text-[10px] font-semibold tracking-widest text-black">TO YOU</span>}
+            <Dot color={b.color} /><Words text={b.text} />
           </motion.div>
         ))}
       </AnimatePresence>
 
-      {/* Captions with no visible speaker, and speech from other rooms. */}
-      <div className="absolute inset-x-3 bottom-[8%] flex flex-col items-center gap-1">
+      {/* Captions with no visible speaker, speech from other rooms, and words in progress with no face to put them on. */}
+      <div className="absolute inset-x-3 bottom-[8%] flex flex-col items-center gap-1.5">
         <AnimatePresence>
           {[...placed.filter((b) => !b.person), ...rooms].slice(-2).map((b) => (
-            <motion.div key={b.id} className="max-w-full rounded-xl bg-black/80 px-3 py-1 text-center text-lg font-semibold text-white"
-              style={{ borderLeft: `4px solid ${b.color ?? '#a1a1aa'}` }}
-              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-              {b.room && <span className="mr-1 text-zinc-400">{b.room}:</span>}{b.text}
+            <motion.div key={b.id} className={`max-w-full text-center ${CAPTION}`}
+              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+              {b.room && <span className="mr-1.5 text-zinc-400">{b.room}</span>}<Words text={b.text} />
             </motion.div>
           ))}
+          {partial && !people.some((p) => p.talk > TALKING) && (
+            <motion.div key="partial" className={`max-w-full text-center ${CAPTION} text-zinc-400`}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <Words text={partial} />
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
 
@@ -116,6 +137,7 @@ export default function Headset() {
   const [people, setPeople] = useState([])
   const [bubbles, setBubbles] = useState([])
   const [rooms, setRooms] = useState([])
+  const [partial, setPartial] = useState('') // words so far while the wearer's mic hears speech
   const [speaking, setSpeaking] = useState(false)
   const [stereo, setStereo] = useState(() => new URLSearchParams(location.search).has('vr'))
   const tracker = useRef(new FaceTracker())
@@ -130,9 +152,11 @@ export default function Headset() {
     navigator.vibrate?.([300, 100, 300])
     setTimeout(() => setAlert((cur) => (cur?.id === a.id ? null : cur)), 6000)
   }, (msg) => {
+    if (msg.type === 'caption_partial' && msg.zone === 'wearer') return setPartial(msg.text)
     if (msg.type !== 'caption') return
     const id = `${msg.ts}`
     if (msg.zone === 'wearer') {
+      setPartial('')
       // Whoever moved their lips most while this was being said gets the bubble.
       const who = tracker.current.claim()
       setBubbles((list) => [...list, { id, text: msg.text, speaker: who?.id, color: who?.color ?? '#e4e4e7', toYou: who?.toYou }].slice(-2))
@@ -213,8 +237,8 @@ export default function Headset() {
   return (
     <div className="relative flex h-full bg-black" onDoubleClick={recenter}>
       <video ref={detectVideo} playsInline muted className="pointer-events-none absolute h-px w-px opacity-0" />
-      <Eye stream={stream} alert={alert} sector={sector} people={people} bubbles={bubbles} speaking={speaking} rooms={rooms} stereo={stereo} />
-      {stereo && <Eye stream={stream} alert={alert} sector={sector} people={people} bubbles={bubbles} speaking={speaking} rooms={rooms} stereo />}
+      <Eye stream={stream} alert={alert} sector={sector} people={people} bubbles={bubbles} speaking={speaking} rooms={rooms} partial={partial} stereo={stereo} />
+      {stereo && <Eye stream={stream} alert={alert} sector={sector} people={people} bubbles={bubbles} speaking={speaking} rooms={rooms} partial={partial} stereo />}
       <div className="absolute right-3 top-3 flex gap-2 text-xs font-medium tracking-wide text-zinc-300">
         <button onClick={toggleWide} className="rounded-full bg-black/60 px-3 py-1">{wide ? '1x' : 'Wide'}</button>
         <button onClick={() => setStereo((v) => !v)} className="rounded-full bg-black/60 px-3 py-1">
