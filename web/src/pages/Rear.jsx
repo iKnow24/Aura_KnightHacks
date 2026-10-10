@@ -1,11 +1,13 @@
-import { FilesetResolver, ObjectDetector } from '@mediapipe/tasks-vision'
 import { useEffect, useRef, useState } from 'react'
+import { cameraFov, loadDetector, toObjects } from '../lib/surroundings'
 import { keepAwake } from '../lib/useBrain'
 
 // Outside mode: a second phone clipped to the back of a bag, camera facing behind you.
 // It runs a small object detector on the phone itself and watches for people, bikes and cars
-// that get bigger in frame fast (coming toward you). Only a one-line "approach" message goes
-// to the brain; video never leaves the phone. The brain decides the alert (Outside mode only).
+// that get bigger in frame fast (coming toward you). Only short JSON goes to the brain: an
+// "approach" when something closes in (the brain decides the alert, Outside mode only), and a
+// few times a second a "scene" list of what's back there for the wearer's walking-figure view.
+// Video never leaves the phone.
 const WATCH = new Set(['person', 'bicycle', 'car', 'truck', 'bus', 'motorcycle'])
 const FPS = 6
 const MIN_AREA = 0.04 // ignore things far away (under 4% of the frame)
@@ -13,15 +15,6 @@ const GROWTH = 1.6 // 60% bigger within about a second = approaching
 const COOLDOWN_MS = 4000
 
 const wsUrl = (path) => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${path}`
-
-async function loadDetector() {
-  const files = await FilesetResolver.forVisionTasks('/mediapipe/wasm')
-  const options = (delegate) => ({
-    baseOptions: { modelAssetPath: '/mediapipe/efficientdet_lite0.tflite', delegate },
-    runningMode: 'VIDEO', scoreThreshold: 0.45, maxResults: 6,
-  })
-  try { return await ObjectDetector.createFromOptions(files, options('GPU')) } catch { return ObjectDetector.createFromOptions(files, options('CPU')) }
-}
 
 export default function Rear() {
   const [status, setStatus] = useState('idle')
@@ -74,6 +67,10 @@ export default function Rear() {
         ctx.fillStyle = '#fbbf24'
         ctx.font = '16px sans-serif'
         ctx.fillText(`${c.categoryName} ${Math.round(area * 100)}%`, b.originX + 4, b.originY + 18)
+      }
+      // Everything it sees, for the walking-figure view on the wearer's phone (a few hundred bytes).
+      if (ws.readyState === 1) {
+        ws.send(JSON.stringify({ type: 'scene', objects: toObjects(detections, v.videoWidth, v.videoHeight), fov: cameraFov(v.videoWidth, v.videoHeight) }))
       }
       for (const [label, { area, score }] of Object.entries(biggest)) {
         const h = (history[label] = [...(history[label] ?? []), { t: now, area }].filter((x) => now - x.t < 1500))

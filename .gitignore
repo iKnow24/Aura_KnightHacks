@@ -9,6 +9,7 @@ node_modules/
 dist/
 # Models and recordings (too big for git)
 models/
+!web/public/models/
 *.wav
 *.mp3
 *.pt

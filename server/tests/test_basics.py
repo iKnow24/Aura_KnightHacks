@@ -46,3 +46,12 @@ def test_node_audio_triggers_real_alarm_alert():
             node.send_bytes(audio[i : i + SR // 2].tobytes())
         msg = strobe.receive_json()
         assert msg["source"] == "alarm_dsp" and msg["zone"] == "kitchen"
+
+
+def test_rear_scene_reaches_wearer_phone_as_rear_side():
+    client = TestClient(app)
+    with client.websocket_connect("/ws/hud") as hud, client.websocket_connect("/ws/node/rear-t?zone=behind") as node:
+        hud.receive_json(); node.receive_json()
+        node.send_json({"type": "scene", "objects": [{"kind": "car", "bearing": -10, "dist": 6.5}], "fov": 52})
+        msg = hud.receive_json()
+        assert msg["type"] == "scene" and msg["side"] == "rear" and msg["objects"][0]["kind"] == "car"
