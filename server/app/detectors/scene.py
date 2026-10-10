@@ -27,6 +27,9 @@ from .items import ITEMS, MODEL_ID
 # label -> (text prompt, minimum score). Things that matter for safety or for "what's going on".
 SCENE = {
     "person": ("a photo of a person", 0.30),
+    # The demo wearer: the dashboard camera highlights whoever has the white headset on.
+    # Tune on the real headset: python -m app.detectors.scene photo.jpg
+    "headset": ("a photo of a white VR headset", 0.20),
     "dog": ("a photo of a dog", 0.30),
     "cat": ("a photo of a cat", 0.30),
     "stove": ("a photo of a kitchen stove", 0.25),

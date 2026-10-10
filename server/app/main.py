@@ -160,24 +160,30 @@ def pose_now(node_id: str) -> tuple[str | None, bool]:
     return scene.posture(landmarks), bool(landmarks)
 
 
-async def run_items(node_id: str, zone: str, jpeg: str):
+async def look_at(node_id: str, zone: str, jpeg: str) -> dict | None:
     """One OWLv2 pass per still: item sightings for Ask Lumen + one scene JSON line. The photo is dropped here."""
+    prompts, thresholds, labels = scene.queries()
+
+    def look():
+        image = decode(jpeg)
+        hits, timing = item_finder.detect(image, prompts, thresholds)
+        return hits, timing, items_from_hits(image, hits), image.size
+
+    hits, timing, items, (width, height) = await asyncio.to_thread(look)
+    for h in items:
+        memory.add_sighting(zone, h["item"], h["confidence"], h["thumb"])
+        await hub.broadcast(["dashboard"], {"type": "sighting", "item": h["item"], "zone": zone, "ts": time.time()})
+    if not timing:
+        return None
+    event = scene.build(node_id, zone, time.time(), hits, labels, width, height, timing, *pose_now(node_id))
+    await publish_vision(event)
+    return event
+
+
+async def run_items(node_id: str, zone: str, jpeg: str):
     items_busy.add(node_id)
     try:
-        prompts, thresholds, labels = scene.queries()
-
-        def look():
-            image = decode(jpeg)
-            hits, timing = item_finder.detect(image, prompts, thresholds)
-            return hits, timing, items_from_hits(image, hits), image.size
-
-        hits, timing, items, (width, height) = await asyncio.to_thread(look)
-        for h in items:
-            memory.add_sighting(zone, h["item"], h["confidence"], h["thumb"])
-            await hub.broadcast(["dashboard"], {"type": "sighting", "item": h["item"], "zone": zone, "ts": time.time()})
-        if timing:
-            await publish_vision(scene.build(node_id, zone, time.time(), hits, labels, width, height, timing,
-                                             *pose_now(node_id)))
+        await look_at(node_id, zone, jpeg)
     except Exception as e:  # a bad frame shouldn't kill the node socket
         print("item finder error:", e)
     finally:
@@ -254,6 +260,11 @@ class Segment(BaseModel):
     ts: float | None = None
 
 
+class Look(BaseModel):
+    jpeg: str
+    zone: str = "living"
+
+
 class RecapRequest(BaseModel):
     segments: list[Segment]
     title: str = "Lecture"
@@ -297,6 +308,23 @@ def get_vision():
     return {"latest": list(latest_vision.values()),
             "speed": {"frames": len(ms), "p50_ms": pick(0.5), "p95_ms": pick(0.95),
                       "device": item_finder.device_name, "model": scene.MODEL_ID}}
+
+
+@app.post("/api/look")
+async def look(body: Look):
+    """The dashboard's own laptop camera, about once a second: what's in this frame (the white headset
+    is one of the scene words), so the camera wall can draw the boxes on the same frame. The photo is dropped; only the JSON is kept."""
+    if item_finder._failed:
+        raise HTTPException(503, "vision model is off")
+    if not body.jpeg.startswith("data:image/jpeg;base64,") or len(body.jpeg) > 400_000:
+        raise HTTPException(400, "send a small JPEG data URL")
+    if "dashboard-camera" in items_busy:
+        raise HTTPException(429, "still looking at the last frame")
+    items_busy.add("dashboard-camera")
+    try:
+        return await look_at("dashboard-camera", body.zone, body.jpeg) or {}
+    finally:
+        items_busy.discard("dashboard-camera")
 
 
 @app.get("/api/state")
