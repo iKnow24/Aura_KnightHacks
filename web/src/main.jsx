@@ -1,6 +1,7 @@
+import './demo/backend.js' // first, so the fake brain is in place before any screen connects (VITE_DEMO only)
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, HashRouter, Navigate, Routes, Route } from 'react-router-dom'
 import './index.css'
 import Home from './pages/Home.jsx'
 import Login from './pages/Login.jsx'
@@ -16,8 +17,12 @@ import Mic from './pages/Mic.jsx'
 // Checked on every visit, not once at startup, so signing in takes effect right away.
 const RequireUser = ({ children }) => (getUser() ? children : <Navigate to="/" replace />)
 
+// Hosts that can't send every path to index.html (an embedded preview) build with VITE_ROUTER=hash.
+const Router = import.meta.env.VITE_ROUTER === 'hash' ? HashRouter : BrowserRouter
+const routerProps = import.meta.env.VITE_ROUTER === 'hash' ? {} : { basename: import.meta.env.BASE_URL }
+
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <BrowserRouter>
+  <Router {...routerProps}>
     <Routes>
       <Route path="/" element={<Login />} />
       <Route path="/devices" element={<Home />} />
@@ -30,5 +35,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <Route path="/rear" element={<Rear />} />
       <Route path="/mic" element={<Mic />} />
     </Routes>
-  </BrowserRouter>
+  </Router>
 )
