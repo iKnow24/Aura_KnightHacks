@@ -53,6 +53,16 @@ Every alert in the system is this JSON, and nothing else (see `server/app/hub.py
 
 Change the contract only with all three people agreeing, and change it in one commit.
 
+Two more message types go out on the same sockets. They are not alerts, so screens can ignore them:
+
+```json
+{"type": "caption", "zone": "kitchen", "text": "Dinner's ready!", "ts": 1728540000.1}   // dashboard + hud
+{"type": "sighting", "item": "keys", "zone": "living", "ts": 1728540000.1}             // dashboard
+```
+
+Nodes send `{"type": "snapshot", "ts": ..., "jpeg": "data:image/jpeg;base64,..."}` every 5 s (turn off with `?items=0`).
+Ask Lumen: `POST /api/ask {"question": "..."}` returns `{"answer", "evidence": [log entries], "brain": "claude" | "rules"}`.
+
 ## Git, plainly
 
 ```bash

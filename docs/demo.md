@@ -20,6 +20,11 @@ Every item here is something code can't fix. Find out early.
 5. **Heat.** Leave one node streaming for an hour on a charger. Does it dim or slow down?
 6. **AMD box.** `bash setup.sh`, then `python -m app.detectors.ast_sound` from `server/`.
    Every label should print OK. If any print MISSING, fix the names in `server/app/detectors/ast_sound.py`.
+7. **Ask Lumen.** On the AMD box, `python -m app.detectors.items photo.jpg` on a few phone photos of your
+   real keys on a table. If keys aren't found, use a bigger, brighter keychain or lower the keys threshold
+   in `server/app/detectors/items.py`. Then leave keys in view of the living-room node, sign in on the
+   dashboard and ask "Where are my keys?". The answer should show a photo crop. If the models won't
+   run, press "Seed demo memory" and say so honestly if asked.
 
 ## The 2-minute demo
 
@@ -27,9 +32,12 @@ Every item here is something code can't fix. Find out early.
 2. **Night mode (30 s).** Kitchen phone hears the real smoke alarm; bedroom phone strobes; the dashboard
    ripples on the kitchen. "The kitchen heard it, the bedroom flashed."
 3. **Headset (30 s).** Judge wears the headset. A teammate plays a doorbell sound next to the hallway node.
-   The glow appears on the hallway's side. (Name calling needs Whisper, which isn't built yet.)
+   The glow appears on the hallway's side. (Name calling works in Wearer mode once Whisper runs: the
+   name comes from the sign-in screen.)
 4. **Fall (30 s).** Teammate falls on the mat, lies still; caregiver dashboard shows "Possible fall · Bedroom".
-5. **Close (15 s).** "No video leaves a phone. The alarm path has no AI guessing in it. And it runs on
+5. **Ask Lumen (20 s).** "Lumen also remembers." Ask "What was the last thing said?" (a teammate spoke
+   in the kitchen earlier) and "Where are my keys?" (answer comes with the photo crop).
+6. **Close (15 s).** "No video leaves a phone. The alarm path has no AI guessing in it. And it runs on
    phones people already own."
 
 ## Questions judges will ask

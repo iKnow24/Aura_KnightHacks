@@ -12,13 +12,19 @@ from pydantic import BaseModel
 from .detectors import alarm_dsp
 from .detectors.ast_sound import SoundClassifier, to_alerts
 from .detectors.fall import FallDetector
+from .detectors.items import ItemFinder, decode
+from .detectors.speech import Segmenter, Transcriber, mentions_name
+from .agent import answer
 from .hub import Hub
+from .memory import Memory, seed_demo
 from .modes import DEFAULT_MODE, MODES
 
 @asynccontextmanager
 async def lifespan(app):
     # Load the sound model in the background so the first real alert isn't slowed by it.
-    asyncio.get_running_loop().run_in_executor(None, sound_model.available)
+    loop = asyncio.get_running_loop()
+    for model in (sound_model, transcriber, item_finder):
+        loop.run_in_executor(None, model.available)
     yield
 
 
@@ -39,6 +45,14 @@ ast_pending: dict[str, int] = {}
 ast_busy: set[str] = set()
 COOLDOWN_S = 10
 last_alert: dict[tuple[str, str], float] = {}
+
+# Memory for "Ask Lumen": what was said (Whisper) and where things were last seen (OWLv2).
+memory = Memory()
+profile = {"name": os.environ.get("LUMEN_NAME", "")}  # set at login; used for name calling
+transcriber = Transcriber()
+segmenters: dict[str, Segmenter] = {}
+item_finder = ItemFinder()
+items_busy: set[str] = set()
 
 
 async def emit_detected(kind: str, zone: str, severity: str, source: str, confidence: float = 1.0):
@@ -61,6 +75,29 @@ async def run_ast(node_id: str, zone: str, audio: np.ndarray):
         ast_busy.discard(node_id)
 
 
+async def run_speech(zone: str, audio: np.ndarray):
+    text = await asyncio.to_thread(transcriber.transcribe, audio)
+    if not text:
+        return
+    entry = memory.add_speech(zone, text)
+    await hub.broadcast(["dashboard", "hud"], {"type": "caption", **entry})
+    if enabled("name_call") and mentions_name(text, profile["name"]):
+        await emit_detected("name_called", zone, "warning", source="whisper")
+
+
+async def run_items(node_id: str, zone: str, jpeg: str):
+    items_busy.add(node_id)
+    try:
+        hits = await asyncio.to_thread(lambda: item_finder.find(decode(jpeg)))
+        for h in hits:
+            memory.add_sighting(zone, h["item"], h["confidence"], h["thumb"])
+            await hub.broadcast(["dashboard"], {"type": "sighting", "item": h["item"], "zone": zone, "ts": time.time()})
+    except Exception as e:  # a bad frame shouldn't kill the node socket
+        print("item finder error:", e)
+    finally:
+        items_busy.discard(node_id)
+
+
 def enabled(detector: str) -> bool:
     return detector in MODES[hub.mode]["detectors"]
 
@@ -73,6 +110,14 @@ class FakeAlert(BaseModel):
 
 class ModeChange(BaseModel):
     mode: str
+
+
+class Question(BaseModel):
+    question: str
+
+
+class Profile(BaseModel):
+    name: str
 
 
 @app.get("/api/health")
@@ -99,6 +144,41 @@ async def set_mode(body: ModeChange):
     return {"mode": hub.mode}
 
 
+@app.post("/api/profile")
+def set_profile(body: Profile):
+    """Demo login: the name is what name calling listens for. No passwords, nothing stored."""
+    profile["name"] = body.name.strip()
+    return profile
+
+
+@app.post("/api/ask")
+async def ask(body: Question):
+    return await asyncio.to_thread(answer, body.question, memory, hub.events)
+
+
+@app.get("/api/memory")
+def get_memory():
+    return {"entries": [{k: v for k, v in e.items() if k != "thumb"} for e in memory.entries[-100:]],
+            "models": {"whisper": model_status(transcriber), "items": model_status(item_finder)}}
+
+
+def model_status(model) -> str:
+    return "off" if model._failed else "ready" if model._pipe is not None else "loading"
+
+
+@app.post("/api/memory/seed")
+def seed_memory():
+    """Fills memory with a believable history so the agent can be rehearsed without the models."""
+    seed_demo(memory)
+    return {"entries": len(memory.entries)}
+
+
+@app.delete("/api/memory")
+def clear_memory():
+    memory.clear()
+    return {"entries": 0}
+
+
 @app.websocket("/ws/{role}")
 async def screen_socket(ws: WebSocket, role: str):
     """Screens that only listen: dashboard, hud, strobe."""
@@ -112,7 +192,8 @@ async def screen_socket(ws: WebSocket, role: str):
 
 @app.websocket("/ws/node/{node_id}")
 async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
-    """Camera/mic phones. Binary messages = 16 kHz mono float32 audio. Text = JSON (heartbeat, pose)."""
+    """Camera/mic phones. Binary messages = 16 kHz mono float32 audio.
+    Text = JSON: {"type": "pose", ...} at 10 fps, {"type": "snapshot", "jpeg": dataURL} every few seconds."""
     await hub.connect(ws, "node")
     hub.heartbeat(node_id, zone)
     try:
@@ -132,6 +213,10 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
                         and node_id not in ast_busy):
                     ast_pending[node_id] = 0
                     asyncio.create_task(run_ast(node_id, zone, buf.copy()))
+                if not transcriber._failed:
+                    utterance = segmenters.setdefault(node_id, Segmenter()).feed(chunk)
+                    if utterance is not None:
+                        asyncio.create_task(run_speech(zone, utterance))
             elif msg.get("text"):
                 data = json.loads(msg["text"])
                 if data.get("type") == "pose" and enabled("fall"):
@@ -140,6 +225,8 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
                     det.stillness_s = stillness
                     if det.update(data["ts"], data.get("landmarks")):
                         await emit_detected("fall", zone, "critical", source="fall")
+                elif data.get("type") == "snapshot" and node_id not in items_busy and not item_finder._failed:
+                    asyncio.create_task(run_items(node_id, zone, data["jpeg"]))
             hub.heartbeat(node_id, zone)
     except WebSocketDisconnect:
         pass
