@@ -5,8 +5,12 @@ import { detectFaces, FaceTracker, loadFaces, toScreen } from '../lib/faces'
 import { keepAwake, useBrain } from '../lib/useBrain'
 import { alertText, SEVERITY_COLOR, ZONES, zoneLabel } from '../lib/zones'
 
-// Fake AR: draw the rear camera twice side by side (one per eye) and put the HUD on top.
-// Works on iOS and Android without WebXR.
+// Camera passthrough with the HUD on top. Works on iOS and Android without WebXR.
+// Default is one full-screen view (hand-held, or a headset you look through with both eyes at one image).
+// "Headset" mode (?vr=1 or the toggle) draws it twice, one window per lens. The window is a centered
+// square, not the whole half-screen: the lens magnifies the edges most, so filling the half-screen is
+// what made the picture look like a fishbowl. We don't pre-distort the image (no WebGL shader), so a
+// little bend at the window edges is expected.
 // Direction uses 8 coarse sectors, not a precise arrow: indoor compass error is 15-30 degrees,
 // and "glow on the left" that's right beats an arrow that's visibly wrong.
 //
@@ -38,15 +42,15 @@ function useHeading() {
   return { heading: (heading - offset + 360) % 360, start, recenter }
 }
 
-function Eye({ stream, alert, sector, people, bubbles, speaking, rooms }) {
+function Eye({ stream, alert, sector, people, bubbles, speaking, rooms, stereo }) {
   const ref = useRef()
   const box = useRef()
   useEffect(() => { if (ref.current && stream) ref.current.srcObject = stream }, [stream])
   const angle = sector * 45
   const at = (p) => (ref.current && box.current ? toScreen(ref.current, box.current, p.x, p.y) : { left: 0, top: 0 })
   const placed = bubbles.map((b) => ({ ...b, person: people.find((p) => p.id === b.speaker) }))
-  return (
-    <div ref={box} className="relative h-full w-1/2 overflow-hidden">
+  const view = (
+    <div ref={box} className={stereo ? 'relative aspect-square h-[86%] max-w-[94%] overflow-hidden rounded-[28px]' : 'relative h-full w-full overflow-hidden'}>
       <video ref={ref} autoPlay playsInline muted className="h-full w-full object-cover" />
 
       {/* "…" over a face whose lips move while the mic hears speech: instant feedback before the words arrive. */}
@@ -103,6 +107,7 @@ function Eye({ stream, alert, sector, people, bubbles, speaking, rooms }) {
       </AnimatePresence>
     </div>
   )
+  return stereo ? <div className="grid h-full w-1/2 place-items-center">{view}</div> : view
 }
 
 export default function Headset() {
@@ -112,6 +117,7 @@ export default function Headset() {
   const [bubbles, setBubbles] = useState([])
   const [rooms, setRooms] = useState([])
   const [speaking, setSpeaking] = useState(false)
+  const [stereo, setStereo] = useState(() => new URLSearchParams(location.search).has('vr'))
   const tracker = useRef(new FaceTracker())
   const node = useRef(null)
   const level = useRef(0)
@@ -162,7 +168,11 @@ export default function Headset() {
   const begin = async () => {
     await start()
     await keepAwake()
-    const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+    const s = await navigator.mediaDevices.getUserMedia({
+      // Without a size the browser often hands back 640x480, which looks soft once it fills the screen.
+      video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
+      audio: false,
+    })
     setStream(s)
     document.documentElement.requestFullscreen?.().catch(() => {})
   }
@@ -179,10 +189,14 @@ export default function Headset() {
     )
   }
   return (
-    <div className="flex h-full bg-black" onDoubleClick={recenter}>
+    <div className="relative flex h-full bg-black" onDoubleClick={recenter}>
       <video ref={detectVideo} playsInline muted className="pointer-events-none absolute h-px w-px opacity-0" />
-      <Eye stream={stream} alert={alert} sector={sector} people={people} bubbles={bubbles} speaking={speaking} rooms={rooms} />
-      <Eye stream={stream} alert={alert} sector={sector} people={people} bubbles={bubbles} speaking={speaking} rooms={rooms} />
+      <Eye stream={stream} alert={alert} sector={sector} people={people} bubbles={bubbles} speaking={speaking} rooms={rooms} stereo={stereo} />
+      {stereo && <Eye stream={stream} alert={alert} sector={sector} people={people} bubbles={bubbles} speaking={speaking} rooms={rooms} stereo />}
+      <button onClick={() => setStereo((v) => !v)}
+        className="absolute right-3 top-3 rounded-full bg-black/60 px-3 py-1 text-xs font-medium tracking-wide text-zinc-300">
+        {stereo ? 'Single view' : 'Headset'}
+      </button>
     </div>
   )
 }
