@@ -25,10 +25,12 @@ from .modes import DEFAULT_MODE, MODES, make_mode
 
 @asynccontextmanager
 async def lifespan(app):
-    # Load the sound model in the background so the first real alert isn't slowed by it.
-    loop = asyncio.get_running_loop()
-    for model in (sound_model, transcriber, item_finder, local_llm):
-        loop.run_in_executor(None, model.available)
+    # Load the models in the background so the first real alert isn't slowed by them.
+    # One after another, sound model first: transformers' lazy imports aren't thread-safe, and loading
+    # all four in parallel threads made Whisper and the item finder fail on the AMD box with
+    # "cannot import name 'pipeline' from 'transformers'".
+    models = (sound_model, transcriber, item_finder, local_llm)
+    asyncio.get_running_loop().run_in_executor(None, lambda: [m.available() for m in models])
     yield
 
 
