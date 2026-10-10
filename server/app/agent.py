@@ -1,7 +1,7 @@
 """Ask Lumen: answers questions about the house from the memory log and the alert timeline.
 
 Two brains, same tools:
-- With an LLM key set (Groq, Claude or xAI; see PROVIDERS), the model gets three tools
+- With an LLM key set (Groq, Claude, xAI or Hugging Face; see PROVIDERS), the model gets three tools
   (last_seen, transcript, alerts) and decides which to call, so free-form questions work
   ("did anyone say anything about milk?").
 - Without a key, or if the API call fails, a keyword router answers the core questions.
@@ -138,13 +138,16 @@ def answer_rules(question: str, memory: Memory, events: list[dict]) -> dict:
 
 # ---- LLM brain --------------------------------------------------------------------------
 # Any provider with an OpenAI-compatible API works through the same client. Pick one with
-# LUMEN_LLM=groq|claude|xai|off, or leave it unset to use the first one that has a key.
+# LUMEN_LLM=groq|claude|xai|hf|off, or leave it unset to use the first one that has a key.
 
 PROVIDERS = {
     # name: (base URL, env var holding the key, default model)
     "groq": ("https://api.groq.com/openai/v1", "GROQ_API_KEY", "openai/gpt-oss-20b"),  # free tier
     "claude": ("https://api.anthropic.com/v1/", "ANTHROPIC_API_KEY", "claude-haiku-5-5"),
     "xai": ("https://api.x.ai/v1", "XAI_API_KEY", "grok-4.7"),
+    # Hugging Face Inference Providers: one HF token, many open models. Last, so it never
+    # takes over from Groq when both keys are set; pick it with LUMEN_LLM=hf.
+    "hf": ("https://router.huggingface.co/v1", "HF_TOKEN", "openai/gpt-oss-20b"),
 }
 
 
