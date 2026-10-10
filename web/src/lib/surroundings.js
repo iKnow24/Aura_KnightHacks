@@ -19,9 +19,9 @@ const DIAGONAL_FOV = 75
 let detectorPromise
 export function loadDetector() {
   detectorPromise ??= (async () => {
-    const files = await FilesetResolver.forVisionTasks('/mediapipe/wasm')
+    const files = await FilesetResolver.forVisionTasks(`${import.meta.env.BASE_URL}mediapipe/wasm`)
     const options = (delegate) => ({
-      baseOptions: { modelAssetPath: '/mediapipe/efficientdet_lite0.tflite', delegate },
+      baseOptions: { modelAssetPath: `${import.meta.env.BASE_URL}mediapipe/efficientdet_lite0.tflite`, delegate },
       runningMode: 'VIDEO', scoreThreshold: 0.45, maxResults: 8,
     })
     try { return await ObjectDetector.createFromOptions(files, options('GPU')) } catch { return ObjectDetector.createFromOptions(files, options('CPU')) }

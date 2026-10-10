@@ -6,7 +6,9 @@ import tailwindcss from '@tailwindcss/vite'
 // so one Cloudflare tunnel URL covers everything (phones need HTTPS for camera + mic).
 const BRAIN = process.env.BRAIN_URL || 'http://localhost:8000'
 
+// BASE_PATH: set when the site is served from a sub-folder (GitHub Pages serves /Aura_KnightHacks/).
 export default defineConfig({
+  base: process.env.BASE_PATH || '/',
   plugins: [react(), tailwindcss()],
   server: {
     allowedHosts: true,
