@@ -77,9 +77,10 @@ setup.sh / run.sh       one-time box setup / start everything
 ## Page map
 
 - `/` sign-in (the name is used for name calling). `/devices` picks what this phone is.
-- `/captions`: **the one wearer page.** Landscape: full camera with captions over it. Portrait: two boxes,
-  camera on top, transcript along the bottom (the 3D walking view is not mounted in portrait). Corner Room view
-  shows the splat scan behind a tap toggle. `/headset` just redirects here; there is no Headset page any more.
+- `/captions`: **the one wearer page.** Full camera with **spatial captions**: each line floats above the head
+  of the face whose mouth moved while it was said; unsure lines go to a neutral spot at the bottom (no side panel
+  any more; see `docs/spatial-captions.md`). Movie look = classic subtitles. The 3D walking view is landscape
+  only. Corner Room view shows the splat scan behind a tap toggle. `/headset` just redirects here; there is no Headset page any more.
 - `/strobe`: bedside flash. `/node?zone=...`: room sensor. `/rear`: Outside-mode rear camera. `/mic`: extra mic.
 - `/dashboard` (needs sign-in): the control center. Camera wall (main view in the middle, one camera each side;
   click a side camera or press 1 / 2 to swap it in; sources are room phones' opt-in previews and this laptop's
