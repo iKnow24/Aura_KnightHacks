@@ -1,0 +1,79 @@
+# CI + auto-merge for the hackathon. Plain-words version: docs/shipping.md.
+#
+# checks:  every PR (and main) runs scripts/check.sh = server tests + web build.
+# sweep:   every ready (non-draft) PR aimed at main is re-tested on top of the latest main
+#          and merged if green, one at a time. Runs after PR checks, after main changes,
+#          and every 10 minutes as a safety net. Logic lives in scripts/automerge.sh.
+#
+# Brakes: drafts never merge. Freeze from FREEZE_AT (only "hotfix"-labeled PRs merge after).
+# Pause anytime: repo variable AUTOMERGE_PAUSED = true
+# (Settings > Secrets and variables > Actions > Variables).
+name: CI and auto-merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled, edited]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: "*/10 * * * *"
+
+permissions:
+  contents: read
+
+env:
+  FREEZE_AT: "2026-10-11T12:00:00Z" # Sun Oct 11, 8:00 AM Orlando time, two hours before Devpost closes
+
+jobs:
+  checks:
+    if: github.event_name != 'schedule'
+    concurrency:
+      group: checks-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: bash scripts/check.sh
+
+  sweep:
+    needs: checks
+    # Run when checks passed, or were skipped (the 10-minute timer). Fork PRs never get write access.
+    if: >-
+      always() &&
+      (needs.checks.result == 'success' || needs.checks.result == 'skipped') &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    concurrency:
+      group: automerge # one sweeper at a time; a queued one picks up whatever the last one left
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      pull-requests: write
+      statuses: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      AUTOMERGE_PAUSED: ${{ vars.AUTOMERGE_PAUSED }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # Copy the sweeper out of the repo first: it checks out other commits while it runs.
+      - run: cp scripts/automerge.sh "$RUNNER_TEMP/automerge.sh" && bash "$RUNNER_TEMP/automerge.sh"
