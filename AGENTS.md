@@ -150,7 +150,7 @@ Setup steps: `databricks/REAL_DATA.md`.
 
 - Working: brain + models on the AMD GPU through the Jupyter bridge; phones reach it via Mac cloudflared.
 - Merged tonight: bridge joins a running kernel (#17), faster private captions without repeat loops (#19).
-  Real Databricks data (#22) is Ready and merging; if `databricks/REAL_DATA.md` isn't on main, it hasn't landed.
+  Real Databricks data (#22) is merged.
 - Room scan uses `sample-room.splat`; a real Scaniverse scan of the demo room still needs to be dropped into
   `web/public/splats/`.
 - Untested: fall detection on a real person, the 3D walking view on real phones, the Databricks pipeline and
