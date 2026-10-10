@@ -1,35 +1,111 @@
-# Lumen
+<p align="center">
+  <img src="docs/images/cover.png" alt="Lumen: Sound you can see." width="100%">
+</p>
 
-**Sound you can see.** Home safety alerts for deaf and hard-of-hearing people.
+<p align="center">
+  <b>Home safety and live captions for deaf and hard-of-hearing people, built from the phones you already own.</b><br>
+  KnightHacks IX · UCF · October 2026
+</p>
 
-Your phone already knows when a smoke alarm goes off *next to it*. It has no idea the alarm two rooms away is
-going off while you're asleep. Lumen turns spare phones into listening and watching nodes around the
-house. When the kitchen hears an alarm, the bedroom phone strobes. When someone calls your name, the
-headset glows toward where they are. When someone falls, the caregiver knows.
+---
 
-## What's in here
+## The problem
 
-| Path | What it is |
+Your phone can hear a smoke alarm going off next to it. It has no idea about the one two rooms away while
+you're asleep, the doorbell, the kettle, or someone calling your name from the kitchen. Dedicated alert
+systems for deaf people cost hundreds of dollars and only cover a few sounds.
+
+## What Lumen does
+
+Lumen turns spare phones into listening nodes around the house, and puts everything they hear on the phone in
+your hand.
+
+- **Night mode.** The kitchen phone hears the smoke alarm. The phone on your nightstand strobes red, vibrates
+  and flashes its flashlight. No LLM in that path: the alarm detector is plain signal processing, so it can't
+  hallucinate.
+- **Live captions.** Hold your phone up like a window. Words appear as they're spoken, labeled with whose lips
+  were moving, and tagged **TO YOU** when someone is talking to you.
+- **Your name.** Lumen alerts you when someone in another room calls your name.
+- **Alerts that won't be missed.** Doorbell, timer, glass breaking, a possible fall. Alerts grow on screen
+  until you tap them.
+- **Ask Lumen.** A memory of what the house heard: "Where are my keys?", "What happened while I was asleep?"
+- **Outside mode.** A second phone in your back pocket or bag watches behind you, and a 3D walking view shows
+  cars and people coming up on either side.
+- **Caregiver dashboard.** A floor plan that lights up the room an alert came from, with a timeline.
+
+<p align="center">
+  <img src="docs/images/dashboard-alert.png" alt="Caregiver dashboard with a smoke alarm lighting up the kitchen" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/images/signin.png" alt="Sign in" width="32%">
+  &nbsp;
+  <img src="docs/images/captions.png" alt="Live captions" width="32%">
+</p>
+
+## How it works
+
+Every device is just a web page. Open `/node` on a spare phone, `/captions` on yours, `/strobe` on the one by
+your bed, and `/dashboard` on a laptop. They all talk to one server (the "brain") over WebSockets.
+
+```mermaid
+flowchart LR
+  subgraph Phones["Phones (browser only)"]
+    N["Room nodes<br/>mic + body pose"]
+    C["Your phone<br/>captions + face/lip tracking"]
+    R["Back phone<br/>what's behind you"]
+  end
+  subgraph Brain["Brain · FastAPI on AMD GPU"]
+    D1["Smoke alarm<br/>3 kHz beep pattern"]
+    D2["Sound AI<br/>AST"]
+    D3["Speech<br/>Whisper"]
+    D4["Fall<br/>pose rules"]
+    F["Fusion by room<br/>+ mode policy"]
+    M["Memory<br/>Ask Lumen"]
+  end
+  N --> D1 & D2 & D3 & D4
+  C --> D3
+  D1 & D2 & D3 & D4 --> F
+  D3 --> M
+  R --> F
+  F --> S["Bedside strobe"]
+  F --> C
+  F --> DB["Caregiver dashboard"]
+```
+
+**No video stream.** Face, pose and object detection run on the phone with MediaPipe. Room phones send audio,
+33 body keypoints, and one small still every few seconds so Ask Lumen can remember where your keys are
+(turn that off with `?items=0`).
+
+**Modes are config, not code.** Home, Night, Lecture, Outside and Watch are entries in
+[`server/app/modes.py`](server/app/modes.py) that decide which detectors run and where each alert goes. You
+can also make a new mode by voice.
+
+## Built with
+
+| Layer | What |
 |---|---|
-| `server/` | The brain. FastAPI + WebSockets. Receives audio/pose from nodes, runs detectors, routes alerts by mode |
-| `server/app/detectors/alarm_dsp.py` | Smoke alarm detector with no AI: 3 kHz beep pattern. The one we trust on stage |
-| `server/app/detectors/fall.py` | Fall detector from pose keypoints: fast drop, then lying still |
-| `server/app/detectors/ast_sound.py` | AI sound classifier (doorbell, glass, baby crying, alarms) on the GPU |
-| `server/app/modes.py` | Watch, Home, Lecture, Outside and Night modes, as config |
-| `server/app/recap.py`, `llm.py` | Lecture recap (summary, memory map, quiz). same AI switch as Ask Lumen, optional local model, then plain rules |
-| `web/` | One React app (Vite, Tailwind, Framer Motion) with a page per device |
-| `web/src/pages/Dashboard.jsx` | Caregiver floor plan, timeline, mode switch, fake-alert buttons |
-| `web/src/pages/Headset.jsx` | Phone-in-headset passthrough view with directional glow |
-| `web/src/pages/Node.jsx` | Spare phone in a room, streams mic audio and body keypoints (never video) |
-| `web/src/pages/Captions.jsx` | Wearer's phone: live captions, mode tabs, alerts that grow until tapped, lecture recap |
-| `web/src/pages/Mic.jsx` | One phone per person in a conversation; captions get labeled with whoever's phone heard it loudest |
-| `web/src/pages/Rear.jsx` | Outside mode: phone on your back that warns when someone or a car comes up behind you |
-| `web/src/pages/Strobe.jsx` | Bedside phone: red flash, vibration, flashlight strobe |
-| `docs/demo.md` | What to test first, the 2-minute demo script, and answers to judge questions |
-| `docs/agent-line.md` | How the team splits work and uses AI agents cheaply |
-| `setup.sh`, `run.sh` | Set up and start on the AMD cloud box or a laptop |
+| Compute | **AMD Radeon Cloud** GPU (PyTorch on ROCm) runs the brain and the models |
+| Models | **Hugging Face** `MIT/ast-finetuned-audioset` (sounds), `openai/whisper` (speech), `google/owlv2` (where things are) |
+| On the phone | MediaPipe Tasks: face landmarks (lip movement), pose, EfficientDet object detection |
+| Server | Python, FastAPI, WebSockets |
+| Web | React, Vite, Tailwind, Framer Motion, three.js (react-three-fiber) |
+| Ask Lumen | Groq by default, swappable to Claude or xAI with one env var |
+| Phones over HTTPS | Cloudflare Tunnel |
 
-## Run it on your laptop
+## Honest status
+
+What works today and what we haven't proven yet. We'd rather you hear it from us.
+
+| Piece | Status |
+|---|---|
+| Smoke alarm detector, fall rules, mode routing, memory | 44 automated tests passing |
+| Dashboard, captions, strobe, alerts, Ask Lumen | Working in the browser; demo alert buttons for judging |
+| AST sound AI, Whisper, OWLv2 on the AMD GPU | Written against the real models, not yet run end to end on the AMD box |
+| 3D walking view, back-phone detection | Built, not yet tested on a real phone |
+| Distance to cars and people | A rough estimate from box size, about ±30% |
+
+## Run it
 
 You need Python 3.10+ and Node 18+.
 
@@ -39,15 +115,15 @@ cd web && npm install && cd ..
 bash run.sh
 ```
 
-Open http://localhost:5173, then the dashboard, and click a fake alert. Open `/strobe` in a second tab and
-arm it to see Night mode fire.
+Open http://localhost:5173, sign in with your first name, and press a demo alert on the dashboard. Open
+`/strobe` in a second tab and tap to arm it to see Night mode fire.
 
 Phones need HTTPS for the camera and mic. `run.sh` starts a Cloudflare tunnel if `cloudflared` is installed
-and prints an `https://….trycloudflare.com` link: open that on every phone.
+and prints an `https://….trycloudflare.com` link to open on every phone.
 
-## Run it on the AMD Radeon Cloud box
+### On the AMD Radeon Cloud box
 
-Create the machine with the **PyTorch ROCm 10** image. You're root; never use sudo.
+Create the machine with the **PyTorch ROCm** image (you're root, no sudo):
 
 ```bash
 git clone https://github.com/iKnow24/Aura_KnightHacks && cd Aura_KnightHacks
@@ -55,29 +131,27 @@ bash setup.sh
 bash run.sh
 ```
 
-The lecture recap and voice-made modes use the same AI switch as Ask Lumen (`LUMEN_LLM`, see docs/agent-line.md).
-A local model on the GPU is opt-in: `LUMEN_LOCAL_LLM=Qwen/Qwen2.5-3B-Instruct`. With no AI at all, they fall back to plain rules.
+Ask Lumen and the lecture recap pick their AI with `LUMEN_LLM=groq|claude|xai|off` and the matching key
+(`GROQ_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`). With no key they fall back to plain rules.
 
-Each credit is one hour. **Delete the machine whenever nobody is using it**; setup takes minutes to redo.
-
-## Tests
+### Tests
 
 ```bash
-cd server && python -m pytest -q    # alarm, fall and sound detectors + alert routing
+cd server && python -m pytest -q
 cd web && npm run build
 ```
 
-## How it works
+## Repo map
 
-```
-phones (mic, pose) ──► brain: detectors ──► fusion by zone ──► mode policy ──► headset glow
-                                                                              ├► caregiver dashboard
-                                                                              └► bedside strobe
-```
-
-Full technical reasoning is in the team's analysis doc. The short version: modes are one config switch on
-one pipeline; the smoke alarm path is deterministic (no LLM in the loop); no video leaves a phone.
+| Path | What it is |
+|---|---|
+| `server/app/detectors/` | Smoke alarm (DSP), fall, AST sounds, Whisper speech, OWLv2 item sightings |
+| `server/app/modes.py` | The modes, as config |
+| `server/app/agent.py`, `memory.py` | Ask Lumen |
+| `web/src/pages/` | One page per device: Dashboard, Captions, Node, Strobe, Rear, Mic, Headset |
+| `docs/demo.md` | The demo script and answers to judge questions |
 
 ## Team
 
-Built at KnightHacks IX (UCF, October 2026). MIT licensed.
+Built in one weekend at KnightHacks IX by Sharan ([@iKnow24](https://github.com/iKnow24)) and team.
+MIT licensed.
