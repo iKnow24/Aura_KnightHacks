@@ -81,8 +81,12 @@ setup.sh / run.sh       one-time box setup / start everything
   camera on top, transcript along the bottom (the 3D walking view is not mounted in portrait). Corner Room view
   shows the splat scan behind a tap toggle. `/headset` just redirects here; there is no Headset page any more.
 - `/strobe`: bedside flash. `/node?zone=...`: room sensor. `/rear`: Outside-mode rear camera. `/mic`: extra mic.
-- `/dashboard` (needs sign-in): caregiver view, alert timeline, Ask Lumen, History tab, 3D button showing the home
-  scan with rooms and alert ripples, fake-alert buttons (`POST /api/fake-alert`).
+- `/dashboard` (needs sign-in): the control center. Camera wall (main view in the middle, one camera each side;
+  click a side camera or press 1 / 2 to swap it in; sources are room phones' opt-in previews and this laptop's
+  webcams), the headset wearer as a 3D figure bottom left (laptop webcam + MediaPipe, `lib/Avatar3D.jsx`,
+  `lib/avatarRig.js`; drop a Blender/Mixamo `.glb` at `web/public/models/avatar.glb` to change the figure), floor
+  plan / 3D home scan bottom right, Messages (Ask Lumen chat), timeline, History tab, fake-alert buttons
+  (`POST /api/fake-alert`).
 
 ## Run and test
 

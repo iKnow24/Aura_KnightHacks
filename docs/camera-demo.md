@@ -28,3 +28,19 @@ No USB debugging or cable is required for this browser setup.
 Hardware acceptance checks: three simultaneous previews; same-room phones; stop/restart; camera permission denial;
 Wi-Fi interruption/reconnect; foreground return after screen lock; alert reaching `/strobe` while previews run.
 These checks must be performed on the actual phones; automated tests do not establish hardware compatibility.
+
+## Control center (laptop)
+
+The dashboard's Live tab is the control center: the main camera in the middle and one camera on each side.
+Click a side camera, or press **1** (left) / **2** (right), to swap it into the main view; each tile's menu picks
+any phone or laptop camera. The layout is remembered in that browser.
+
+- **Laptop cameras** (built-in webcam, USB webcams): tap **Use laptop cameras** once to allow access. A newly
+  plugged-in webcam shows up in the menus by itself. Laptop camera video plays in the laptop browser only and is
+  never sent to the brain.
+- **Headset wearer (bottom left)**: point a laptop webcam at the person in the headset and tap **Start**. Their
+  pose is copied onto a 3D figure; body tracking runs in the laptop browser and nothing is sent anywhere. Upper body
+  is enough; legs follow only when the camera can see them.
+- **Your own figure**: in Blender, rig the character with Mixamo bone names (or start from a Mixamo download),
+  then File > Export > glTF 2.0 (.glb) and save it as `web/public/models/avatar.glb`. An `idle` animation in the
+  file is used when nobody is tracked. Without the file, the walker figure is shown.
