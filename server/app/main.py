@@ -17,9 +17,10 @@ from .detectors.speech import Segmenter, Transcriber, mentions_name
 from .agent import answer
 from .llm import local as local_llm
 from .recap import recap
+from .speakers import CrossTalk
 from .hub import Hub
 from .memory import Memory, seed_demo
-from .modes import DEFAULT_MODE, MODES
+from .modes import DEFAULT_MODE, MODES, make_mode
 
 @asynccontextmanager
 async def lifespan(app):
@@ -77,12 +78,29 @@ async def run_ast(node_id: str, zone: str, audio: np.ndarray):
         ast_busy.discard(node_id)
 
 
+crosstalk = CrossTalk()
+
+
+def caption_id(entry: dict) -> str:
+    return f"{entry['ts']:.3f}-{entry['zone']}"
+
+
 async def run_speech(zone: str, audio: np.ndarray):
     text = await asyncio.to_thread(transcriber.transcribe, audio)
     if not text:
         return
+    keep, replaced = crosstalk.check(zone, text, float(np.sqrt(np.mean(audio ** 2))))
+    if not keep:
+        return  # a louder phone already captioned this sentence
     entry = memory.add_speech(zone, text)
-    await hub.broadcast(["dashboard", "hud"], {"type": "caption", **entry})
+    msg = {**entry, "type": "caption", "id": caption_id(entry)}
+    if replaced:
+        old = next((e for e in reversed(memory.entries) if e.get("type") == "speech"
+                    and e["zone"] == replaced["zone"] and e["text"] == replaced["text"]), None)
+        if old:
+            memory.entries.remove(old)
+            msg["replaces"] = caption_id(old)
+    await hub.broadcast(["dashboard", "hud"], msg)
     if enabled("name_call") and mentions_name(text, profile["name"]):
         await emit_detected("name_called", zone, "warning", source="whisper")
 
@@ -140,6 +158,15 @@ class Ack(BaseModel):
     by: str = "wearer"
 
 
+class Heard(BaseModel):
+    text: str
+    zone: str = "wearer"
+
+
+class NewMode(BaseModel):
+    description: str
+
+
 class Segment(BaseModel):
     text: str
     ts: float | None = None
@@ -170,6 +197,23 @@ async def fake_alert(body: FakeAlert):
 async def ack(body: Ack):
     event = await hub.ack(body.id, body.by)
     return event or {"error": "unknown alert"}
+
+
+@app.post("/api/speech")
+def heard(body: Heard):
+    """Captions made in the browser (Instant mode) get saved too, so Ask Lumen can answer from them."""
+    if body.text.strip():
+        memory.add_speech(body.zone, body.text)
+    return {"ok": True}
+
+
+@app.post("/api/modes")
+async def add_mode(body: NewMode):
+    """'Add a new mode': the wearer describes it out loud, Lumen picks what to listen for."""
+    key, mode = await asyncio.to_thread(make_mode, body.description)
+    MODES[key] = mode
+    await hub.set_mode(key)
+    return {"key": key, **mode}
 
 
 @app.post("/api/recap")

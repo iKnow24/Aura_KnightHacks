@@ -12,8 +12,12 @@ import { streamMic } from './mic'
 const SR = typeof window !== 'undefined' ? window.SpeechRecognition || window.webkitSpeechRecognition : null
 export const instantSupported = !!SR
 
+// The transcript is saved in this browser so a reload doesn't lose the conversation.
+const KEY = 'lumen_transcript'
+const loadSaved = () => { try { return JSON.parse(localStorage.getItem(KEY)) || [] } catch { return [] } }
+
 export function useLiveCaptions({ engine, active, onFinal }) {
-  const [lines, setLines] = useState([])
+  const [lines, setLines] = useState(loadSaved)
   const [interim, setInterim] = useState('')
   const [listening, setListening] = useState(false)
   const [error, setError] = useState(null)
@@ -21,11 +25,15 @@ export function useLiveCaptions({ engine, active, onFinal }) {
   const finalRef = useRef(onFinal)
   finalRef.current = onFinal
 
+  useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(lines.slice(-1000))) } catch { /* full or private */ } }, [lines])
+
+  // onFinal can return true to say "that was a voice command": it then stays out of the transcript.
   const addLine = useCallback((text, extra = {}) => {
     const line = { id: `${Date.now()}-${Math.random()}`, text: text.trim(), ts: Date.now() / 1000, ...extra }
     if (!line.text) return
-    setLines((l) => [...l, line].slice(-200))
-    finalRef.current?.(line)
+    if (finalRef.current?.(line)) return
+    setLines((l) => [...l.filter((x) => x.id !== extra.replaces), line].slice(-1000))
+    if (extra.local) fetch('/api/speech', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: line.text }) }).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -43,7 +51,7 @@ export function useLiveCaptions({ engine, active, onFinal }) {
         let live = ''
         for (let i = e.resultIndex; i < e.results.length; i++) {
           const r = e.results[i]
-          if (r.isFinal) addLine(r[0].transcript)
+          if (r.isFinal) addLine(r[0].transcript, { local: true })
           else live += r[0].transcript
         }
         setInterim(live)
@@ -65,10 +73,11 @@ export function useLiveCaptions({ engine, active, onFinal }) {
     return () => { stop?.(); setListening(false) }
   }, [engine, active, addLine])
 
-  // Captions the brain sends back (Whisper): our own mic in private mode, plus other rooms' nodes.
+  // Captions the brain sends back (Whisper): our own mic in private mode, speaker mics, room nodes.
+  // `replaces`: a louder phone heard the same sentence, so it takes over the label.
   const addRemote = useCallback((msg) => {
     if (msg.zone === 'wearer' && engine !== 'private') return
-    addLine(msg.text, { zone: msg.zone === 'wearer' ? null : msg.zone, ts: msg.ts })
+    addLine(msg.text, { id: msg.id ?? `${msg.ts}-${msg.zone}`, zone: msg.zone === 'wearer' ? null : msg.zone, ts: msg.ts, replaces: msg.replaces })
   }, [engine, addLine])
 
   return { lines, interim, listening, error, level, addRemote, clear: () => setLines([]), addLine }

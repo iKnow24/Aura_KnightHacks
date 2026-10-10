@@ -16,12 +16,13 @@ headset glows toward where they are. When someone falls, the caregiver knows.
 | `server/app/detectors/fall.py` | Fall detector from pose keypoints: fast drop, then lying still |
 | `server/app/detectors/ast_sound.py` | AI sound classifier (doorbell, glass, baby crying, alarms) on the GPU |
 | `server/app/modes.py` | Watch, Home, Lecture, Outside and Night modes, as config |
-| `server/app/recap.py`, `llm.py` | Lecture recap (summary, memory map, quiz). Local model on the AMD GPU first, then Hugging Face, Claude, or plain rules |
+| `server/app/recap.py`, `llm.py` | Lecture recap (summary, memory map, quiz). Claude first, then Hugging Face, optional local model, then plain rules |
 | `web/` | One React app (Vite, Tailwind, Framer Motion) with a page per device |
 | `web/src/pages/Dashboard.jsx` | Caregiver floor plan, timeline, mode switch, fake-alert buttons |
 | `web/src/pages/Headset.jsx` | Phone-in-headset passthrough view with directional glow |
 | `web/src/pages/Node.jsx` | Spare phone in a room, streams mic audio and body keypoints (never video) |
 | `web/src/pages/Captions.jsx` | Wearer's phone: live captions, mode tabs, alerts that grow until tapped, lecture recap |
+| `web/src/pages/Mic.jsx` | One phone per person in a conversation; captions get labeled with whoever's phone heard it loudest |
 | `web/src/pages/Rear.jsx` | Outside mode: phone on your back that warns when someone or a car comes up behind you |
 | `web/src/pages/Strobe.jsx` | Bedside phone: red flash, vibration, flashlight strobe |
 | `docs/demo.md` | What to test first, the 2-minute demo script, and answers to judge questions |
@@ -54,9 +55,9 @@ bash setup.sh
 bash run.sh
 ```
 
-Optional, for the lecture recap: the brain loads `Qwen/Qwen2.5-3B-Instruct` on the GPU by itself
-(`LUMEN_LOCAL_LLM=off` to skip, or another model id). Set `HF_TOKEN` to fall back to Hugging Face credits.
-With neither, the recap is built by rules and still works.
+Optional, for Ask Lumen, the lecture recap and voice-made modes: set `ANTHROPIC_API_KEY` (Claude, the default),
+and/or `HF_TOKEN` (Hugging Face credits). A local model on the GPU is opt-in: `LUMEN_LLM_ORDER=claude,hf,local`.
+With none of them, everything falls back to plain rules and still works.
 
 Each credit is one hour. **Delete the machine whenever nobody is using it**; setup takes minutes to redo.
 

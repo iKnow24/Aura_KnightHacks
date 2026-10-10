@@ -18,8 +18,21 @@ export async function streamMic(zone = 'wearer', onLevel) {
   open()
   src.connect(proc)
   proc.connect(ctx.destination)
+  // iPhones can ignore the 16 kHz request and record at 48 kHz. The brain expects 16 kHz,
+  // so average down if needed (otherwise Whisper hears everyone at triple speed).
+  const ratio = ctx.sampleRate / 16000
+  const resample = (x) => {
+    if (ratio === 1) return x
+    const out = new Float32Array(Math.floor(x.length / ratio))
+    for (let i = 0; i < out.length; i++) {
+      let sum = 0, n = 0
+      for (let j = Math.floor(i * ratio); j < Math.floor((i + 1) * ratio); j++) { sum += x[j]; n++ }
+      out[i] = sum / n
+    }
+    return out
+  }
   proc.onaudioprocess = (e) => {
-    const samples = e.inputBuffer.getChannelData(0)
+    const samples = resample(e.inputBuffer.getChannelData(0))
     if (onLevel) {
       let sum = 0
       for (let i = 0; i < samples.length; i++) sum += samples[i] * samples[i]

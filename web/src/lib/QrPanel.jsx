@@ -9,6 +9,7 @@ const DEVICES = [
   ['Live captions', '/captions'],
   ['Headset', '/headset'],
   ['Rear guard', '/rear'],
+  ['Speaker mic', '/mic'],
   ['Bedside strobe', '/strobe'],
 ]
 

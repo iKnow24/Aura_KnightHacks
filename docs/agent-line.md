@@ -65,6 +65,9 @@ Two more message types go out on the same sockets. They are not alerts, so scree
 ```
 
 Nodes send `{"type": "snapshot", "ts": ..., "jpeg": "data:image/jpeg;base64,..."}` every 5 s (turn off with `?items=0`).
+Captions carry `"id"` and, when a louder speaker mic heard the same sentence, `"replaces": old_id`
+(see `server/app/speakers.py`). Browser captions are saved with `POST /api/speech {"text"}`.
+Voice "add a new mode": `POST /api/modes {"description"}` builds a mode, switches to it, returns `{"key", "label", "sound_kinds", ...}`.
 Acknowledging: any screen calls `POST /api/ack {"id": alert_id, "by": "wearer"}`; every screen gets
 `{"type": "ack", "id", "ts", "by"}` and drops the alert, and the dashboard timeline shows "seen at".
 Rear guard phone sends `{"type": "approach", "label": "person" | "car" | ..., "score", "area"}` on its node socket.

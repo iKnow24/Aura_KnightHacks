@@ -11,6 +11,7 @@ import Node from './pages/Node.jsx'
 import Strobe from './pages/Strobe.jsx'
 import Captions from './pages/Captions.jsx'
 import Rear from './pages/Rear.jsx'
+import Mic from './pages/Mic.jsx'
 
 // Checked on every visit, not once at startup, so signing in takes effect right away.
 const RequireUser = ({ children }) => (getUser() ? children : <Navigate to="/" replace />)
@@ -27,6 +28,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <Route path="/strobe" element={<Strobe />} />
       <Route path="/captions" element={<Captions />} />
       <Route path="/rear" element={<Rear />} />
+      <Route path="/mic" element={<Mic />} />
     </Routes>
   </BrowserRouter>
 )

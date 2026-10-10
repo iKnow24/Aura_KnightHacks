@@ -1,10 +1,11 @@
 """One place to ask a language model for JSON, local first.
 
-Order, first one that answers wins:
-  1. "local": a small open model on our own AMD GPU (LUMEN_LOCAL_LLM, default Qwen2.5-3B-Instruct).
-     Nothing leaves the box. Off on CPU-only machines unless LUMEN_LOCAL_LLM_CPU=1 (too slow).
-  2. "hf": Hugging Face Inference Providers with HF_TOKEN (the team's credits).
-  3. "claude": Claude, if ANTHROPIC_API_KEY is set.
+Order, first one that answers wins (LUMEN_LLM_ORDER, default "claude,hf"):
+  - "claude": Claude, if ANTHROPIC_API_KEY is set. Biggest context, best answers. The default.
+  - "hf": Hugging Face Inference Providers with HF_TOKEN (the team's credits).
+  - "local": a small open model on our own AMD GPU (LUMEN_LOCAL_LLM, default Qwen2.5-3B-Instruct).
+     Nothing leaves the box, but a 3B model is far weaker and its GPU memory competes with Whisper.
+     Add it to the order to turn it on. Off on CPU-only machines unless LUMEN_LOCAL_LLM_CPU=1.
 Each returns None on failure and the caller falls back to plain rules, so the demo never
 depends on a model. Safety alerts never go through here (see CLAUDE.md).
 """
@@ -20,12 +21,13 @@ LOCAL_MODEL = os.environ.get("LUMEN_LOCAL_LLM", "Qwen/Qwen2.5-3B-Instruct")
 HF_MODEL = os.environ.get("LUMEN_HF_LLM", "Qwen/Qwen2.5-7B-Instruct")  # any chat model a provider serves
 HF_URL = "https://router.huggingface.co/v1/chat/completions"
 CLAUDE_MODEL = os.environ.get("LUMEN_LLM", "claude-haiku-5-5")
+ORDER = [b.strip() for b in os.environ.get("LUMEN_LLM_ORDER", "claude,hf").split(",") if b.strip()]
 
 
 class LocalLLM:
     def __init__(self):
         self._pipe = None
-        self._failed = LOCAL_MODEL.lower() in ("", "off", "none")
+        self._failed = "local" not in ORDER or LOCAL_MODEL.lower() in ("", "off", "none")
         self._lock = threading.Lock()  # one generation at a time on the GPU
 
     def available(self) -> bool:
@@ -97,7 +99,11 @@ def parse_json(text: str | None) -> dict | None:
 
 def chat_json(system: str, user: str, max_tokens: int = 1200) -> tuple[dict | None, str]:
     """Returns (parsed JSON, which brain answered) or (None, "rules") if nobody could."""
-    for name, fn in (("local", local.chat), ("hf", _hf), ("claude", _claude)):
+    brains = {"local": local.chat, "hf": _hf, "claude": _claude}
+    for name in ORDER:
+        fn = brains.get(name)
+        if fn is None:
+            continue
         try:
             data = parse_json(fn(system, user, max_tokens))
         except Exception as e:
