@@ -36,7 +36,7 @@ ZONE_WORDS = {"kitchen": "kitchen", "living": "living", "lounge": "living", "bed
 ALERT_NAMES = {"smoke_alarm": "a smoke alarm", "doorbell": "the doorbell", "name_called": "someone call your name",
                "fall": "a possible fall", "glass_break": "glass breaking", "baby_cry": "a baby crying"}
 
-ZONE_NAMES = {"living": "living room"}
+ZONE_NAMES = {"living": "living room", "wearer": "room with you"}
 
 
 def ago(ts: float, now: float | None = None) -> str:
@@ -66,7 +66,8 @@ def tool_last_seen(memory: Memory, item: str) -> dict:
 
 def tool_transcript(memory: Memory, zone: str | None = None, minutes: float = 60, limit: int = 10) -> dict:
     lines = memory.speech(zone=zone, since=time.time() - minutes * 60, limit=limit)
-    return {"lines": [{"zone": e["zone"], "text": e["text"], "ts": e["ts"], "ago": ago(e["ts"])} for e in lines],
+    return {"lines": [{"zone": e["zone"], "text": e["text"], "ago": ago(e["ts"]),
+                       "said_to_you": e.get("to_you", False), "speaker": e.get("speaker")} for e in lines],
             "entries": lines}
 
 
@@ -107,12 +108,16 @@ def answer_rules(question: str, memory: Memory, events: list[dict]) -> dict:
 
     if re.search(r"\b(said|say|saying|told|talk|spoke|heard|hear)\b", q):
         zone = find_zone(q)
-        lines = tool_transcript(memory, zone=zone, minutes=24 * 60, limit=3)["entries"]
+        lines = tool_transcript(memory, zone=zone, minutes=24 * 60, limit=20)["entries"]
+        if re.search(r"\b(to me|told me)\b", q):
+            lines = [e for e in lines if e.get("to_you")] or lines
+        lines = lines[-3:]
         if not lines:
             where = f" in the {room(zone)}" if zone else ""
             return {"answer": f"I haven't heard anyone speak{where} yet.", "evidence": []}
         last = lines[-1]
-        return {"answer": f"“{last['text']}”, in the {room(last['zone'])}, {ago(last['ts'])}.",
+        where = "to you" if last.get("to_you") else f"in the {room(last['zone'])}"
+        return {"answer": f"“{last['text']}”, {where}, {ago(last['ts'])}.",
                 "evidence": lines}
 
     if re.search(r"\b(happen|happened|miss|missed|asleep|sleep|night|while|recap|anything|alerts?)\b", q):
@@ -160,15 +165,19 @@ TOOLS = [
     fn("last_seen", "Where and when a household item was last seen by a room camera.",
        {"item": {"type": "string", "enum": list(ITEM_WORDS)}}, ["item"]),
     fn("transcript", "What people said out loud, newest last. Optionally one room.",
-       {"zone": {"type": "string", "enum": ["kitchen", "living", "bedroom", "hallway"]},
+       {"zone": {"type": "string", "enum": ["kitchen", "living", "bedroom", "hallway", "wearer"]},
         "minutes": {"type": "number", "description": "How far back to look. Default 60."}}),
     fn("alerts", "Safety alerts (smoke alarm, doorbell, fall, name called...) in the last N hours.",
        {"hours": {"type": "number"}}),
 ]
 
-SYSTEM = ("You are Lumen, the memory of a home that helps a deaf or hard-of-hearing person. Answer in one or two "
-          "short sentences, plain words, no markdown. Only state what the tools return; if they return nothing, "
-          "say you haven't seen or heard it. Say times as relative ('12 minutes ago'). Room 'living' is the living room.")
+SYSTEM = ("You are Lumen, the memory of a home. You help a deaf or hard-of-hearing person, often an older adult, "
+          "keep up with what was said around them. Answer in one to three short sentences, warm and plain, like a "
+          "patient family member. No markdown, no jargon. If someone asked them a question or told them something to "
+          "do (a time, a pill, an appointment), say that clearly first. Only state what the tools return; if they "
+          "return nothing, say you haven't seen or heard it. Say times as relative ('12 minutes ago'). "
+          "Zone 'living' is the living room; zone 'wearer' means said in the same room as the user, and "
+          "said_to_you=true means the speaker was facing them.")
 
 
 def run_tool(name: str, args: dict, memory: Memory, events: list[dict]) -> dict:

@@ -128,3 +128,27 @@ def test_provider_choice(monkeypatch):
 def test_wav_encoding():
     from app.detectors.speech import to_wav
     assert to_wav(np.zeros(SAMPLE_RATE, np.float32))[:4] == b"RIFF"
+
+
+def test_said_to_me_prefers_lines_facing_the_wearer():
+    m = Memory()
+    seed_demo(m)
+    r = answer_rules("what was said to me?", m, [])
+    assert "blue pill" in r["answer"] and "to you" in r["answer"]
+    # The plain question still gives the newest line from anywhere.
+    assert "Dinner" in answer_rules("what was the last thing said", m, [])["answer"]
+
+
+def test_headset_speech_skips_alarm_detectors_and_takes_caption_meta(monkeypatch):
+    client = TestClient(main.app)
+    client.delete("/api/memory")
+    entry = main.memory.add_speech("wearer", "Your pills are on the counter")
+    seen = []
+    monkeypatch.setattr(main.alarm_dsp, "is_alarm", lambda buf: seen.append(1) or False)
+    with client.websocket_connect("/ws/dashboard") as dash, client.websocket_connect("/ws/node/h1?zone=wearer") as node:
+        dash.receive_json(); node.receive_json()
+        node.send_bytes(np.zeros(SAMPLE_RATE * 4, np.float32).tobytes())
+        node.send_text('{"type": "caption_meta", "ts": %r, "speaker": 2, "to_you": true}' % entry["ts"])
+        msg = dash.receive_json()
+    assert msg["type"] == "caption" and msg["to_you"] and msg["speaker"] == 2
+    assert not seen

@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useState } from 'react'
 import { api, useBrain } from '../lib/useBrain'
 import AskLumen from '../lib/AskLumen'
+import Conversation, { useCaptions } from '../lib/Conversation'
 import QrPanel from '../lib/QrPanel'
 import { getUser, signOut } from '../lib/user'
 import { ALERT_TEXT, SEVERITY_COLOR, ZONES } from '../lib/zones'
@@ -17,10 +18,11 @@ export default function Dashboard() {
   const [ripples, setRipples] = useState([])
   const [showQr, setShowQr] = useState(false)
   const user = getUser()
+  const captions = useCaptions()
   const { state, connected } = useBrain('dashboard', (alert) => {
     setRipples((r) => [...r, alert])
     setTimeout(() => setRipples((r) => r.filter((x) => x.id !== alert.id)), 4000)
-  })
+  }, (msg) => msg.type === 'caption' && captions.add(msg))
   const now = Date.now() / 1000
 
   return (
@@ -87,7 +89,7 @@ export default function Dashboard() {
               {ALERT_TEXT[kind].icon} {ALERT_TEXT[kind].text} · {ZONES[zone].label}
             </button>
           ))}
-          <button onClick={() => api('/api/memory/seed', {})} className="rounded-lg bg-zinc-800 px-3 py-1.5 text-sm hover:bg-zinc-700">
+          <button onClick={() => api('/api/memory/seed', {}).then(captions.reload)} className="rounded-lg bg-zinc-800 px-3 py-1.5 text-sm hover:bg-zinc-700">
             🧠 Seed demo memory
           </button>
         </div>
@@ -95,7 +97,9 @@ export default function Dashboard() {
         <div className="mt-4"><AskLumen /></div>
       </section>
 
-      <aside className="rounded-2xl border border-zinc-800 p-4">
+      <aside className="space-y-4">
+        <Conversation lines={captions.lines} />
+        <div className="rounded-2xl border border-zinc-800 p-4">
         <h2 className="mb-2 font-semibold">Timeline</h2>
         <ul className="space-y-2">
           {[...state.events].reverse().map((e) => (
@@ -107,6 +111,7 @@ export default function Dashboard() {
             </li>
           ))}
         </ul>
+        </div>
       </aside>
     </main>
   )

@@ -60,6 +60,11 @@ Two more message types go out on the same sockets. They are not alerts, so scree
 {"type": "sighting", "item": "keys", "zone": "living", "ts": 1728540000.1}             // dashboard
 ```
 
+The headset streams its own mic as node zone `"wearer"` (speech only, no alarm detectors). When a caption
+for it arrives, the headset works out who said it from lip movement and sends back
+`{"type": "caption_meta", "ts": <caption ts>, "speaker": 1, "to_you": true}`; the dashboard then gets the caption
+again with `speaker` and `to_you` filled in. `POST /api/fake-caption {"zone": "wearer", "text": "..."}` fakes a Whisper result.
+
 Nodes send `{"type": "snapshot", "ts": ..., "jpeg": "data:image/jpeg;base64,..."}` every 5 s (turn off with `?items=0`).
 Ask Lumen: `POST /api/ask {"question": "..."}` returns `{"answer", "evidence": [log entries], "brain": "groq" | "claude" | "xai" | "rules"}`.
 Pick the AI with `LUMEN_LLM=groq|claude|xai|off` and the matching key (`GROQ_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`). No key means keyword answers.

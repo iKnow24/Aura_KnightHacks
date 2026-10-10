@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { nodeSocket, streamMic } from '../lib/audio'
 import { keepAwake } from '../lib/useBrain'
 import { BONES, detectPose, loadPose } from '../lib/pose'
 
@@ -6,8 +7,6 @@ import { BONES, detectPose, loadPose } from '../lib/pose'
 // at 10 fps for fall detection. Unless ?items=0, it also sends one small still photo every
 // SNAPSHOT_S seconds so the brain can remember where keys, wallet, glasses were last seen.
 // Live video never leaves the phone; the brain keeps only a crop of each item it finds.
-// Browser audio "cleanup" is turned off on purpose: auto-gain and noise suppression
-// distort loudness and can erase steady alarm beeps.
 // Mount the phone high (about 1.8 m) and angled down so a person on the floor stays in frame.
 
 const POSE_FPS = 10
@@ -31,26 +30,7 @@ export default function Node() {
 
   useEffect(() => () => timers.current.forEach(clearInterval), [])
 
-  const send = (data) => wsRef.current?.readyState === 1 && wsRef.current.send(data)
-
-  const startAudio = async () => {
-    const mic = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-    })
-    const ctx = new AudioContext({ sampleRate: 16000 })
-    const src = ctx.createMediaStreamSource(mic)
-    // ScriptProcessor is deprecated but works everywhere with zero setup. Fine for a hackathon.
-    const proc = ctx.createScriptProcessor(4096, 1, 1)
-    src.connect(proc)
-    proc.connect(ctx.destination)
-    proc.onaudioprocess = (e) => {
-      const samples = e.inputBuffer.getChannelData(0)
-      let sum = 0
-      for (let i = 0; i < samples.length; i++) sum += samples[i] * samples[i]
-      setLevel(Math.sqrt(sum / samples.length))
-      send(new Float32Array(samples).buffer)
-    }
-  }
+  const send = (data) => wsRef.current?.send(data)
 
   const startCamera = async () => {
     try {
@@ -86,16 +66,8 @@ export default function Node() {
 
   const start = async () => {
     await keepAwake()
-    const connect = () => {
-      const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-      const ws = new WebSocket(`${proto}://${location.host}/ws/node/${nodeId}?zone=${zone}`)
-      ws.binaryType = 'arraybuffer'
-      ws.onopen = () => setStatus('streaming')
-      ws.onclose = () => { setStatus('reconnecting'); setTimeout(connect, 1000) }
-      wsRef.current = ws
-    }
-    connect()
-    await startAudio()
+    wsRef.current = nodeSocket(nodeId, zone, setStatus)
+    await streamMic(send, setLevel)
     if (useCamera) await startCamera()
   }
 
