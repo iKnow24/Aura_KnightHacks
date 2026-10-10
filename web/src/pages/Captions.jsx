@@ -338,7 +338,7 @@ export default function Captions() {
   const toggleBar = () => (bar ? setBar(false) : showBar())
 
   const startCamera = async () => {
-    try { setCamera(await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })) } catch { setCamera(null) }
+    try { setCamera(await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false })) } catch { setCamera(null) }
   }
   const stopCamera = () => { camera?.getTracks().forEach((t) => t.stop()); setCamera(null) }
 
