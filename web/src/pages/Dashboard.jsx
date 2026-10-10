@@ -1,7 +1,10 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useState } from 'react'
 import { api, useBrain } from '../lib/useBrain'
+import AskLumen from '../lib/AskLumen'
+import Conversation, { useCaptions } from '../lib/Conversation'
 import QrPanel from '../lib/QrPanel'
+import { getUser, signOut } from '../lib/user'
 import { ALERT_TEXT, SEVERITY_COLOR, ZONES } from '../lib/zones'
 
 const FAKES = [
@@ -14,17 +17,19 @@ const FAKES = [
 export default function Dashboard() {
   const [ripples, setRipples] = useState([])
   const [showQr, setShowQr] = useState(false)
+  const user = getUser()
+  const captions = useCaptions()
   const { state, connected } = useBrain('dashboard', (alert) => {
     setRipples((r) => [...r, alert])
     setTimeout(() => setRipples((r) => r.filter((x) => x.id !== alert.id)), 4000)
-  })
+  }, (msg) => msg.type === 'caption' && captions.add(msg))
   const now = Date.now() / 1000
 
   return (
     <main className="grid min-h-full gap-4 p-4 lg:grid-cols-[1fr_360px]">
       <section>
         <header className="mb-3 flex flex-wrap items-center gap-3">
-          <h1 className="text-xl font-bold">Lumen · Home</h1>
+          <h1 className="text-xl font-bold">Lumen · {user?.household ?? 'Home'}</h1>
           <span className={`text-sm ${connected ? 'text-green-400' : 'text-red-400'}`}>
             ● {connected ? 'brain connected' : 'brain offline'}
           </span>
@@ -38,6 +43,9 @@ export default function Dashboard() {
           >
             {Object.entries(state.modes).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
           </select>
+          <button onClick={() => { signOut(); location.href = '/' }} className="text-sm text-zinc-500 hover:text-zinc-300">
+            {user?.name} · Sign out
+          </button>
         </header>
 
         {showQr && <QrPanel />}
@@ -81,10 +89,17 @@ export default function Dashboard() {
               {ALERT_TEXT[kind].icon} {ALERT_TEXT[kind].text} · {ZONES[zone].label}
             </button>
           ))}
+          <button onClick={() => api('/api/memory/seed', {}).then(captions.reload)} className="rounded-lg bg-zinc-800 px-3 py-1.5 text-sm hover:bg-zinc-700">
+            🧠 Seed demo memory
+          </button>
         </div>
+
+        <div className="mt-4"><AskLumen /></div>
       </section>
 
-      <aside className="rounded-2xl border border-zinc-800 p-4">
+      <aside className="space-y-4">
+        <Conversation lines={captions.lines} />
+        <div className="rounded-2xl border border-zinc-800 p-4">
         <h2 className="mb-2 font-semibold">Timeline</h2>
         <ul className="space-y-2">
           {[...state.events].reverse().map((e) => (
@@ -96,6 +111,7 @@ export default function Dashboard() {
             </li>
           ))}
         </ul>
+        </div>
       </aside>
     </main>
   )

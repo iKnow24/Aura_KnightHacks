@@ -1,20 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
+import { nodeSocket, streamMic } from '../lib/audio'
 import { keepAwake } from '../lib/useBrain'
 import { BONES, detectPose, loadPose } from '../lib/pose'
 
 // A spare phone in a room. Streams 16 kHz mono audio and, unless ?pose=0, body keypoints
-// at 10 fps for fall detection. Video never leaves the phone.
-// Browser audio "cleanup" is turned off on purpose: auto-gain and noise suppression
-// distort loudness and can erase steady alarm beeps.
+// at 10 fps for fall detection. Unless ?items=0, it also sends one small still photo every
+// SNAPSHOT_S seconds so the brain can remember where keys, wallet, glasses were last seen.
+// Live video never leaves the phone; the brain keeps only a crop of each item it finds.
 // Mount the phone high (about 1.8 m) and angled down so a person on the floor stays in frame.
 
 const POSE_FPS = 10
+const SNAPSHOT_S = 5
 
 export default function Node() {
   const params = new URLSearchParams(location.search)
   const zone = params.get('zone') || 'living'
   const nodeId = params.get('id') || `${zone}-${Math.random().toString(36).slice(2, 6)}`
   const usePose = params.get('pose') !== '0'
+  const useItems = params.get('items') !== '0'
+  const useCamera = usePose || useItems
   const [status, setStatus] = useState('idle')
   const [level, setLevel] = useState(0)
   const [personSeen, setPersonSeen] = useState(false)
@@ -26,34 +30,17 @@ export default function Node() {
 
   useEffect(() => () => timers.current.forEach(clearInterval), [])
 
-  const send = (data) => wsRef.current?.readyState === 1 && wsRef.current.send(data)
+  const send = (data) => wsRef.current?.send(data)
 
-  const startAudio = async () => {
-    const mic = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-    })
-    const ctx = new AudioContext({ sampleRate: 16000 })
-    const src = ctx.createMediaStreamSource(mic)
-    // ScriptProcessor is deprecated but works everywhere with zero setup. Fine for a hackathon.
-    const proc = ctx.createScriptProcessor(4096, 1, 1)
-    src.connect(proc)
-    proc.connect(ctx.destination)
-    proc.onaudioprocess = (e) => {
-      const samples = e.inputBuffer.getChannelData(0)
-      let sum = 0
-      for (let i = 0; i < samples.length; i++) sum += samples[i] * samples[i]
-      setLevel(Math.sqrt(sum / samples.length))
-      send(new Float32Array(samples).buffer)
-    }
-  }
-
-  const startPose = async () => {
+  const startCamera = async () => {
     try {
       const cam = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: 640, height: 480 },
       })
       videoRef.current.srcObject = cam
       await videoRef.current.play()
+      if (useItems) timers.current.push(setInterval(sendSnapshot, SNAPSHOT_S * 1000))
+      if (!usePose) return
       await loadPose()
       timers.current.push(setInterval(() => {
         const now = performance.now()
@@ -67,19 +54,21 @@ export default function Node() {
     }
   }
 
+  const sendSnapshot = () => {
+    const v = videoRef.current
+    if (!v?.videoWidth) return
+    const c = document.createElement('canvas')
+    c.width = 640
+    c.height = Math.round((640 * v.videoHeight) / v.videoWidth)
+    c.getContext('2d').drawImage(v, 0, 0, c.width, c.height)
+    send(JSON.stringify({ type: 'snapshot', ts: Date.now() / 1000, jpeg: c.toDataURL('image/jpeg', 0.7) }))
+  }
+
   const start = async () => {
     await keepAwake()
-    const connect = () => {
-      const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-      const ws = new WebSocket(`${proto}://${location.host}/ws/node/${nodeId}?zone=${zone}`)
-      ws.binaryType = 'arraybuffer'
-      ws.onopen = () => setStatus('streaming')
-      ws.onclose = () => { setStatus('reconnecting'); setTimeout(connect, 1000) }
-      wsRef.current = ws
-    }
-    connect()
-    await startAudio()
-    if (usePose) await startPose()
+    wsRef.current = nodeSocket(nodeId, zone, setStatus)
+    await streamMic(send, setLevel)
+    if (useCamera) await startCamera()
   }
 
   const color = status === 'streaming' ? 'bg-green-700' : status === 'idle' ? 'bg-zinc-800' : 'bg-amber-600'
@@ -90,13 +79,13 @@ export default function Node() {
       <div className="h-3 w-64 rounded bg-black/40">
         <div className="h-3 rounded bg-white" style={{ width: `${Math.min(100, level * 400)}%` }} />
       </div>
-      {usePose && (
+      {useCamera && (
         <div className={`relative w-64 overflow-hidden rounded-lg bg-black ${status === 'idle' ? 'hidden' : ''}`}>
-          {/* Preview only, to aim the camera. It is never sent anywhere. */}
+          {/* Preview to aim the camera. Only a still every few seconds is sent, for item memory. */}
           <video ref={videoRef} playsInline muted className="w-full opacity-60" />
           <canvas ref={canvasRef} width={640} height={480} className="absolute inset-0 h-full w-full" />
           <div className="absolute left-2 top-2 rounded bg-black/60 px-2 text-xs">
-            {poseError ? `pose off: ${poseError}` : personSeen ? '● person tracked' : '○ no person'}
+            {poseError ? `camera off: ${poseError}` : !usePose ? '● watching for items' : personSeen ? '● person tracked' : '○ no person'}
           </div>
         </div>
       )}
