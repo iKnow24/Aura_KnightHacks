@@ -19,8 +19,8 @@ generate_household.py  ─┘            │  Auto Loader
 ```
 
 The headline table is `gold_change_from_normal`: for each day it compares the last 7 days with the
-7 before, for the same person. With the generated data, the last day reads **51% slower to notice
-alerts, 8 missed vs 2 the week before → flagged**. That decline is planted by the generator; say so.
+7 before, for the same person. With the generated data, the last day reads **50% slower to notice
+alerts, 15 missed vs 5 the week before → flagged** (at night: 7 missed vs 2). That decline is planted by the generator; say so.
 It's "a change from her normal, worth a call", never a diagnosis.
 
 ## 1. Make the data
@@ -92,8 +92,8 @@ Then **Settings → Enable Genie → Link existing Genie agent**, paste your age
 2. In front of the judge: upload the **other 7 files** to the volume.
 3. Pipeline → **Run** (or a Job: **Create → Job**, task 1 = pipeline, task 2 = Dashboard refresh,
    **Run now**). Auto Loader reads only the 7 new files.
-4. Refresh the dashboard: it flips to **"Worth a call: slower than her usual"**, about 51% slower,
-   8 missed vs 2.
+4. Refresh the dashboard: it flips to **"Worth a call: slower than her usual"**, about 50% slower,
+   15 missed vs 5 (7 vs 2 at night).
 5. Ask Genie on the dashboard: *"Is Mom doing okay this week?"*
 
 ## Stretch: Ask Lumen calls Genie

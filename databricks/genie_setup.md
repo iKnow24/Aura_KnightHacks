@@ -55,7 +55,7 @@ Usually not needed; the Gold tables already joined alerts to taps. If you add `s
 ## Benchmarks (Benchmarks → Add)
 
 Use the three example questions above with their SQL as the correct answer, then **Run benchmarks**.
-On the generated data the first one should say about **51% slower, 8 missed vs 2, flagged**.
+On the generated data the first one should say about **50% slower, 15 missed vs 5, flagged**.
 
 ## Questions to ask live in the demo
 
