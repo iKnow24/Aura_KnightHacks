@@ -70,6 +70,10 @@ for it arrives, the headset works out who said it from lip movement and sends ba
 again with `speaker` and `to_you` filled in. `POST /api/fake-caption {"zone": "wearer", "text": "..."}` fakes a Whisper result.
 
 Nodes send `{"type": "snapshot", "ts": ..., "jpeg": "data:image/jpeg;base64,..."}` every 5 s (turn off with `?items=0`).
+For an explicitly enabled camera demo, a room node can also send `{"type": "camera_preview", "ts": ..., "jpeg": "data:image/jpeg;base64,..."}` once per second.
+The brain forwards this only when `LUMEN_DEMO_PREVIEW=1`, to dashboard sockets only, with `node_id` and `zone` added.
+These full-frame previews are never stored in memory or the event log. Normal sensor operation keeps previews off.
+Node sockets also accept `{"type": "heartbeat"}`; dashboard state updates include current node connection status.
 Captions carry `"id"` and, when a louder speaker mic heard the same sentence, `"replaces": old_id`
 (see `server/app/speakers.py`). Browser captions are saved with `POST /api/speech {"text"}`.
 Voice "add a new mode": `POST /api/modes {"description"}` builds a mode, switches to it, returns `{"key", "label", "sound_kinds", ...}`.
