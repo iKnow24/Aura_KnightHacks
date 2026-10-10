@@ -16,7 +16,7 @@ headset glows toward where they are. When someone falls, the caregiver knows.
 | `server/app/detectors/fall.py` | Fall detector from pose keypoints: fast drop, then lying still |
 | `server/app/detectors/ast_sound.py` | AI sound classifier (doorbell, glass, baby crying, alarms) on the GPU |
 | `server/app/modes.py` | Watch, Home, Lecture, Outside and Night modes, as config |
-| `server/app/recap.py`, `llm.py` | Lecture recap (summary, memory map, quiz). Claude first, then Hugging Face, optional local model, then plain rules |
+| `server/app/recap.py`, `llm.py` | Lecture recap (summary, memory map, quiz). same AI switch as Ask Lumen, optional local model, then plain rules |
 | `web/` | One React app (Vite, Tailwind, Framer Motion) with a page per device |
 | `web/src/pages/Dashboard.jsx` | Caregiver floor plan, timeline, mode switch, fake-alert buttons |
 | `web/src/pages/Headset.jsx` | Phone-in-headset passthrough view with directional glow |
@@ -55,9 +55,8 @@ bash setup.sh
 bash run.sh
 ```
 
-Optional, for Ask Lumen, the lecture recap and voice-made modes: set `ANTHROPIC_API_KEY` (Claude, the default),
-and/or `HF_TOKEN` (Hugging Face credits). A local model on the GPU is opt-in: `LUMEN_LLM_ORDER=claude,hf,local`.
-With none of them, everything falls back to plain rules and still works.
+The lecture recap and voice-made modes use the same AI switch as Ask Lumen (`LUMEN_LLM`, see docs/agent-line.md).
+A local model on the GPU is opt-in: `LUMEN_LOCAL_LLM=Qwen/Qwen2.5-3B-Instruct`. With no AI at all, they fall back to plain rules.
 
 Each credit is one hour. **Delete the machine whenever nobody is using it**; setup takes minutes to redo.
 

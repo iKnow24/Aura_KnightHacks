@@ -1,33 +1,25 @@
-"""One place to ask a language model for JSON, local first.
+"""Ask a language model for JSON (lecture recap, voice-made modes).
 
-Order, first one that answers wins (LUMEN_LLM_ORDER, default "claude,hf"):
-  - "claude": Claude, if ANTHROPIC_API_KEY is set. Biggest context, best answers. The default.
-  - "hf": Hugging Face Inference Providers with HF_TOKEN (the team's credits).
-  - "local": a small open model on our own AMD GPU (LUMEN_LOCAL_LLM, default Qwen2.5-3B-Instruct).
-     Nothing leaves the box, but a 3B model is far weaker and its GPU memory competes with Whisper.
-     Add it to the order to turn it on. Off on CPU-only machines unless LUMEN_LOCAL_LLM_CPU=1.
-Each returns None on failure and the caller falls back to plain rules, so the demo never
-depends on a model. Safety alerts never go through here (see CLAUDE.md).
+Uses the same provider switch as Ask Lumen (agent.py: LUMEN_LLM=groq|claude|xai|off, first key
+found wins), so there is one setting for the whole app. Optionally, a small open model on our own
+AMD GPU (set LUMEN_LOCAL_LLM to a Hugging Face model id, e.g. Qwen/Qwen2.5-3B-Instruct) answers
+when no provider does: nothing leaves the box, but it's far weaker and shares the GPU with Whisper.
+Every caller falls back to plain rules when this returns None. Safety alerts never come through here.
 """
 import json
 import logging
 import os
 import threading
-import urllib.request
 
 log = logging.getLogger(__name__)
 
-LOCAL_MODEL = os.environ.get("LUMEN_LOCAL_LLM", "Qwen/Qwen2.5-3B-Instruct")
-HF_MODEL = os.environ.get("LUMEN_HF_LLM", "Qwen/Qwen2.5-7B-Instruct")  # any chat model a provider serves
-HF_URL = "https://router.huggingface.co/v1/chat/completions"
-CLAUDE_MODEL = os.environ.get("LUMEN_LLM", "claude-haiku-5-5")
-ORDER = [b.strip() for b in os.environ.get("LUMEN_LLM_ORDER", "claude,hf").split(",") if b.strip()]
+LOCAL_MODEL = os.environ.get("LUMEN_LOCAL_LLM", "")
 
 
 class LocalLLM:
     def __init__(self):
         self._pipe = None
-        self._failed = "local" not in ORDER or LOCAL_MODEL.lower() in ("", "off", "none")
+        self._failed = not LOCAL_MODEL
         self._lock = threading.Lock()  # one generation at a time on the GPU
 
     def available(self) -> bool:
@@ -40,14 +32,11 @@ class LocalLLM:
                 from transformers import pipeline
 
                 gpu = torch.cuda.is_available()  # ROCm shows up as "cuda"
-                if not gpu and os.environ.get("LUMEN_LOCAL_LLM_CPU") != "1":
-                    raise RuntimeError("no GPU")
-                self._pipe = pipeline("text-generation", model=LOCAL_MODEL, device=0 if gpu else -1,
-                                      torch_dtype="auto")
+                self._pipe = pipeline("text-generation", model=LOCAL_MODEL, device=0 if gpu else -1, torch_dtype="auto")
                 log.info("Local LLM %s loaded on %s", LOCAL_MODEL, "GPU" if gpu else "CPU")
             except Exception as e:
                 self._failed = True
-                log.warning("Local LLM off (%s). Using Hugging Face, Claude, or rules instead.", e)
+                log.warning("Local LLM off (%s).", e)
         return self._pipe
 
     def chat(self, system: str, user: str, max_tokens: int) -> str | None:
@@ -63,26 +52,19 @@ class LocalLLM:
 local = LocalLLM()
 
 
-def _hf(system: str, user: str, max_tokens: int) -> str | None:
-    token = os.environ.get("HF_TOKEN")
-    if not token:
-        return None
-    body = json.dumps({"model": HF_MODEL, "max_tokens": max_tokens, "temperature": 0.2,
-                       "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]})
-    req = urllib.request.Request(HF_URL, data=body.encode(), method="POST",
-                                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.loads(r.read())["choices"][0]["message"]["content"]
+def _provider(system: str, user: str, max_tokens: int) -> tuple[str | None, str | None]:
+    from .agent import pick_provider
 
+    provider = pick_provider()
+    if not provider:
+        return None, None
+    name, base_url, key, model = provider
+    from openai import OpenAI
 
-def _claude(system: str, user: str, max_tokens: int) -> str | None:
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        return None
-    import anthropic
-
-    resp = anthropic.Anthropic().messages.create(model=CLAUDE_MODEL, max_tokens=max_tokens, system=system,
-                                                 messages=[{"role": "user", "content": user}])
-    return "".join(b.text for b in resp.content if b.type == "text")
+    client = OpenAI(base_url=base_url, api_key=key, timeout=30)
+    msg = client.chat.completions.create(model=model, max_tokens=max_tokens, temperature=0.2, messages=[
+        {"role": "system", "content": system}, {"role": "user", "content": user}]).choices[0].message
+    return msg.content, name
 
 
 def parse_json(text: str | None) -> dict | None:
@@ -99,16 +81,17 @@ def parse_json(text: str | None) -> dict | None:
 
 def chat_json(system: str, user: str, max_tokens: int = 1200) -> tuple[dict | None, str]:
     """Returns (parsed JSON, which brain answered) or (None, "rules") if nobody could."""
-    brains = {"local": local.chat, "hf": _hf, "claude": _claude}
-    for name in ORDER:
-        fn = brains.get(name)
-        if fn is None:
-            continue
-        try:
-            data = parse_json(fn(system, user, max_tokens))
-        except Exception as e:
-            log.warning("%s LLM failed (%s)", name, e)
-            continue
+    try:
+        text, name = _provider(system, user, max_tokens)
+        data = parse_json(text)
         if data is not None:
             return data, name
+    except Exception as e:
+        log.warning("LLM provider failed (%s)", e)
+    try:
+        data = parse_json(local.chat(system, user, max_tokens))
+        if data is not None:
+            return data, "local"
+    except Exception as e:
+        log.warning("Local LLM failed (%s)", e)
     return None, "rules"

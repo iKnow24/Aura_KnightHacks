@@ -4,6 +4,8 @@ Alerts stay in hub.events (the alert contract). This log holds the two other kin
 the "Ask Lumen" agent needs:
 
   {"type": "speech",   "ts": 1728540000.1, "zone": "kitchen", "text": "dinner's ready"}
+      (lines heard by the headset have zone "wearer", plus "speaker": 1 and "to_you": true
+       once the headset works out who said it)
   {"type": "sighting", "ts": 1728540000.1, "zone": "living",  "item": "keys",
    "confidence": 0.41, "thumb": "data:image/jpeg;base64,..."}
 
@@ -38,6 +40,14 @@ class Memory:
         return self.add({"type": "sighting", "zone": zone, "item": item, "confidence": confidence,
                          "thumb": thumb, "ts": ts})
 
+    def tag_speech(self, ts: float, speaker: int | None, to_you: bool) -> dict | None:
+        """The headset says who said a line (person number) and whether they faced the wearer."""
+        for e in reversed(self.entries):
+            if e["type"] == "speech" and abs(e["ts"] - ts) < 0.001:
+                e.update(speaker=speaker, to_you=to_you)
+                return e
+        return None
+
     def speech(self, zone: str | None = None, since: float = 0, limit: int = 20) -> list[dict]:
         hits = [e for e in self.entries if e["type"] == "speech" and e["ts"] >= since
                 and (zone is None or e["zone"] == zone)]
@@ -65,4 +75,8 @@ def seed_demo(memory: "Memory", now: float | None = None):
     memory.add_speech("kitchen", "Can you grab milk on the way home?", ts=now - 40 * 60)
     memory.add_sighting("living", "keys", 0.47, ts=now - 12 * 60)
     memory.add_sighting("bedroom", "glasses", 0.44, ts=now - 8 * 60)
+    memory.add_speech("wearer", "Your appointment with Dr. Patel moved to Thursday at 2.", ts=now - 5 * 60)
+    memory.tag_speech(now - 5 * 60, 1, True)
+    memory.add_speech("wearer", "Did you take the blue pill this morning?", ts=now - 4 * 60)
+    memory.tag_speech(now - 4 * 60, 2, True)
     memory.add_speech("kitchen", "Dinner's ready, come eat!", ts=now - 90)

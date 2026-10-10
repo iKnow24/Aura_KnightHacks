@@ -1,8 +1,9 @@
 """Ask Lumen: answers questions about the house from the memory log and the alert timeline.
 
 Two brains, same tools:
-- With ANTHROPIC_API_KEY set, Claude gets three tools (last_seen, transcript, alerts) and
-  decides which to call, so free-form questions work ("did anyone say anything about milk?").
+- With an LLM key set (Groq, Claude or xAI; see PROVIDERS), the model gets three tools
+  (last_seen, transcript, alerts) and decides which to call, so free-form questions work
+  ("did anyone say anything about milk?").
 - Without a key, or if the API call fails, a keyword router answers the core questions.
   The demo never depends on the network to answer "where are my keys".
 
@@ -18,8 +19,6 @@ import time
 from .memory import Memory
 
 log = logging.getLogger(__name__)
-
-LLM_MODEL = os.environ.get("LUMEN_LLM", "claude-haiku-5-5")
 
 # Words people use -> the item name the camera logs. Keep in sync with detectors/items.py.
 ITEM_WORDS = {
@@ -41,7 +40,7 @@ ALERT_NAMES = {"smoke_alarm": "a smoke alarm", "doorbell": "the doorbell", "name
                "car_horn": "a car horn", "siren": "a siren", "vehicle": "a car approaching",
                "person_behind": "someone come up behind you", "vehicle_behind": "a vehicle come up behind you"}
 
-ZONE_NAMES = {"living": "living room"}
+ZONE_NAMES = {"living": "living room", "wearer": "room with you"}
 
 
 def ago(ts: float, now: float | None = None) -> str:
@@ -71,7 +70,8 @@ def tool_last_seen(memory: Memory, item: str) -> dict:
 
 def tool_transcript(memory: Memory, zone: str | None = None, minutes: float = 60, limit: int = 10) -> dict:
     lines = memory.speech(zone=zone, since=time.time() - minutes * 60, limit=limit)
-    return {"lines": [{"zone": e["zone"], "text": e["text"], "ts": e["ts"], "ago": ago(e["ts"])} for e in lines],
+    return {"lines": [{"zone": e["zone"], "text": e["text"], "ago": ago(e["ts"]),
+                       "said_to_you": e.get("to_you", False), "speaker": e.get("speaker")} for e in lines],
             "entries": lines}
 
 
@@ -112,12 +112,16 @@ def answer_rules(question: str, memory: Memory, events: list[dict]) -> dict:
 
     if re.search(r"\b(said|say|saying|told|talk|spoke|heard|hear)\b", q):
         zone = find_zone(q)
-        lines = tool_transcript(memory, zone=zone, minutes=24 * 60, limit=3)["entries"]
+        lines = tool_transcript(memory, zone=zone, minutes=24 * 60, limit=20)["entries"]
+        if re.search(r"\b(to me|told me)\b", q):
+            lines = [e for e in lines if e.get("to_you")] or lines
+        lines = lines[-3:]
         if not lines:
             where = f" in the {room(zone)}" if zone else ""
             return {"answer": f"I haven't heard anyone speak{where} yet.", "evidence": []}
         last = lines[-1]
-        return {"answer": f"“{last['text']}”, in the {room(last['zone'])}, {ago(last['ts'])}.",
+        where = "to you" if last.get("to_you") else f"in the {room(last['zone'])}"
+        return {"answer": f"“{last['text']}”, {where}, {ago(last['ts'])}.",
                 "evidence": lines}
 
     if re.search(r"\b(happen|happened|miss|missed|asleep|sleep|night|while|recap|anything|alerts?)\b", q):
@@ -132,62 +136,92 @@ def answer_rules(question: str, memory: Memory, events: list[dict]) -> dict:
                       "or “What happened while I was asleep?”", "evidence": []}
 
 
-# ---- Claude brain -----------------------------------------------------------------------
+# ---- LLM brain --------------------------------------------------------------------------
+# Any provider with an OpenAI-compatible API works through the same client. Pick one with
+# LUMEN_LLM=groq|claude|xai|off, or leave it unset to use the first one that has a key.
+
+PROVIDERS = {
+    # name: (base URL, env var holding the key, default model)
+    "groq": ("https://api.groq.com/openai/v1", "GROQ_API_KEY", "openai/gpt-oss-20b"),  # free tier
+    "claude": ("https://api.anthropic.com/v1/", "ANTHROPIC_API_KEY", "claude-haiku-5-5"),
+    "xai": ("https://api.x.ai/v1", "XAI_API_KEY", "grok-4.7"),
+}
+
+
+def pick_provider() -> tuple[str, str, str, str] | None:
+    """(name, base_url, api_key, model) for the configured provider, or None for keyword answers."""
+    choice = os.environ.get("LUMEN_LLM", "").lower()
+    if choice == "off":
+        return None
+    for name in [choice] if choice in PROVIDERS else list(PROVIDERS):
+        url, key_env, model = PROVIDERS[name]
+        if os.environ.get(key_env):
+            return name, url, os.environ[key_env], os.environ.get("LUMEN_LLM_MODEL", model)
+    return None
+
+
+def fn(name: str, description: str, properties: dict, required: list | None = None) -> dict:
+    return {"type": "function", "function": {"name": name, "description": description, "parameters": {
+        "type": "object", "properties": properties, "required": required or []}}}
+
 
 TOOLS = [
-    {"name": "last_seen", "description": "Where and when a household item was last seen by a room camera.",
-     "input_schema": {"type": "object", "properties": {"item": {"type": "string", "enum": list(ITEM_WORDS)}},
-                      "required": ["item"]}},
-    {"name": "transcript", "description": "What people said out loud, newest last. Optionally one room.",
-     "input_schema": {"type": "object", "properties": {
-         "zone": {"type": "string", "enum": ["kitchen", "living", "bedroom", "hallway"]},
-         "minutes": {"type": "number", "description": "How far back to look. Default 60."}}}},
-    {"name": "alerts", "description": "Safety alerts (smoke alarm, doorbell, fall, name called...) in the last N hours.",
-     "input_schema": {"type": "object", "properties": {"hours": {"type": "number"}}}},
+    fn("last_seen", "Where and when a household item was last seen by a room camera.",
+       {"item": {"type": "string", "enum": list(ITEM_WORDS)}}, ["item"]),
+    fn("transcript", "What people said out loud, newest last. Optionally one room.",
+       {"zone": {"type": "string", "enum": ["kitchen", "living", "bedroom", "hallway", "wearer"]},
+        "minutes": {"type": "number", "description": "How far back to look. Default 60."}}),
+    fn("alerts", "Safety alerts (smoke alarm, doorbell, fall, name called...) in the last N hours.",
+       {"hours": {"type": "number"}}),
 ]
 
-SYSTEM = ("You are Lumen, the memory of a home that helps a deaf or hard-of-hearing person. Answer in one or two "
-          "short sentences, plain words, no markdown. Only state what the tools return; if they return nothing, "
-          "say you haven't seen or heard it. Say times as relative ('12 minutes ago'). Room 'living' is the living room.")
+SYSTEM = ("You are Lumen, the memory of a home. You help a deaf or hard-of-hearing person, often an older adult, "
+          "keep up with what was said around them. Answer in one to three short sentences, warm and plain, like a "
+          "patient family member. No markdown, no jargon. If someone asked them a question or told them something to "
+          "do (a time, a pill, an appointment), say that clearly first. Only state what the tools return; if they "
+          "return nothing, say you haven't seen or heard it. Say times as relative ('12 minutes ago'). "
+          "Zone 'living' is the living room; zone 'wearer' means said in the same room as the user, and "
+          "said_to_you=true means the speaker was facing them.")
+
+
+def run_tool(name: str, args: dict, memory: Memory, events: list[dict]) -> dict:
+    if name == "last_seen":
+        r = tool_last_seen(memory, args.get("item", ""))
+        r["entries"] = [r.pop("entry")] if "entry" in r else []
+        return r
+    if name == "transcript":
+        return tool_transcript(memory, args.get("zone"), args.get("minutes", 60))
+    return tool_alerts(events, args.get("hours", 12))
 
 
 def answer_llm(question: str, memory: Memory, events: list[dict]) -> dict | None:
-    if not os.environ.get("ANTHROPIC_API_KEY"):
+    provider = pick_provider()
+    if not provider:
         return None
+    name, base_url, key, model = provider
     try:
-        import anthropic
+        from openai import OpenAI
     except ImportError:
         return None
-    client = anthropic.Anthropic()
-    messages = [{"role": "user", "content": question}]
+    client = OpenAI(base_url=base_url, api_key=key, timeout=15)
+    messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": question}]
     evidence: list[dict] = []
     try:
         for _ in range(4):
-            resp = client.messages.create(model=LLM_MODEL, max_tokens=300, system=SYSTEM, tools=TOOLS,
-                                          messages=messages)
-            if resp.stop_reason != "tool_use":
-                text = "".join(b.text for b in resp.content if b.type == "text").strip()
-                return {"answer": text, "evidence": evidence, "brain": "claude"}
-            messages.append({"role": "assistant", "content": resp.content})
-            results = []
-            for b in resp.content:
-                if b.type != "tool_use":
-                    continue
-                if b.name == "last_seen":
-                    r = tool_last_seen(memory, b.input.get("item", ""))
-                    evidence += [r["entry"]] if r.get("entry") else []
-                elif b.name == "transcript":
-                    r = tool_transcript(memory, b.input.get("zone"), b.input.get("minutes", 60))
-                    evidence += r["entries"]
-                else:
-                    r = tool_alerts(events, b.input.get("hours", 12))
-                    evidence += r["entries"]
-                # The model never sees photos or raw entries, only the facts.
-                slim = {k: v for k, v in r.items() if k not in ("entry", "entries")}
-                results.append({"type": "tool_result", "tool_use_id": b.id, "content": json.dumps(slim)})
-            messages.append({"role": "user", "content": results})
+            msg = client.chat.completions.create(model=model, max_tokens=400, tools=TOOLS,
+                                                 messages=messages).choices[0].message
+            if not msg.tool_calls:
+                return {"answer": (msg.content or "").strip(), "evidence": evidence, "brain": name}
+            messages.append({"role": "assistant", "content": msg.content or "", "tool_calls": [
+                {"id": c.id, "type": "function", "function": {"name": c.function.name, "arguments": c.function.arguments}}
+                for c in msg.tool_calls]})
+            for c in msg.tool_calls:
+                r = run_tool(c.function.name, json.loads(c.function.arguments or "{}"), memory, events)
+                evidence += r.pop("entries")
+                # The model only gets the facts, never the photos.
+                messages.append({"role": "tool", "tool_call_id": c.id, "content": json.dumps(r)})
     except Exception as e:
-        log.warning("Claude call failed, using keyword answers (%s)", e)
+        log.warning("%s call failed, using keyword answers (%s)", name, e)
     return None
 
 

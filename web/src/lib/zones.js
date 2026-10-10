@@ -43,3 +43,6 @@ export const ALERT_TEXT = {
 export const alertText = (kind) => ALERT_TEXT[kind] ?? { icon: '❗', text: kind }
 
 export const SEVERITY_COLOR = { critical: '#ef4444', warning: '#f59e0b', info: '#38bdf8' }
+
+// One color per person in the headset view (speech bubbles and the dashboard conversation).
+export const SPEAKER_COLORS = ['#fbbf24', '#38bdf8', '#f472b6']

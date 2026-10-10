@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import AlertStack, { useAlerts } from '../lib/AlertToast'
+import { detectFaces, FaceTracker, loadFaces, toScreen } from '../lib/faces'
 import Logo from '../lib/Logo'
 import Recap from '../lib/Recap'
 import { api, keepAwake, useBrain } from '../lib/useBrain'
@@ -23,6 +24,10 @@ const MAIN_MODES = ['wearer', 'lecture', 'outside']
 const SPEAKER_COLORS = ['#fbbf24', '#38bdf8', '#a78bfa', '#34d399', '#f472b6', '#fb923c']
 const speakerColor = (name) => SPEAKER_COLORS[[...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 997, 7) % SPEAKER_COLORS.length]
 const HIDE_BAR_MS = 4000
+const TALKING = 0.04 // lip movement that counts as "this face is talking" (same as the headset)
+const SPEECH_LEVEL = 0.02 // mic loudness that counts as speech (Private engine)
+const NAME_RE = /\b(?:[Mm]y name is|[Mm]y name's|I'm|I am|[Cc]all me)\s+([A-Z][a-z]{2,})/
+const NOT_NAMES = new Set(['Going', 'Not', 'Just', 'Sure', 'Sorry', 'Good', 'Fine', 'Okay', 'So', 'Here', 'Really', 'Glad'])
 const DOWN_BETA = 35 // phone tilted flatter than this = you're looking at the person, not the screen
 
 const SAMPLE = [
@@ -65,6 +70,31 @@ function Radar({ recent }) {
   )
 }
 
+// Who's talking, from the held-up phone's camera: every face scores points for lip movement
+// while speech is heard; each new caption goes to the face with the most points. Also whether
+// that person was facing you. Runs on the phone; no video or face data leaves it.
+function useFaceSpeakers(videoRef, active, speechActive) {
+  const tracker = useRef(new FaceTracker())
+  const [people, setPeople] = useState([])
+  const speaking = useRef(speechActive)
+  speaking.current = speechActive
+  useEffect(() => {
+    if (!active) { setPeople([]); return }
+    let timer, dead = false
+    loadFaces().then(() => {
+      if (dead) return
+      timer = setInterval(() => {
+        const v = videoRef.current
+        if (!v || v.readyState < 2) return
+        const now = performance.now()
+        setPeople(tracker.current.update(detectFaces(v, now), now, speaking.current()).map((p) => ({ ...p })))
+      }, 100)
+    }).catch(() => {})
+    return () => { dead = true; clearInterval(timer) }
+  }, [active, videoRef])
+  return { people, claim: () => tracker.current.claim() }
+}
+
 function useLookingDown(active) {
   const [down, setDown] = useState(false)
   useEffect(() => {
@@ -99,6 +129,9 @@ export default function Captions() {
   const hideTimer = useRef()
   const lookingDown = useLookingDown(started)
   const downSince = useRef(null)
+  const lastInterim = useRef(0)
+  const [names, setNames] = useState({}) // face person id -> name they said ("I'm Dana")
+  const levelRef = useRef(0)
 
   const { state, connected } = useBrain('hud', push, (msg) => {
     if (msg.type === 'caption') captions.addRemote(msg)
@@ -141,12 +174,23 @@ export default function Captions() {
     return false
   }
 
+  const faces = useFaceSpeakers(videoRef, started && !!camera,
+    () => Date.now() - lastInterim.current < 700 || levelRef.current > SPEECH_LEVEL)
+
   const captions = useLiveCaptions({
     engine: realEngine,
     active: started,
     onFinal: (line) => {
       if (!line.zone && command(line.text)) return true
       if (line.zone && ZONES[line.zone]) return false // a room node: shown, but not part of the lecture
+      if (!line.zone && camera) {
+        const who = faces.claim()
+        if (who) {
+          line.speaker = who
+          const said = line.text.match(NAME_RE)?.[1]
+          if (said && !NOT_NAMES.has(said)) setNames((n) => ({ ...n, [who.id]: said }))
+        }
+      }
       if (mode === 'lecture') setSegments((s) => [...s, { text: line.text, ts: line.ts }])
       if (realEngine === 'instant' && !line.zone && user?.name && new RegExp(`\\b${user.name}\\b`, 'i').test(line.text)) {
         push({ id: `local-${Date.now()}`, kind: 'name_called', zone: 'wearer', severity: 'warning', ts: Date.now() / 1000 })
@@ -155,6 +199,9 @@ export default function Captions() {
       return false
     },
   })
+
+  useEffect(() => { if (captions.interim) lastInterim.current = Date.now() }, [captions.interim])
+  useEffect(() => { levelRef.current = captions.level }, [captions.level])
 
   // For rehearsing without a mic: window.lumenSay("switch mode") in the browser console.
   useEffect(() => { window.lumenSay = (t) => captions.addLine(t, { local: true }) })
@@ -252,6 +299,25 @@ export default function Captions() {
   return (
     <main className="relative h-full overflow-hidden bg-[radial-gradient(ellipse_at_top,#1c1917,#000_60%)]" onClick={toggleBar}>
       {camera && <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />}
+      {camera && faces.people.map((p) => {
+        const v = videoRef.current
+        const root = v?.parentElement
+        if (!v || !root) return null
+        const { left, top } = toScreen(v, root, p.x, p.y)
+        const talking = p.talk > TALKING
+        return (
+          <motion.div key={p.id} className="pointer-events-none absolute z-[15] -translate-x-1/2 -translate-y-full"
+            animate={{ left, top: top - 8, scale: talking ? 1.08 : 1 }} transition={{ type: 'spring', stiffness: 300, damping: 30 }}>
+            <div className="flex items-center gap-1.5 whitespace-nowrap rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold backdrop-blur"
+              style={{ boxShadow: talking ? `0 0 0 2px ${p.color}` : 'none' }}>
+              <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
+              {names[p.id] ?? `Person ${p.id}`}
+              {talking && <span>🗣</span>}
+              {p.facing && <span className="text-green-300">· looking at you</span>}
+            </div>
+          </motion.div>
+        )
+      })}
       <AlertStack alerts={alerts} onAck={ack} />
 
       {/* Top-left: who you are and what mode. Always visible, quiet. */}
@@ -284,7 +350,12 @@ export default function Captions() {
             return (
               <motion.p id={`line-${l.id}`} key={l.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                 className={`mb-2.5 text-[17px] font-medium leading-snug ${missed ? 'border-l-2 border-amber-400 pl-2' : ''}`}>
-                {l.zone && (
+                {l.speaker && (
+                  <span className="mr-1.5 align-middle text-xs font-semibold" style={{ color: l.speaker.color }}>
+                    {names[l.speaker.id] ?? `Person ${l.speaker.id}`}{l.speaker.toYou && <span className="text-green-300"> → you</span>}
+                  </span>
+                )}
+                {!l.speaker && l.zone && (
                   <span className="mr-1.5 align-middle text-xs font-semibold" style={{ color: speaker ? speakerColor(l.zone) : '#a1a1aa' }}>
                     {speaker ? l.zone : zoneLabel(l.zone)}
                   </span>

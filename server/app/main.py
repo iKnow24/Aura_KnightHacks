@@ -85,6 +85,17 @@ def caption_id(entry: dict) -> str:
     return f"{entry['ts']:.3f}-{entry['zone']}"
 
 
+WEARER = "wearer"  # zone name the headset uses for its own mic
+
+
+def feed_speech(node_id: str, zone: str, chunk: np.ndarray):
+    if transcriber._failed:
+        return
+    utterance = segmenters.setdefault(node_id, Segmenter()).feed(chunk)
+    if utterance is not None:
+        asyncio.create_task(run_speech(zone, utterance))
+
+
 async def run_speech(zone: str, audio: np.ndarray):
     text = await asyncio.to_thread(transcriber.transcribe, audio)
     if not text:
@@ -161,6 +172,14 @@ class Ack(BaseModel):
 class Heard(BaseModel):
     text: str
     zone: str = "wearer"
+    speaker: int | None = None  # person number from the phone's face tracking
+    to_you: bool = False
+
+
+class SpeechTag(BaseModel):
+    ts: float
+    speaker: int | None = None
+    to_you: bool = False
 
 
 class NewMode(BaseModel):
@@ -203,8 +222,17 @@ async def ack(body: Ack):
 def heard(body: Heard):
     """Captions made in the browser (Instant mode) get saved too, so Ask Lumen can answer from them."""
     if body.text.strip():
-        memory.add_speech(body.zone, body.text)
+        entry = memory.add_speech(body.zone, body.text)
+        if body.speaker is not None:
+            entry.update(speaker=body.speaker, to_you=body.to_you)
     return {"ok": True}
+
+
+@app.post("/api/speech/tag")
+def tag_speech(body: SpeechTag):
+    """The captions phone worked out who said a Whisper line (lips) and whether they faced the wearer."""
+    entry = memory.tag_speech(body.ts, body.speaker, body.to_you)
+    return {"ok": entry is not None}
 
 
 @app.post("/api/modes")
@@ -229,6 +257,19 @@ async def set_mode(body: ModeChange):
         return {"error": f"unknown mode {body.mode}"}
     await hub.set_mode(body.mode)
     return {"mode": hub.mode}
+
+
+class FakeCaption(BaseModel):
+    text: str = "Your appointment moved to Thursday at 2."
+    zone: str = "wearer"
+
+
+@app.post("/api/fake-caption")
+async def fake_caption(body: FakeCaption):
+    """Like a Whisper result, for building and rehearsing the caption screens without a model."""
+    entry = memory.add_speech(body.zone, body.text)
+    await hub.broadcast(["dashboard", "hud"], {**entry, "type": "caption"})
+    return entry
 
 
 @app.post("/api/profile")
@@ -291,6 +332,11 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
                 break
             if msg.get("bytes"):
                 chunk = np.frombuffer(msg["bytes"], dtype=np.float32)
+                # The wearer's own mic: speech only, alarms are the room nodes' job. Except Outside,
+                # where there are no room nodes and this mic is what hears the car horn.
+                if zone == WEARER and hub.mode != "outside":
+                    feed_speech(node_id, zone, chunk)
+                    continue
                 buf = np.concatenate([audio_buffers.get(node_id, np.zeros(0, np.float32)), chunk])[-AUDIO_WINDOW:]
                 audio_buffers[node_id] = buf
                 if len(buf) == AUDIO_WINDOW and enabled("alarm_dsp") and alarm_dsp.is_alarm(buf):
@@ -301,10 +347,7 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
                         and node_id not in ast_busy):
                     ast_pending[node_id] = 0
                     asyncio.create_task(run_ast(node_id, zone, buf.copy()))
-                if not transcriber._failed:
-                    utterance = segmenters.setdefault(node_id, Segmenter()).feed(chunk)
-                    if utterance is not None:
-                        asyncio.create_task(run_speech(zone, utterance))
+                feed_speech(node_id, zone, chunk)
             elif msg.get("text"):
                 data = json.loads(msg["text"])
                 if data.get("type") == "pose" and enabled("fall"):
@@ -315,6 +358,10 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
                         await emit_detected("fall", zone, "critical", source="fall")
                 elif data.get("type") == "approach":
                     await handle_approach(zone, data)
+                elif data.get("type") == "caption_meta":
+                    entry = memory.tag_speech(data["ts"], data.get("speaker"), bool(data.get("to_you")))
+                    if entry:
+                        await hub.broadcast(["dashboard"], {**entry, "type": "caption"})
                 elif data.get("type") == "snapshot" and node_id not in items_busy and not item_finder._failed:
                     asyncio.create_task(run_items(node_id, zone, data["jpeg"]))
             hub.heartbeat(node_id, zone)

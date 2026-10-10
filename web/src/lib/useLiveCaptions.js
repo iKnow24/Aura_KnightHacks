@@ -31,9 +31,12 @@ export function useLiveCaptions({ engine, active, onFinal }) {
   const addLine = useCallback((text, extra = {}) => {
     const line = { id: `${Date.now()}-${Math.random()}`, text: text.trim(), ts: Date.now() / 1000, ...extra }
     if (!line.text) return
-    if (finalRef.current?.(line)) return
+    if (finalRef.current?.(line)) return // onFinal may also attach line.speaker (from the camera)
     setLines((l) => [...l.filter((x) => x.id !== extra.replaces), line].slice(-1000))
-    if (extra.local) fetch('/api/speech', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: line.text }) }).catch(() => {})
+    const post = (path, body) => fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => {})
+    const who = { speaker: line.speaker?.id ?? null, to_you: !!line.speaker?.toYou }
+    if (extra.local) post('/api/speech', { text: line.text, ...who })
+    else if (line.speaker && !line.zone) post('/api/speech/tag', { ts: line.ts, ...who })
   }, [])
 
   useEffect(() => {

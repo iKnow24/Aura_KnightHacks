@@ -26,6 +26,12 @@ Every item here is something code can't fix. Find out early.
    dashboard and ask "Where are my keys?". The answer should show a photo crop. If the models won't
    run, press "Seed demo memory" and say so honestly if asked.
 
+8. **Captions over faces.** Headset on, two teammates in front of it taking turns talking, one facing the
+   wearer and one turned away. Each sentence should land as a bubble over the right person's head, in their
+   color, with "TO YOU" only for the one facing the wearer. If bubbles land on the wrong person, raise
+   `TALKING` in `web/src/pages/Headset.jsx`; if captions never show, check Whisper first with
+   `POST /api/fake-caption`. Glasses, masks and bad light break lip reading: test in the demo room.
+
 ## The 2-minute demo
 
 1. **Problem (15 s).** "Millions of Americans are deaf or hard of hearing. Your phone can hear a smoke alarm next to it. It can't hear the one two rooms away while you're asleep."

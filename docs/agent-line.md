@@ -64,6 +64,11 @@ Two more message types go out on the same sockets. They are not alerts, so scree
 {"type": "sighting", "item": "keys", "zone": "living", "ts": 1728540000.1}             // dashboard
 ```
 
+The headset streams its own mic as node zone `"wearer"` (speech only, no alarm detectors). When a caption
+for it arrives, the headset works out who said it from lip movement and sends back
+`{"type": "caption_meta", "ts": <caption ts>, "speaker": 1, "to_you": true}`; the dashboard then gets the caption
+again with `speaker` and `to_you` filled in. `POST /api/fake-caption {"zone": "wearer", "text": "..."}` fakes a Whisper result.
+
 Nodes send `{"type": "snapshot", "ts": ..., "jpeg": "data:image/jpeg;base64,..."}` every 5 s (turn off with `?items=0`).
 Captions carry `"id"` and, when a louder speaker mic heard the same sentence, `"replaces": old_id`
 (see `server/app/speakers.py`). Browser captions are saved with `POST /api/speech {"text"}`.
@@ -72,8 +77,10 @@ Acknowledging: any screen calls `POST /api/ack {"id": alert_id, "by": "wearer"}`
 `{"type": "ack", "id", "ts", "by"}` and drops the alert, and the dashboard timeline shows "seen at".
 Rear guard phone sends `{"type": "approach", "label": "person" | "car" | ..., "score", "area"}` on its node socket.
 Lecture recap: `POST /api/recap {"segments": [{"text", "ts"}], "title"}` returns
-`{"title", "summary", "points", "map": {"center", "branches": [{"label", "ts", "details"}]}, "quiz": [{"q", "choices", "answer"}], "people", "brain": "local" | "hf" | "claude" | "rules"}`.
-Ask Lumen: `POST /api/ask {"question": "..."}` returns `{"answer", "evidence": [log entries], "brain": "claude" | "rules"}`.
+`{"title", "summary", "points", "map": {"center", "branches": [{"label", "ts", "details"}]}, "quiz": [{"q", "choices", "answer"}], "people", "brain": "groq" | "claude" | "xai" | "local" | "rules"}`.
+Ask Lumen: `POST /api/ask {"question": "..."}` returns `{"answer", "evidence": [log entries], "brain": "groq" | "claude" | "xai" | "rules"}`.
+Pick the AI with `LUMEN_LLM=groq|claude|xai|off` and the matching key (`GROQ_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`). No key means keyword answers.
+Set `WHISPER_PROVIDER=groq` to transcribe on Groq instead of the AMD GPU.
 
 ## Git, plainly
 
