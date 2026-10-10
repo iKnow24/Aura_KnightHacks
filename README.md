@@ -111,7 +111,7 @@ than 25% slower than the week before, or misses at least double (plus two). Here
 weeks of sample data in [`databricks/sample_data/`](databricks/sample_data/):
 
 <p align="center">
-  <img src="docs/images/change-from-normal.svg" alt="Median seconds to notice an alert per day: about 6 seconds in week one, about 9 in week two, with misses going from 2 to 8" width="100%">
+  <img src="docs/images/change-from-normal.svg" alt="Median seconds to notice an alert per day: about 6 seconds in week one, about 9 in week two, with misses going from 5 to 15 (2 to 7 at night)" width="100%">
 </p>
 
 That slowdown is **planted by our data generator** to show the feature; it is not a real person. The full
