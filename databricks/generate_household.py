@@ -28,6 +28,14 @@ DAILY_ALERTS = [
     ("kettle", "kitchen", "info", (7, 17), (1, 3)),
     ("alarm_clock", "bedroom", "warning", (7, 7), (1, 1)),
 ]
+NIGHT_ALERTS = [  # kind, zone, severity, chance per night
+    ("phone_ring", "bedroom", "warning", 0.5),
+    ("doorbell", "hallway", "warning", 0.3),
+    ("knock", "hallway", "warning", 0.3),
+    ("dog_bark", "outside", "warning", 0.5),
+    ("car_alarm", "outside", "warning", 0.3),
+    ("glass_break", "kitchen", "critical", 0.08),
+]
 SPEAKERS = {1: "Ana (daughter)", 2: "Dr. Patel's office", 3: "neighbor", 4: "Leo (grandson)", 5: "Rosa (home aide)"}
 LINES = [
     (1, "Mom, I'm heading out, back around six."),
@@ -70,7 +78,7 @@ def alert_events(rng, when, kind, zone, severity, d, night):
     out = [alert]
     # Baseline: noticed in ~6 s (warnings) or ~12 s (info). Week 2 gets up to 70% slower.
     median = (6 if severity != "info" else 12) * (1 + 0.7 * d) * (1.8 if night else 1)
-    miss = (0.03 + 0.12 * d) * (2.5 if night else 1)
+    miss = 0.03 * (1.5 if night else 1) + 0.12 * d * (4 if night else 1)  # the decline hits nights hardest
     if severity == "critical":
         miss /= 3  # the strobe is hard to sleep through
     if rng.random() > miss:
@@ -88,12 +96,16 @@ def day_events(rng, day: date, index: int) -> list[dict]:
         for _ in range(rng.randint(n0, n1)):
             events += alert_events(rng, at(rng.randint(h0, h1), rng.randint(0, 59), rng.randint(0, 59)),
                                    kind, zone, severity, d, night=False)
-    # Night: a smoke alarm on two nights (one each week), and the odd doorbell or phone call.
-    if index in (3, 11):
-        events += alert_events(rng, at(2, 13), "smoke_alarm", "kitchen", "critical", d, night=True)
-    for kind, zone in (("phone_ring", "bedroom"), ("doorbell", "hallway")):
-        if rng.random() < 0.35:
-            events += alert_events(rng, at(23, rng.randint(0, 59)), kind, zone, "warning", d, night=True)
+    # Night (Night mode is the hero): every night has something, from a dog barking outside to a
+    # kitchen smoke alarm at 2 AM. Smoke alarms on four nights, two in each week.
+    if index in (1, 4, 9, 12):
+        events += alert_events(rng, at(rng.choice([1, 2, 3]), rng.randint(0, 59)), "smoke_alarm", "kitchen",
+                               "critical", d, night=True)
+    for kind, zone, severity, chance in NIGHT_ALERTS:
+        if rng.random() < chance:
+            hour = rng.choice([22, 23, 0, 1, 2, 3, 4, 5])
+            hour = 23 if hour == 22 else hour  # night mode starts 22:30
+            events += alert_events(rng, at(hour, rng.randint(0, 59)), kind, zone, severity, d, night=True)
     for _ in range(rng.randint(8, 14)):
         speaker, text = rng.choice(LINES)
         ts = at(rng.randint(8, 21), rng.randint(0, 59), rng.randint(0, 59)).timestamp()

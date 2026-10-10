@@ -16,7 +16,8 @@ PEOPLE = {1: "Ana (daughter)", 2: "Dr. Patel's office", 3: "Neighbor", 4: "Leo (
 ROOMS = ["kitchen", "living room", "hallway", "bedroom"]
 NAMES = {"smoke_alarm": "Smoke alarm went off", "doorbell": "Doorbell rang", "knock": "Knock at the door",
          "phone_ring": "Phone rang", "name_called": "Someone called Maria's name", "timer": "Oven timer beeped",
-         "kettle": "Kettle whistled", "alarm_clock": "Alarm clock rang"}
+         "kettle": "Kettle whistled", "alarm_clock": "Alarm clock rang",
+         "dog_bark": "Dog barked outside", "car_alarm": "Car alarm outside", "glass_break": "Glass broke"}
 ROOM = {"living": "living room"}
 
 
