@@ -24,6 +24,14 @@ export default function History() {
   if (!data) return <div className="glass h-64 animate-pulse rounded-xl" />
 
   const { days, status: s } = data
+  if (days.length === 0) {
+    return (
+      <div className="glass rounded-xl p-6 text-sm text-zinc-400">
+        No alerts logged yet. Real alerts land here as they happen (test buttons are left out).
+        <Source data={data} />
+      </div>
+    )
+  }
   const week = days.slice(-7)
   const sum = (key, rows = week) => rows.reduce((n, d) => n + d[key], 0)
   const weekBefore = days.slice(-14, -7)
@@ -64,24 +72,51 @@ export default function History() {
         </Panel>
       </div>
 
-      <footer className="flex flex-wrap items-center gap-3 text-xs text-zinc-500">
-        <span className="glass flex items-center gap-2 rounded-full px-3 py-1">
-          <span className={`h-1.5 w-1.5 rounded-full ${data.source === 'databricks' ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
-          {data.source === 'databricks' ? 'Live from Databricks' : 'Sample household (planted decline), offline'}
-        </span>
-        {data.note && <span>{data.note}</span>}
-        {data.dashboard_url && (
-          <a href={data.dashboard_url} target="_blank" rel="noreferrer" className="glass ml-auto rounded-full px-4 py-1.5 text-sm font-medium text-zinc-100 hover:border-white/20">
-            Open Databricks dashboard ↗
-          </a>
-        )}
-      </footer>
+      <Source data={data} />
     </motion.div>
+  )
+}
+
+const SOURCES = {
+  databricks: 'Live from Databricks',
+  event_log: "This home's real events",
+  sample: 'Sample household (planted decline), offline',
+}
+
+function Source({ data }) {
+  return (
+    <footer className="mt-4 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+      <span className="glass flex items-center gap-2 rounded-full px-3 py-1">
+        <span className={`h-1.5 w-1.5 rounded-full ${data.source === 'sample' ? 'bg-zinc-500' : 'bg-emerald-400'}`} />
+        {SOURCES[data.source] || data.source}
+      </span>
+      {data.note && <span>{data.note}</span>}
+      {data.dashboard_url && (
+        <a href={data.dashboard_url} target="_blank" rel="noreferrer" className="glass ml-auto rounded-full px-4 py-1.5 text-sm font-medium text-zinc-100 hover:border-white/20">
+          Open Databricks dashboard ↗
+        </a>
+      )}
+    </footer>
   )
 }
 
 function StatusBanner({ s, name }) {
   const who = name ? name[0].toUpperCase() + name.slice(1) : 'She'
+  if (s.alerts_week_before != null && s.alerts_week_before < 20) {
+    // Real data starts today: there is no "her normal" to compare with yet, so don't pretend.
+    return (
+      <div className="glass flex items-start gap-4 rounded-xl p-5">
+        <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-zinc-500" />
+        <div>
+          <div className="text-lg font-semibold">Learning her normal</div>
+          <p className="mt-1 text-sm text-zinc-400">
+            {`So far: ${s.alerts_this_week} alerts, ${s.missed_this_week} missed, typically noticed in ${secs(s.median_seconds_this_week)}. `}
+            Lumen compares each week with the one before, so the "worth a call" check starts after a week of alerts.
+          </p>
+        </div>
+      </div>
+    )
+  }
   return (
     <div className="glass flex items-start gap-4 rounded-xl p-5" style={s.flagged ? { borderColor: `${WARN}66` } : undefined}>
       <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: s.flagged ? WARN : '#34d399' }} />

@@ -40,3 +40,23 @@ def test_databricks_rows_are_parsed(monkeypatch):
     days, status, missed = history.from_databricks("maria")
     assert days[0]["alerts"] == 8 and status["flagged"] and status["pct_slower"] == 50
     assert missed[0]["at_night"] is False
+
+
+def test_real_event_log_is_used_and_says_no_baseline_yet(tmp_path, monkeypatch):
+    from app.eventlog import record
+    for k in ("DATABRICKS_HOST", "DATABRICKS_TOKEN", "DATABRICKS_WAREHOUSE_ID"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("EVENT_LOG_DIR", str(tmp_path))
+    monkeypatch.setenv("LUMEN_HOUSEHOLD", "home")
+    t = 1791519600.0
+    record({"type": "alert", "id": "a", "kind": "doorbell", "zone": "hallway", "severity": "warning", "source": "ast", "ts": t})
+    record({"type": "ack", "id": "a", "by": "wearer", "ts": t + 4})
+    record({"type": "alert", "id": "b", "kind": "smoke_alarm", "zone": "kitchen", "severity": "critical", "source": "fake", "ts": t + 9})
+    history._cache.clear()
+    out = history.history()
+    history._cache.clear()
+    assert out["source"] == "event_log" and out["household"] == "home"
+    s = out["status"]
+    assert s["alerts_this_week"] == 1  # the test-button alert is left out
+    assert s["alerts_week_before"] == 0 and not s["flagged"]
+    assert s["median_seconds_this_week"] == 4.0

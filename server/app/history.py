@@ -1,11 +1,12 @@
 """History for the dashboard's History tab: alerts per day, time to notice, missed alerts, and the
 "change from normal" warning.
 
-Two sources, same numbers:
+Three sources, same numbers:
 - Databricks, when DATABRICKS_HOST, DATABRICKS_TOKEN and DATABRICKS_WAREHOUSE_ID are set. Reads the
   Gold tables lumen_pipeline.sql builds, through the SQL Statement Execution API.
-- Otherwise the committed sample files in databricks/sample_data/, run through the same Gold logic
-  in Python. This is the default, so the demo never waits on a network call.
+- This house's own event log, when EVENT_LOG_DIR is set (real events, same Gold logic in Python).
+  On the AMD box this is the one that works: its proxy blocks databricks.com.
+- Otherwise the committed sample files in databricks/sample_data/ (the generated "Maria" household).
 
 If the Databricks call fails for any reason, we fall back to the sample and say so in "note".
 
@@ -46,7 +47,7 @@ def _alert_rows(lines):
     """gold_alert_response: each non-info alert with seconds to notice and missed."""
     alerts, first_ack = {}, {}
     for e in lines:
-        if e.get("type") == "alert" and e.get("kind") and e.get("severity") != "info":
+        if e.get("type") == "alert" and e.get("kind") and e.get("severity") != "info" and e.get("source") != "fake":
             alerts[(e["household"], e["id"])] = e
         elif e.get("type") == "ack" and e.get("id"):
             key = (e["household"], e["id"])
@@ -103,6 +104,7 @@ def _status(day, this, before):
     return {
         "latest_day": day, "median_seconds_this_week": m_this, "median_seconds_week_before": m_before,
         "pct_slower": pct, "missed_this_week": missed_this, "missed_week_before": missed_before, "flagged": flagged,
+        "alerts_this_week": len(this), "alerts_week_before": len(before),  # < 20 before = no "normal" yet
     }
 
 
@@ -171,6 +173,7 @@ def from_databricks(household: str):
             "pct_slower": None if c["pct_slower"] is None else round(float(c["pct_slower"])),
             "missed_this_week": _int(c["missed_this_week"]), "missed_week_before": _int(c["missed_week_before"]),
             "flagged": str(c["flagged"]).lower() == "true",
+            "alerts_this_week": _int(c.get("alerts_this_week")), "alerts_week_before": _int(c.get("alerts_week_before")),
         }
     return days, status, [
         {"time": r["alert_time"], "kind": r["kind"], "zone": r["zone"], "at_night": str(r["at_night"]).lower() == "true"}
@@ -183,7 +186,8 @@ def databricks_configured():
 
 
 def history(household: str | None = None):
-    household = household or os.environ.get("LUMEN_HOUSEHOLD", "maria")
+    log_dir = os.environ.get("EVENT_LOG_DIR")
+    household = household or os.environ.get("LUMEN_HOUSEHOLD", "demo" if log_dir else "maria")
     hit = _cache.get(household)
     if hit and time.time() - hit[0] < CACHE_SECONDS:
         return hit[1]
@@ -194,6 +198,9 @@ def history(household: str | None = None):
             source = "databricks"
         except Exception as e:  # never let a cloud hiccup blank the tab
             note = f"Databricks unavailable, showing sample data ({type(e).__name__}: {str(e)[:160]})"
+    if source == "sample" and log_dir and Path(log_dir).is_dir():
+        days, status, missed = from_sample(household, Path(log_dir))
+        source = "event_log"
     if source == "sample":
         days, status, missed = from_sample(household)
     result = {

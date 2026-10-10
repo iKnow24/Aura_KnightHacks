@@ -23,7 +23,9 @@ FROM STREAM read_files(
 CREATE OR REFRESH STREAMING TABLE silver_alerts (
   CONSTRAINT has_kind EXPECT (kind IS NOT NULL) ON VIOLATION DROP ROW,
   CONSTRAINT real_time EXPECT (alert_time > '2024-01-01') ON VIOLATION DROP ROW,
-  CONSTRAINT known_severity EXPECT (severity IN ('critical', 'warning', 'info'))
+  CONSTRAINT known_severity EXPECT (severity IN ('critical', 'warning', 'info')),
+  -- the app's test buttons send source 'fake'; those never count as real alerts
+  CONSTRAINT not_a_test_button EXPECT (coalesce(source, '') <> 'fake') ON VIOLATION DROP ROW
 )
 COMMENT 'One row per alert Lumen raised (smoke alarm, doorbell, name called, ...).'
 AS SELECT

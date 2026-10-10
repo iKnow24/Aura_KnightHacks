@@ -5,7 +5,7 @@ import time
 from contextlib import asynccontextmanager
 
 import numpy as np
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Header, HTTPException, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -18,6 +18,7 @@ from .agent import answer
 from .llm import local as local_llm
 from .recap import recap
 from .speakers import CrossTalk
+from . import eventlog
 from .history import history
 from .hub import Hub
 from .memory import Memory, seed_demo
@@ -231,6 +232,25 @@ def health():
 def get_history(household: str | None = None):
     """History tab: Databricks Gold tables when configured, else the committed sample week."""
     return history(household)
+
+
+@app.get("/api/eventlog")
+def get_eventlog(x_lumen_sync_key: str | None = Header(None)):
+    """Hourly event files, for scripts/databricks_sync.py. Needs LUMEN_SYNC_KEY (the log holds speech)."""
+    if not eventlog.sync_allowed(x_lumen_sync_key):
+        raise HTTPException(403, "event log sync is off (set EVENT_LOG_DIR and LUMEN_SYNC_KEY on the brain)")
+    return {"files": eventlog.list_files()}
+
+
+@app.get("/api/eventlog/{name}")
+def get_eventlog_file(name: str, offset: int = 0, x_lumen_sync_key: str | None = Header(None)):
+    """New lines of one hourly file, starting at byte offset."""
+    if not eventlog.sync_allowed(x_lumen_sync_key):
+        raise HTTPException(403, "event log sync is off")
+    try:
+        return Response(eventlog.read_from(name, offset), media_type="application/x-ndjson")
+    except (ValueError, FileNotFoundError):
+        raise HTTPException(404, "no such file")
 
 
 @app.get("/api/state")

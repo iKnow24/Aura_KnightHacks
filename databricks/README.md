@@ -1,5 +1,8 @@
 # Lumen on Databricks
 
+**Real events from a running Lumen, no generated data: see [REAL_DATA.md](REAL_DATA.md).**
+Everything below uses the generated "maria" household.
+
 Live captions and alerts stay on the Lumen brain (they need sub-second speed). Databricks gets the
 history: every alert, tap, caption and sighting, cleaned into tables a caregiver can ask questions of.
 
