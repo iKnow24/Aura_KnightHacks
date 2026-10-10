@@ -28,15 +28,32 @@ DAILY_ALERTS = [
     ("kettle", "kitchen", "info", (7, 17), (1, 3)),
     ("alarm_clock", "bedroom", "warning", (7, 7), (1, 1)),
 ]
-SPEAKERS = {1: "Ana (daughter)", 2: "Dr. Patel's office", 3: "neighbor"}
+SPEAKERS = {1: "Ana (daughter)", 2: "Dr. Patel's office", 3: "neighbor", 4: "Leo (grandson)", 5: "Rosa (home aide)"}
 LINES = [
     (1, "Mom, I'm heading out, back around six."),
     (1, "Did you take the blue pill this morning?"),
     (1, "Can you grab milk if you go out?"),
-    (2, "Your appointment moved to Thursday at 2."),
-    (3, "Your package is on the porch."),
     (1, "Dinner's ready, come eat!"),
     (1, "Call me when you wake up."),
+    (1, "I put your glasses on the nightstand."),
+    (1, "The plumber is coming Tuesday at ten."),
+    (1, "Don't forget your sweater, it's cold out."),
+    (2, "Your appointment moved to Thursday at 2."),
+    (2, "Please bring your medication list to the visit."),
+    (2, "Your blood test results came back normal."),
+    (3, "Your package is on the porch."),
+    (3, "I'm making soup, want some?"),
+    (3, "The power might go out tonight, there's a storm coming."),
+    (4, "Grandma, can I use the laptop?"),
+    (4, "I fixed the TV remote."),
+    (4, "Grandma, look at this video!"),
+    (4, "I'm going to soccer practice, bye!"),
+    (5, "Time for your walk, Maria."),
+    (5, "Let's check your blood pressure."),
+    (5, "Lunch is soup and a sandwich today."),
+    (5, "I refilled your pill organizer for the week."),
+    (5, "Did you sleep okay last night?"),
+    (5, "I'll be back tomorrow at nine."),
 ]
 ITEMS = [("keys", ["hallway", "living", "kitchen"]), ("glasses", ["bedroom", "living"]), ("wallet", ["kitchen", "hallway"])]
 

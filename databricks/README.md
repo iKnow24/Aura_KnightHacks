@@ -19,8 +19,8 @@ generate_household.py  ─┘            │  Auto Loader
 ```
 
 The headline table is `gold_change_from_normal`: for each day it compares the last 7 days with the
-7 before, for the same person. With the generated data, the last day reads **57% slower to notice
-alerts, 9 missed vs 1 the week before → flagged**. That decline is planted by the generator; say so.
+7 before, for the same person. With the generated data, the last day reads **51% slower to notice
+alerts, 8 missed vs 2 the week before → flagged**. That decline is planted by the generator; say so.
 It's "a change from her normal, worth a call", never a diagnosis.
 
 ## 1. Make the data
@@ -32,6 +32,12 @@ EVENT_LOG_DIR=./event_log LUMEN_HOUSEHOLD=maria ./run.sh
 ```
 
 `databricks/sample_data/` already holds 14 days ending 2026-10-09.
+
+## Quickest start: one SQL file
+
+`fake_timeline.sql` is the same two weeks as one readable table (`lumen.home.home_timeline`: when, who,
+what, where). Paste it into the SQL editor and run it, no upload or pipeline needed. Rebuild it with
+`python3 databricks/make_timeline_sql.py > databricks/fake_timeline.sql`.
 
 ## 2. Set up Free Edition (SQL editor)
 
