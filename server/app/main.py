@@ -10,20 +10,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .detectors import alarm_dsp
-from .detectors.ast_sound import SoundClassifier, to_alerts
+from .detectors.ast_sound import SoundClassifier, loudness_rise, to_alerts
 from .detectors.fall import FallDetector
 from .detectors.items import ItemFinder, decode
 from .detectors.speech import Segmenter, Transcriber, mentions_name
 from .agent import answer
+from .llm import local as local_llm
+from .recap import recap
+from .speakers import CrossTalk
 from .hub import Hub
 from .memory import Memory, seed_demo
-from .modes import DEFAULT_MODE, MODES
+from .modes import DEFAULT_MODE, MODES, make_mode
 
 @asynccontextmanager
 async def lifespan(app):
     # Load the sound model in the background so the first real alert isn't slowed by it.
     loop = asyncio.get_running_loop()
-    for model in (sound_model, transcriber, item_finder):
+    for model in (sound_model, transcriber, item_finder, local_llm):
         loop.run_in_executor(None, model.available)
     yield
 
@@ -69,10 +72,17 @@ async def run_ast(node_id: str, zone: str, audio: np.ndarray):
     ast_busy.add(node_id)
     try:
         scores = await asyncio.to_thread(sound_model.classify, audio)
-        for a in to_alerts(scores):
+        for a in to_alerts(scores, MODES[hub.mode].get("sound_kinds"), loudness_rise(audio)):
             await emit_detected(a["kind"], zone, a["severity"], "ast_sound", a["confidence"])
     finally:
         ast_busy.discard(node_id)
+
+
+crosstalk = CrossTalk()
+
+
+def caption_id(entry: dict) -> str:
+    return f"{entry['ts']:.3f}-{entry['zone']}"
 
 
 WEARER = "wearer"  # zone name the headset uses for its own mic
@@ -90,8 +100,18 @@ async def run_speech(zone: str, audio: np.ndarray):
     text = await asyncio.to_thread(transcriber.transcribe, audio)
     if not text:
         return
+    keep, replaced = crosstalk.check(zone, text, float(np.sqrt(np.mean(audio ** 2))))
+    if not keep:
+        return  # a louder phone already captioned this sentence
     entry = memory.add_speech(zone, text)
-    await hub.broadcast(["dashboard", "hud"], {**entry, "type": "caption"})
+    msg = {**entry, "type": "caption", "id": caption_id(entry)}
+    if replaced:
+        old = next((e for e in reversed(memory.entries) if e.get("type") == "speech"
+                    and e["zone"] == replaced["zone"] and e["text"] == replaced["text"]), None)
+        if old:
+            memory.entries.remove(old)
+            msg["replaces"] = caption_id(old)
+    await hub.broadcast(["dashboard", "hud"], msg)
     if enabled("name_call") and mentions_name(text, profile["name"]):
         await emit_detected("name_called", zone, "warning", source="whisper")
 
@@ -107,6 +127,19 @@ async def run_items(node_id: str, zone: str, jpeg: str):
         print("item finder error:", e)
     finally:
         items_busy.discard(node_id)
+
+
+# Rear-facing phone (Outside mode): the phone's own object detector says something behind
+# the wearer is getting bigger in frame fast. The brain only decides what to call it.
+APPROACH_KINDS = {"person": ("person_behind", "warning"), "bicycle": ("bike_behind", "warning"),
+                  "car": ("vehicle_behind", "critical"), "truck": ("vehicle_behind", "critical"),
+                  "bus": ("vehicle_behind", "critical"), "motorcycle": ("vehicle_behind", "critical")}
+
+
+async def handle_approach(zone: str, data: dict):
+    hit = APPROACH_KINDS.get(data.get("label", ""))
+    if hit and enabled("rear_vision"):
+        await emit_detected(hit[0], zone, hit[1], source="rear_vision", confidence=float(data.get("score", 1.0)))
 
 
 def enabled(detector: str) -> bool:
@@ -131,6 +164,38 @@ class Profile(BaseModel):
     name: str
 
 
+class Ack(BaseModel):
+    id: str
+    by: str = "wearer"
+
+
+class Heard(BaseModel):
+    text: str
+    zone: str = "wearer"
+    speaker: int | None = None  # person number from the phone's face tracking
+    to_you: bool = False
+
+
+class SpeechTag(BaseModel):
+    ts: float
+    speaker: int | None = None
+    to_you: bool = False
+
+
+class NewMode(BaseModel):
+    description: str
+
+
+class Segment(BaseModel):
+    text: str
+    ts: float | None = None
+
+
+class RecapRequest(BaseModel):
+    segments: list[Segment]
+    title: str = "Lecture"
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True, "mode": hub.mode}
@@ -145,6 +210,45 @@ def state():
 async def fake_alert(body: FakeAlert):
     """Lets the frontend team build everything before any real detector works."""
     return await hub.emit_alert(body.kind, body.zone, body.severity, source="fake")
+
+
+@app.post("/api/ack")
+async def ack(body: Ack):
+    event = await hub.ack(body.id, body.by)
+    return event or {"error": "unknown alert"}
+
+
+@app.post("/api/speech")
+def heard(body: Heard):
+    """Captions made in the browser (Instant mode) get saved too, so Ask Lumen can answer from them."""
+    if body.text.strip():
+        entry = memory.add_speech(body.zone, body.text)
+        if body.speaker is not None:
+            entry.update(speaker=body.speaker, to_you=body.to_you)
+    return {"ok": True}
+
+
+@app.post("/api/speech/tag")
+def tag_speech(body: SpeechTag):
+    """The captions phone worked out who said a Whisper line (lips) and whether they faced the wearer."""
+    entry = memory.tag_speech(body.ts, body.speaker, body.to_you)
+    return {"ok": entry is not None}
+
+
+@app.post("/api/modes")
+async def add_mode(body: NewMode):
+    """'Add a new mode': the wearer describes it out loud, Lumen picks what to listen for."""
+    key, mode = await asyncio.to_thread(make_mode, body.description)
+    MODES[key] = mode
+    await hub.set_mode(key)
+    return {"key": key, **mode}
+
+
+@app.post("/api/recap")
+async def make_recap(body: RecapRequest):
+    """End of a lecture: summary, memory map, quiz. Local model first, rules if none."""
+    segs = [s.model_dump() for s in body.segments]
+    return await asyncio.to_thread(recap, segs, body.title)
 
 
 @app.post("/api/mode")
@@ -183,7 +287,8 @@ async def ask(body: Question):
 @app.get("/api/memory")
 def get_memory():
     return {"entries": [{k: v for k, v in e.items() if k != "thumb"} for e in memory.entries[-100:]],
-            "models": {"whisper": model_status(transcriber), "items": model_status(item_finder)}}
+            "models": {"whisper": model_status(transcriber), "items": model_status(item_finder),
+                       "llm": model_status(local_llm)}}
 
 
 def model_status(model) -> str:
@@ -227,7 +332,9 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
                 break
             if msg.get("bytes"):
                 chunk = np.frombuffer(msg["bytes"], dtype=np.float32)
-                if zone == WEARER:  # the headset mic: speech only, alarms are the room nodes' job
+                # The wearer's own mic: speech only, alarms are the room nodes' job. Except Outside,
+                # where there are no room nodes and this mic is what hears the car horn.
+                if zone == WEARER and hub.mode != "outside":
                     feed_speech(node_id, zone, chunk)
                     continue
                 buf = np.concatenate([audio_buffers.get(node_id, np.zeros(0, np.float32)), chunk])[-AUDIO_WINDOW:]
@@ -249,6 +356,8 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
                     det.stillness_s = stillness
                     if det.update(data["ts"], data.get("landmarks")):
                         await emit_detected("fall", zone, "critical", source="fall")
+                elif data.get("type") == "approach":
+                    await handle_approach(zone, data)
                 elif data.get("type") == "caption_meta":
                     entry = memory.tag_speech(data["ts"], data.get("speaker"), bool(data.get("to_you")))
                     if entry:

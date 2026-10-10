@@ -26,6 +26,8 @@ export function useBrain(role, onAlert, onOther) {
         if (msg.type === 'alert') {
           setState((s) => ({ ...s, events: [...s.events, msg].slice(-50) }))
           alertRef.current?.(msg)
+        } else if (msg.type === 'ack') {
+          setState((s) => ({ ...s, events: s.events.map((e) => (e.id === msg.id ? { ...e, acked: { ts: msg.ts, by: msg.by } } : e)) }))
         } else if (msg.type !== 'state') {
           otherRef.current?.(msg)
         }

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { nodeSocket, streamMic } from '../lib/audio'
 import { detectFaces, FaceTracker, loadFaces, toScreen } from '../lib/faces'
 import { keepAwake, useBrain } from '../lib/useBrain'
-import { ALERT_TEXT, SEVERITY_COLOR, ZONES } from '../lib/zones'
+import { alertText, SEVERITY_COLOR, ZONES, zoneLabel } from '../lib/zones'
 
 // Fake AR: draw the rear camera twice side by side (one per eye) and put the HUD on top.
 // Works on iOS and Android without WebXR.
@@ -95,7 +95,7 @@ function Eye({ stream, alert, sector, people, bubbles, speaking, rooms }) {
             <motion.div key="label" className="absolute inset-x-0 bottom-[22%] text-center"
               initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ opacity: 0 }}>
               <span className="rounded-full bg-black/70 px-3 py-1 text-sm font-semibold">
-                {ALERT_TEXT[alert.kind]?.icon} {ALERT_TEXT[alert.kind]?.text} · {ZONES[alert.zone]?.label ?? 'near you'}
+                {alertText(alert.kind).icon} {alertText(alert.kind).text} · {zoneLabel(alert.zone)}
               </span>
             </motion.div>
           </>
@@ -168,7 +168,8 @@ export default function Headset() {
   }
 
   const bearing = alert ? (ZONES[alert.zone]?.bearing ?? 0) : 0
-  const sector = Math.round(((bearing - heading + 360) % 360) / 45) % 8
+  // "Behind you" comes from the rear camera, which turns with you: always the bottom edge.
+  const sector = alert?.zone === 'behind' ? 4 : Math.round(((bearing - heading + 360) % 360) / 45) % 8
 
   if (!stream) {
     return (

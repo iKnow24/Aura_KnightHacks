@@ -34,7 +34,11 @@ ZONE_WORDS = {"kitchen": "kitchen", "living": "living", "lounge": "living", "bed
               "hall": "hallway", "hallway": "hallway", "door": "hallway"}
 
 ALERT_NAMES = {"smoke_alarm": "a smoke alarm", "doorbell": "the doorbell", "name_called": "someone call your name",
-               "fall": "a possible fall", "glass_break": "glass breaking", "baby_cry": "a baby crying"}
+               "fall": "a possible fall", "glass_break": "glass breaking", "baby_cry": "a baby crying",
+               "timer": "a timer go off", "kettle": "the kettle", "phone_ring": "the phone ring", "knock": "a knock",
+               "alarm_clock": "an alarm clock", "water_running": "water left running", "dog_bark": "the dog bark",
+               "car_horn": "a car horn", "siren": "a siren", "vehicle": "a car approaching",
+               "person_behind": "someone come up behind you", "vehicle_behind": "a vehicle come up behind you"}
 
 ZONE_NAMES = {"living": "living room", "wearer": "room with you"}
 

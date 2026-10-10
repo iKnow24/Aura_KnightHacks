@@ -47,6 +47,10 @@ Every alert in the system is this JSON, and nothing else (see `server/app/hub.py
 ```
 
 - `kind`: smoke_alarm, doorbell, name_called, fall, glass_break, baby_cry
+  - everyday (home): timer, kettle, phone_ring, knock, alarm_clock, water_running, dog_bark, car_alarm
+  - outside: car_horn, siren, vehicle (only when getting louder), bike_bell, reversing,
+    person_behind, vehicle_behind, bike_behind (from the rear camera phone, zone `behind`)
+  - Each mode's `sound_kinds` in `server/app/modes.py` decides which of these it listens for.
 - `severity`: critical, warning, info. The current mode decides which screens get each one (`server/app/modes.py`).
 - Branch A produces these. Branch B produces raw audio and pose keypoints. Branch C only consumes alerts.
 - Branch C never waits on A: the dashboard's fake-alert buttons call `POST /api/fake-alert`.
@@ -66,6 +70,14 @@ for it arrives, the headset works out who said it from lip movement and sends ba
 again with `speaker` and `to_you` filled in. `POST /api/fake-caption {"zone": "wearer", "text": "..."}` fakes a Whisper result.
 
 Nodes send `{"type": "snapshot", "ts": ..., "jpeg": "data:image/jpeg;base64,..."}` every 5 s (turn off with `?items=0`).
+Captions carry `"id"` and, when a louder speaker mic heard the same sentence, `"replaces": old_id`
+(see `server/app/speakers.py`). Browser captions are saved with `POST /api/speech {"text"}`.
+Voice "add a new mode": `POST /api/modes {"description"}` builds a mode, switches to it, returns `{"key", "label", "sound_kinds", ...}`.
+Acknowledging: any screen calls `POST /api/ack {"id": alert_id, "by": "wearer"}`; every screen gets
+`{"type": "ack", "id", "ts", "by"}` and drops the alert, and the dashboard timeline shows "seen at".
+Rear guard phone sends `{"type": "approach", "label": "person" | "car" | ..., "score", "area"}` on its node socket.
+Lecture recap: `POST /api/recap {"segments": [{"text", "ts"}], "title"}` returns
+`{"title", "summary", "points", "map": {"center", "branches": [{"label", "ts", "details"}]}, "quiz": [{"q", "choices", "answer"}], "people", "brain": "groq" | "claude" | "xai" | "local" | "rules"}`.
 Ask Lumen: `POST /api/ask {"question": "..."}` returns `{"answer", "evidence": [log entries], "brain": "groq" | "claude" | "xai" | "rules"}`.
 Pick the AI with `LUMEN_LLM=groq|claude|xai|off` and the matching key (`GROQ_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`). No key means keyword answers.
 Set `WHISPER_PROVIDER=groq` to transcribe on Groq instead of the AMD GPU.

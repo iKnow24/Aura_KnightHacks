@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { keepAwake, useBrain } from '../lib/useBrain'
+import { api, keepAwake, useBrain } from '../lib/useBrain'
 import { ALERT_TEXT, ZONES } from '../lib/zones'
 
 // Bedside phone for Night mode. Screen flashes red, phone vibrates, and the flashlight
@@ -34,7 +34,7 @@ export default function Strobe() {
   if (!armed) return <button onClick={arm} className="h-full w-full text-2xl">Tap to arm bedside alerts</button>
   if (!alert) return <div className="grid h-full place-items-center text-zinc-700">armed · sleeping</div>
   return (
-    <button onClick={() => { setAlert(null); navigator.vibrate?.(0); torch.current?.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {}) }}
+    <button onClick={() => { api('/api/ack', { id: alert.id, by: 'bedside' }).catch(() => {}); setAlert(null); navigator.vibrate?.(0); torch.current?.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {}) }}
       className="grid h-full w-full animate-pulse place-items-center bg-red-600 text-center">
       <div>
         <div className="text-7xl">{ALERT_TEXT[alert.kind]?.icon}</div>
