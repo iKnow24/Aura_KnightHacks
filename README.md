@@ -32,6 +32,9 @@ your hand.
 - **Outside mode.** A second phone in your back pocket or bag watches behind you, and a 3D walking view shows
   cars and people coming up on either side.
 - **Caregiver dashboard.** A floor plan that lights up the room an alert came from, with a timeline.
+- **Change from normal.** Every alert and every tap is logged. A Databricks pipeline compares this week with
+  the week before, for the same person, and tells the family when she's taking longer to notice alerts or
+  missing more of them. It says "worth a call", never a diagnosis.
 
 <p align="center">
   <img src="docs/images/dashboard-alert.png" alt="Caregiver dashboard with a smoke alarm lighting up the kitchen" width="100%">
@@ -81,6 +84,39 @@ flowchart LR
 [`server/app/modes.py`](server/app/modes.py) that decide which detectors run and where each alert goes. You
 can also make a new mode by voice.
 
+## How the data flows
+
+Live alerts never wait on the cloud: they're decided on the brain in under a second. Databricks gets the
+history, so a caregiver can see slow changes no single alert would show.
+
+```mermaid
+flowchart LR
+  E["Brain event log<br/>alert, tap, caption,<br/>speaker, item sighting"] -->|"one .jsonl file per day"| V["Volume<br/>raw_events"]
+  V -->|"Auto Loader reads only new files"| B["Bronze<br/>bronze_events<br/>raw lines"]
+  B -->|"expectations drop bad rows"| S["Silver<br/>alerts · acks · speech<br/>speakers · sightings"]
+  S --> G["Gold<br/>alert_response · daily<br/>change_from_normal<br/>who_talks · item_last_seen"]
+  G --> D["Caregiver view<br/>AI/BI dashboard + Genie<br/>'Is Mom doing okay this week?'"]
+```
+
+| Layer | What it holds | Why |
+|---|---|---|
+| **Events** | One JSON line per thing that happened, written by [`server/app/eventlog.py`](server/app/eventlog.py) when `EVENT_LOG_DIR` is set | Off by default, so the house forgets on restart unless you opt in |
+| **Bronze** | Every line, untouched | Replayable; a new day's file only processes that day |
+| **Silver** | One clean table per event type, with expectations that drop impossible rows | Bad data never reaches a caregiver |
+| **Gold** | Time to notice each alert, a daily summary, and this week vs. last week | What a family actually asks about |
+| **Caregiver view** | A one-page dashboard with an "Ask Genie" box | Plain answers, no SQL |
+
+The headline table is `gold_change_from_normal`. A week is flagged when the median time to notice is more
+than 25% slower than the week before, or misses at least double (plus two). Here is what it sees on the two
+weeks of sample data in [`databricks/sample_data/`](databricks/sample_data/):
+
+<p align="center">
+  <img src="docs/images/change-from-normal.svg" alt="Median seconds to notice an alert per day: about 6 seconds in week one, about 9 in week two, with misses going from 2 to 8" width="100%">
+</p>
+
+That slowdown is **planted by our data generator** to show the feature; it is not a real person. The full
+setup, including the "a new week arrives" live demo, is in [`databricks/README.md`](databricks/README.md).
+
 ## Built with
 
 | Layer | What |
@@ -91,19 +127,22 @@ can also make a new mode by voice.
 | Server | Python, FastAPI, WebSockets |
 | Web | React, Vite, Tailwind, Framer Motion, three.js (react-three-fiber) |
 | Ask Lumen | Groq by default, swappable to Claude or xAI with one env var |
+| History | **Databricks**: Lakeflow declarative pipeline (Bronze/Silver/Gold), AI/BI dashboard, Genie |
 | Phones over HTTPS | Cloudflare Tunnel |
 
-## Honest status
+## What's built vs. what's tested
 
-What works today and what we haven't proven yet. We'd rather you hear it from us.
+We'd rather you hear the limits from us.
 
-| Piece | Status |
-|---|---|
-| Smoke alarm detector, fall rules, mode routing, memory | 44 automated tests passing |
-| Dashboard, captions, strobe, alerts, Ask Lumen | Working in the browser; demo alert buttons for judging |
-| AST sound AI, Whisper, OWLv2 on the AMD GPU | Written against the real models, not yet run end to end on the AMD box |
-| 3D walking view, back-phone detection | Built, not yet tested on a real phone |
-| Distance to cars and people | A rough estimate from box size, about ±30% |
+| Piece | Built | Tested |
+|---|---|---|
+| Smoke alarm detector, fall rules, mode routing, memory, event log | ✅ | ✅ 46 automated tests |
+| Dashboard, captions, strobe, alerts, Ask Lumen | ✅ | ✅ in the browser, with demo alert buttons |
+| Clean UI with calm motion (page fade, panel rise, live pulses) | ✅ | ✅ in the browser |
+| AST sound AI, Whisper, OWLv2 on the AMD GPU | ✅ | ⚠️ written against the real models, not yet run end to end on the AMD box |
+| 3D walking view, back-phone detection | ✅ | ⚠️ not yet on a real phone; distance is a rough estimate, about ±30% |
+| Databricks pipeline, dashboard datasets, Genie setup | ✅ | ⚠️ the change-from-normal math is checked on the sample data above; not yet run on a Databricks workspace |
+| Household history | ⚠️ generated, not real | Two weeks of fake events with a planted slowdown |
 
 ## Run it
 
@@ -149,6 +188,8 @@ cd web && npm run build
 | `server/app/modes.py` | The modes, as config |
 | `server/app/agent.py`, `memory.py` | Ask Lumen |
 | `web/src/pages/` | One page per device: Dashboard, Captions, Node, Strobe, Rear, Mic, Headset |
+| `server/app/eventlog.py` | Daily event files for Databricks (opt-in) |
+| `databricks/` | Pipeline SQL, data generator, sample data, dashboard and Genie setup |
 | `docs/demo.md` | The demo script and answers to judge questions |
 
 ## Team
