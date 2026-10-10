@@ -8,7 +8,7 @@ Three sources, same numbers:
   On the AMD box this is the one that works: its proxy blocks databricks.com.
 - Otherwise the committed sample files in databricks/sample_data/ (the generated "Maria" household).
 
-If the Databricks call fails for any reason, we fall back to the sample and say so in "note".
+Generated samples require LUMEN_HISTORY_SAMPLE=1 and are never a fallback for a configured real source.
 
 Turning the live call on (all in the brain's environment, e.g. before ./run.sh):
   DATABRICKS_HOST=https://<your-workspace>.cloud.databricks.com
@@ -111,7 +111,15 @@ def _status(day, this, before):
 def from_sample(household: str, folder: Path = SAMPLE_DIR):
     lines = []
     for f in sorted(folder.glob("*.jsonl")):
-        lines += [json.loads(l) for l in f.read_text().splitlines() if l.strip()]
+        for line in f.read_text().splitlines(keepends=True):
+            if not line.endswith("\n") or not line.strip():
+                continue
+            try:
+                event = json.loads(line)
+                if isinstance(event, dict):
+                    lines.append(event)
+            except json.JSONDecodeError:
+                continue
     return _from_rows(_alert_rows(lines), household)
 
 
@@ -188,25 +196,33 @@ def databricks_configured():
 def history(household: str | None = None):
     log_dir = os.environ.get("EVENT_LOG_DIR")
     household = household or os.environ.get("LUMEN_HOUSEHOLD", "demo" if log_dir else "maria")
-    hit = _cache.get(household)
+    sample_enabled = os.environ.get("LUMEN_HISTORY_SAMPLE") == "1"
+    cache_key = (household, log_dir, sample_enabled, databricks_configured())
+    hit = _cache.get(cache_key)
     if hit and time.time() - hit[0] < CACHE_SECONDS:
         return hit[1]
-    source, note = "sample", None
+    source, note = "unavailable", None
+    days, status, missed = [], None, []
     if databricks_configured():
         try:
             days, status, missed = from_databricks(household)
             source = "databricks"
-        except Exception as e:  # never let a cloud hiccup blank the tab
-            note = f"Databricks unavailable, showing sample data ({type(e).__name__}: {str(e)[:160]})"
-    if source == "sample" and log_dir and Path(log_dir).is_dir():
+        except Exception:
+            note = "Databricks unavailable. No generated data has been substituted."
+    if source != "databricks" and log_dir:
         days, status, missed = from_sample(household, Path(log_dir))
         source = "event_log"
-    if source == "sample":
+        if note:
+            note = "Databricks unavailable. Showing this home's local event log."
+    if source == "unavailable" and sample_enabled and not log_dir and not databricks_configured():
         days, status, missed = from_sample(household)
+        source = "sample"
+    if source == "unavailable" and note is None:
+        note = "Real history is not connected yet. Configure event logging or Databricks."
     result = {
         "household": household, "source": source, "note": note,
         "days": days, "status": status, "missed": missed,
         "dashboard_url": os.environ.get("DATABRICKS_DASHBOARD_URL") or None,
     }
-    _cache[household] = (time.time(), result)
+    _cache[cache_key] = (time.time(), result)
     return result

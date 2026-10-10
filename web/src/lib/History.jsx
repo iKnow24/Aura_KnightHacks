@@ -80,6 +80,7 @@ export default function History() {
 const SOURCES = {
   databricks: 'Live from Databricks',
   event_log: "This home's real events",
+  unavailable: "Real history not connected",
   sample: 'Sample household (planted decline), offline',
 }
 
@@ -87,7 +88,7 @@ function Source({ data }) {
   return (
     <footer className="mt-4 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
       <span className="glass flex items-center gap-2 rounded-full px-3 py-1">
-        <span className={`h-1.5 w-1.5 rounded-full ${data.source === 'sample' ? 'bg-zinc-500' : 'bg-emerald-400'}`} />
+        <span className={`h-1.5 w-1.5 rounded-full ${['databricks', 'event_log'].includes(data.source) ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
         {SOURCES[data.source] || data.source}
       </span>
       {data.note && <span>{data.note}</span>}

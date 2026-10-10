@@ -6,6 +6,7 @@ from app import history, main
 
 
 def test_sample_history_matches_planted_decline(monkeypatch):
+    monkeypatch.setenv("LUMEN_HISTORY_SAMPLE", "1")
     for k in ("DATABRICKS_HOST", "DATABRICKS_TOKEN", "DATABRICKS_WAREHOUSE_ID"):
         monkeypatch.delenv(k, raising=False)
     history._cache.clear()
@@ -18,13 +19,15 @@ def test_sample_history_matches_planted_decline(monkeypatch):
     assert s["pct_slower"] == 50 and s["flagged"]
 
 
-def test_databricks_failure_falls_back_to_sample(monkeypatch):
+def test_databricks_failure_never_falls_back_to_sample(monkeypatch):
+    monkeypatch.setenv("LUMEN_HISTORY_SAMPLE", "1")
     monkeypatch.setenv("DATABRICKS_HOST", "http://127.0.0.1:9")
     monkeypatch.setenv("DATABRICKS_TOKEN", "x")
     monkeypatch.setenv("DATABRICKS_WAREHOUSE_ID", "x")
     history._cache.clear()
     out = history.history("maria")
-    assert out["source"] == "sample" and "Databricks unavailable" in out["note"]
+    assert out["source"] == "unavailable" and "Databricks unavailable" in out["note"]
+    assert out["days"] == [] and out["status"] is None
     history._cache.clear()
 
 
@@ -60,3 +63,40 @@ def test_real_event_log_is_used_and_says_no_baseline_yet(tmp_path, monkeypatch):
     assert s["alerts_this_week"] == 1  # the test-button alert is left out
     assert s["alerts_week_before"] == 0 and not s["flagged"]
     assert s["median_seconds_this_week"] == 4.0
+
+
+def test_default_history_has_no_generated_household(monkeypatch):
+    for key in ("DATABRICKS_HOST", "DATABRICKS_TOKEN", "DATABRICKS_WAREHOUSE_ID", "EVENT_LOG_DIR", "LUMEN_HISTORY_SAMPLE"):
+        monkeypatch.delenv(key, raising=False)
+    history._cache.clear()
+    result = history.history()
+    assert result["source"] == "unavailable"
+    assert result["days"] == [] and result["status"] is None
+
+
+def test_missing_real_log_directory_never_uses_samples(tmp_path, monkeypatch):
+    for key in ("DATABRICKS_HOST", "DATABRICKS_TOKEN", "DATABRICKS_WAREHOUSE_ID"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("LUMEN_HISTORY_SAMPLE", "1")
+    monkeypatch.setenv("EVENT_LOG_DIR", str(tmp_path / "not-created-yet"))
+    history._cache.clear()
+    result = history.history("maria")
+    assert result["source"] == "event_log" and result["days"] == []
+
+
+def test_sample_cache_does_not_leak_after_switch_to_real_mode(monkeypatch):
+    for key in ("DATABRICKS_HOST", "DATABRICKS_TOKEN", "DATABRICKS_WAREHOUSE_ID", "EVENT_LOG_DIR"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("LUMEN_HISTORY_SAMPLE", "1")
+    history._cache.clear()
+    assert history.history("maria")["source"] == "sample"
+    monkeypatch.delenv("LUMEN_HISTORY_SAMPLE")
+    assert history.history("maria")["days"] == []
+
+
+def test_partial_event_line_does_not_break_real_history(tmp_path):
+    event = {"type": "alert", "id": "a", "kind": "doorbell", "severity": "warning",
+             "zone": "hallway", "household": "home", "source": "ast", "ts": 1760000000.0}
+    (tmp_path / "events.jsonl").write_text(json.dumps(event) + '\n{"type":')
+    days, status, _ = history.from_sample("home", tmp_path)
+    assert len(days) == 1 and status["alerts_this_week"] == 1

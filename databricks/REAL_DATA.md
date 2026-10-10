@@ -82,3 +82,41 @@ Questions that work on a few hours of real data: *"What alerts happened in the l
 The script prints the reason. The common ones: **403** means the password doesn't match the box's
 `LUMEN_SYNC_KEY` (or the brain was started without it); **404** means the volume wasn't created;
 **can't reach localhost:5173** means the Jupyter bridge isn't running.
+
+## Delivery checks and recovery
+
+- Keep **one uploader** running for a source. Its checkpoint and pending event batch live in
+  `.lumen-sync/state.json` inside your checkout (ignored by Git). The file contains private event
+  data, but no API token. Keep it when restarting; do not upload or share it.
+- The uploader saves the exact pending bytes before uploading. If a response is lost, it retries
+  those same bytes, even if the hourly log has grown. A conflicting remote file is accepted only
+  after its contents have been checked. The checkpoint is replaced atomically.
+- If a pipeline job is busy, or starting it fails, the next round retries the pending refresh even
+  if no new events arrived. A successful start is **not** proof the job finished: check the job's
+  result in Databricks, then check the dashboard's ingestion time. Rerun a failed pipeline job
+  after fixing its reported error; the uploaded files remain available.
+- For a separate source or destination use `--state /path/to/separate-state.json`. Reusing a
+  checkpoint for another source/destination is rejected. Keep the bridge URL stable.
+- The original PR #22 uploader used `~/.lumen_databricks_sync.json`. If you already ran that
+  version, stop and reconcile its offsets before switching; a fresh checkpoint replays the logs.
+  Do not delete checkpoints to troubleshoot a timeout. Starting fresh or running parallel
+  uploaders can duplicate rows. Source logs must remain append-only.
+- `--once` does one upload/processing attempt; connection and upload failures return an error.
+  Use the normal continuous mode when a job is busy so the queued refresh is retried.
+
+## No generated fallback
+
+History uses real sources by default. With neither event logging nor Databricks configured, it
+shows an empty "Real history not connected" state. A Databricks outage never substitutes sample
+rows. An empty local log remains empty. Generated data is available only through the explicit
+`LUMEN_HISTORY_SAMPLE=1` demo setting, with no real source configured. Leave that setting off for
+this project’s real-data demonstration.
+
+## What these records can measure
+
+An acknowledgment measures **time until somebody tapped**, not detector accuracy. To evaluate
+machine learning, keep a separate labeled test sheet with event type, actual occurrence time,
+whether Aura detected it, detection time, and whether the alert was correct. Include quiet
+periods and similar-sounding non-events. Missed detections cannot be discovered from emitted
+alerts alone. Compare models on the same held-out recordings before changing live thresholds;
+do not train a new model on a few hours of unverified predictions.
