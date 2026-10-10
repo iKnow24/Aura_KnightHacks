@@ -5,7 +5,7 @@ history: every alert, tap, caption and sighting, cleaned into tables a caregiver
 
 ```
 brain (EVENT_LOG_DIR)  ─┐
-                        ├─► Volume /Volumes/lumen/home/raw_events/<day>.jsonl
+                        ├─► Volume /Volumes/lumen/home/raw_events/*.jsonl  
 generate_household.py  ─┘            │  Auto Loader
                                      ▼
                          BRONZE  bronze_events (raw lines)
@@ -30,6 +30,9 @@ python3 databricks/generate_household.py --days 14          # ends yesterday; --
 # real events from the brain, same format:
 EVENT_LOG_DIR=./event_log LUMEN_HOUSEHOLD=maria ./run.sh
 ```
+
+The brain writes one file per hour (`2026-10-10_14.jsonl`). Upload only finished hours: Auto Loader
+reads each file name once, so a file that keeps growing after upload would lose its new lines.
 
 `databricks/sample_data/` already holds 14 days ending 2026-10-09.
 
