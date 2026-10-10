@@ -1,13 +1,17 @@
 """Speech: cut each node's audio into utterances, then transcribe them with Whisper.
 
-The segmenter is plain loudness gating (no model), so it's testable anywhere. Whisper loads
-lazily like the AST model and switches itself off if transformers/torch are missing.
+The segmenter is plain loudness gating (no model), so it's testable anywhere. Whisper runs
+either on Groq's free API (WHISPER_PROVIDER=groq plus GROQ_API_KEY: large-v3 quality, no GPU
+needed, but the audio clip goes to Groq) or locally, loading lazily like the AST model and
+switching itself off if transformers/torch are missing.
 
 Whisper invents text on noise ("Thank you.", "you"). Those known ghosts are dropped.
 """
+import io
 import logging
 import os
 import re
+import wave
 
 import numpy as np
 
@@ -67,6 +71,17 @@ class Transcriber:
         return self._load() is not None
 
     def _load(self):
+        if self._pipe is None and not self._failed and os.environ.get("WHISPER_PROVIDER") == "groq":
+            try:
+                from openai import OpenAI
+
+                client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=os.environ["GROQ_API_KEY"], timeout=20)
+                self._pipe = lambda audio: {"text": client.audio.transcriptions.create(
+                    file=("speech.wav", to_wav(audio["raw"])), model="whisper-large-v3-turbo", language="en").text}
+                log.info("Whisper via Groq")
+            except Exception as e:
+                self._failed = True
+                log.warning("Groq Whisper off (%s).", e)
         if self._pipe is None and not self._failed:
             try:
                 import torch
@@ -86,6 +101,16 @@ class Transcriber:
         if pipe is None:
             return None
         return clean(pipe({"raw": audio, "sampling_rate": SAMPLE_RATE})["text"])
+
+
+def to_wav(audio: np.ndarray) -> bytes:
+    out = io.BytesIO()
+    with wave.open(out, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(SAMPLE_RATE)
+        w.writeframes((np.clip(audio, -1, 1) * 32767).astype(np.int16).tobytes())
+    return out.getvalue()
 
 
 def mentions_name(text: str, name: str) -> bool:

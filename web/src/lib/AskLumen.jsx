@@ -79,7 +79,7 @@ export default function AskLumen() {
                 ))}
               </ul>
             )}
-            <div className="mt-2 text-xs text-zinc-600">{result.brain === 'claude' ? 'answered by Claude from the house log' : 'answered from the house log'}</div>
+            <div className="mt-2 text-xs text-zinc-600">{result.brain && result.brain !== 'rules' ? `answered by ${result.brain} from the house log` : 'answered from the house log'}</div>
           </motion.div>
         )}
       </AnimatePresence>

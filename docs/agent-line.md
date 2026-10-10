@@ -61,7 +61,9 @@ Two more message types go out on the same sockets. They are not alerts, so scree
 ```
 
 Nodes send `{"type": "snapshot", "ts": ..., "jpeg": "data:image/jpeg;base64,..."}` every 5 s (turn off with `?items=0`).
-Ask Lumen: `POST /api/ask {"question": "..."}` returns `{"answer", "evidence": [log entries], "brain": "claude" | "rules"}`.
+Ask Lumen: `POST /api/ask {"question": "..."}` returns `{"answer", "evidence": [log entries], "brain": "groq" | "claude" | "xai" | "rules"}`.
+Pick the AI with `LUMEN_LLM=groq|claude|xai|off` and the matching key (`GROQ_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`). No key means keyword answers.
+Set `WHISPER_PROVIDER=groq` to transcribe on Groq instead of the AMD GPU.
 
 ## Git, plainly
 

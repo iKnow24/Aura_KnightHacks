@@ -77,32 +77,54 @@ def test_ask_endpoint_with_seeded_memory():
     assert client.post("/api/profile", json={"name": " Sharan "}).json()["name"] == "Sharan"
 
 
-def test_claude_brain_tool_loop(monkeypatch):
-    """Fake Anthropic client: asks for last_seen(keys), then answers. Checks evidence flows back."""
+def test_llm_brain_tool_loop(monkeypatch):
+    """Fake OpenAI-style client: asks for last_seen(keys), then answers. Checks evidence flows back."""
     import sys
     import types
     from app import agent
 
-    class B:
-        def __init__(self, **kw): self.__dict__.update(kw)
+    def B(**kw): return types.SimpleNamespace(**kw)
 
-    replies = [
-        B(stop_reason="tool_use", content=[B(type="tool_use", id="t1", name="last_seen", input={"item": "keys"})]),
-        B(stop_reason="end_turn", content=[B(type="text", text="In the living room, 12 minutes ago.")]),
-    ]
-    seen = []
+    call = B(id="t1", function=B(name="last_seen", arguments='{"item": "keys"}'))
+    replies = [B(content=None, tool_calls=[call]), B(content="In the living room, 12 minutes ago.", tool_calls=None)]
+    sent = []
 
     class Client:
-        def __init__(self): self.messages = self
+        def __init__(self, **kw):
+            sent.append(kw["base_url"])
+            self.chat = B(completions=B(create=self.create))
         def create(self, **kw):
-            seen.append(kw["messages"][-1])
-            return replies.pop(0)
+            sent.append(kw["messages"][-1])
+            return B(choices=[B(message=replies.pop(0))])
 
-    monkeypatch.setitem(sys.modules, "anthropic", types.SimpleNamespace(Anthropic=Client))
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
+    monkeypatch.setitem(sys.modules, "openai", types.SimpleNamespace(OpenAI=Client))
+    monkeypatch.delenv("LUMEN_LLM", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("GROQ_API_KEY", "x")
     m = Memory()
     seed_demo(m)
     r = agent.answer("yo where'd my keys go", m, [])
-    assert r["brain"] == "claude" and "living room" in r["answer"]
+    assert r["brain"] == "groq" and "groq.com" in sent[0] and "living room" in r["answer"]
     assert r["evidence"][0]["item"] == "keys"
-    assert "thumb" not in seen[-1]["content"][0]["content"]  # photos never sent to the model
+    assert "thumb" not in sent[-1]["content"]  # photos never sent to the model
+
+
+def test_provider_choice(monkeypatch):
+    from app.agent import pick_provider
+
+    for k in ("GROQ_API_KEY", "ANTHROPIC_API_KEY", "XAI_API_KEY", "LUMEN_LLM"):
+        monkeypatch.delenv(k, raising=False)
+    assert pick_provider() is None
+    monkeypatch.setenv("XAI_API_KEY", "x")
+    assert pick_provider()[0] == "xai"
+    monkeypatch.setenv("GROQ_API_KEY", "g")
+    assert pick_provider()[0] == "groq"
+    monkeypatch.setenv("LUMEN_LLM", "xai")
+    assert pick_provider()[0] == "xai"
+    monkeypatch.setenv("LUMEN_LLM", "off")
+    assert pick_provider() is None
+
+
+def test_wav_encoding():
+    from app.detectors.speech import to_wav
+    assert to_wav(np.zeros(SAMPLE_RATE, np.float32))[:4] == b"RIFF"
