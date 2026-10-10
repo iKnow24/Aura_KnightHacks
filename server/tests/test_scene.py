@@ -1,11 +1,9 @@
-import base64
-import io
 import json
 import time
+from types import SimpleNamespace
 
 import numpy as np
 from fastapi.testclient import TestClient
-from PIL import Image
 
 from app import main
 from app.detectors import scene
@@ -53,12 +51,6 @@ def test_scene_json_shape():
     assert 'jpeg' not in json.dumps(ev)
 
 
-def tiny_jpeg():
-    out = io.BytesIO()
-    Image.new('RGB', (64, 48), 'gray').save(out, format='JPEG')
-    return 'data:image/jpeg;base64,' + base64.b64encode(out.getvalue()).decode()
-
-
 def wait_for(sent, kind):
     for _ in range(100):
         found = [m for _, m in sent if m.get('type') == kind]
@@ -81,13 +73,14 @@ def test_snapshot_becomes_logged_scene_json_without_the_photo(monkeypatch, tmp_p
 
     monkeypatch.setattr(main.hub, 'broadcast', broadcast)
     monkeypatch.setattr(main.item_finder, 'detect', detect)
+    monkeypatch.setattr(main, 'decode', lambda jpeg: SimpleNamespace(size=(64, 48)))  # CI has no Pillow
     monkeypatch.setattr(main.item_finder, '_failed', False)
     main.vision_ms.clear()
     client = TestClient(main.app)
     with client.websocket_connect('/ws/node/scene-test?zone=kitchen') as node:
         node.receive_json()
         node.send_json({'type': 'pose', 'ts': 1, 'landmarks': body(0.2, 0.5, 0.75)})
-        node.send_json({'type': 'snapshot', 'ts': 1, 'jpeg': tiny_jpeg()})
+        node.send_json({'type': 'snapshot', 'ts': 1, 'jpeg': 'data:image/jpeg;base64,AA=='})
         vision = wait_for(sent, 'vision')
         assert vision and vision[0]['posture'] == 'standing' and vision[0]['people'] == 1
         speed = client.get('/api/vision').json()['speed']
