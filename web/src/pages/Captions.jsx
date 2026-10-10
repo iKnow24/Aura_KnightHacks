@@ -202,7 +202,21 @@ function useLookingDown(active) {
   return down
 }
 
+// True while the phone is held upright; updates when it rotates.
+function usePortrait() {
+  const query = '(orientation: portrait)'
+  const [portrait, setPortrait] = useState(() => window.matchMedia(query).matches)
+  useEffect(() => {
+    const m = window.matchMedia(query)
+    const onChange = () => setPortrait(m.matches)
+    m.addEventListener('change', onChange)
+    return () => m.removeEventListener('change', onChange)
+  }, [])
+  return portrait
+}
+
 export default function Captions() {
+  const portrait = usePortrait()
   const user = getUser()
   const { alerts, push, drop, ack } = useAlerts('wearer')
   const [started, setStarted] = useState(false)
@@ -428,8 +442,9 @@ export default function Captions() {
         {lookingDown && <span className="text-xs text-amber-300">· holding your place</span>}
       </div>
       {mode === 'outside' && <div className="absolute left-3 top-16 z-10"><Radar recent={recent} /></div>}
-      {/* In portrait the bottom is the transcript, so the walking view only shows in landscape. */}
-      {camera && <div className="portrait:hidden"><Surround videoRef={videoRef} active={started} rear={rearScene} raised={bar} /></div>}
+      {/* In portrait the bottom is the transcript, so the walking view only shows in landscape.
+          Not mounted at all in portrait, so its 3D scene and object detector don't run for nothing. */}
+      {camera && !portrait && <Surround videoRef={videoRef} active={started} rear={rearScene} raised={bar} />}
 
       <AnimatePresence>
         {notice && (
