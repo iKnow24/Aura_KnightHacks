@@ -56,3 +56,30 @@ body {
 input, select, textarea { font: inherit; }
 :focus-visible { outline: 2px solid #f4f4f5; outline-offset: 2px; }
 .tabular { font-variant-numeric: tabular-nums; }
+
+/* Motion. One easing curve everywhere, short distances, nothing that loops except "live" signals. */
+:root { --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1); }
+
+/* Every page fades up a few pixels when it opens (each route mounts a fresh <main>). */
+#root > main { animation: page-in 0.55s var(--ease-out) backwards; }
+@keyframes page-in { from { opacity: 0; transform: translateY(8px); } }
+
+/* Panels rise in just after the page, so a screen assembles instead of popping. */
+.glass { animation: rise 0.6s var(--ease-out) 0.08s backwards; }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+
+/* Buttons and links give a little under the finger. */
+button:not(:disabled), a { transition: transform 0.15s var(--ease-out), background-color 0.2s, color 0.2s, border-color 0.2s; }
+button:not(:disabled):active, a:active { transform: scale(0.97); }
+
+/* A soft ring that breathes out of a "live" dot (brain connected, node live). */
+.live-dot { position: relative; }
+.live-dot::after {
+  content: ""; position: absolute; inset: 0; border-radius: 9999px; background: inherit;
+  animation: live-ring 2.4s var(--ease-out) infinite;
+}
+@keyframes live-ring { from { transform: scale(1); opacity: 0.6; } to { transform: scale(3.2); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
