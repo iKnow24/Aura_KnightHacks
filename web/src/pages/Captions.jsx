@@ -428,7 +428,8 @@ export default function Captions() {
         {lookingDown && <span className="text-xs text-amber-300">· holding your place</span>}
       </div>
       {mode === 'outside' && <div className="absolute left-3 top-16 z-10"><Radar recent={recent} /></div>}
-      {camera && <Surround videoRef={videoRef} active={started} rear={rearScene} raised={bar} />}
+      {/* In portrait the bottom is the transcript, so the walking view only shows in landscape. */}
+      {camera && <div className="portrait:hidden"><Surround videoRef={videoRef} active={started} rear={rearScene} raised={bar} /></div>}
 
       <AnimatePresence>
         {notice && (
@@ -440,9 +441,9 @@ export default function Captions() {
       {look === 'cinema' ? (
         <CinemaCaptions lines={captions.lines} live={live} names={names} recent={state.events} />
       ) : (<>
-      {/* Right: the see-through transcript. Scroll up for history; it stops following until you come back down. */}
+      {/* Right (landscape) or bottom (portrait, so the camera keeps the top of the screen): the see-through transcript. Scroll up for history; it stops following until you come back down. */}
       <section onClick={(e) => e.stopPropagation()}
-        className={`absolute bottom-0 right-0 top-0 z-10 flex flex-col glass-dark border-y-0 border-r-0 ${camera ? 'w-[64%] rounded-l-3xl sm:w-[42%]' : 'w-full'}`}>
+        className={`absolute bottom-0 right-0 top-0 z-10 flex flex-col glass-dark border-y-0 border-r-0 ${camera ? 'w-[64%] rounded-l-3xl sm:w-[42%] portrait:top-auto portrait:h-[42%] portrait:w-full! portrait:rounded-none portrait:rounded-t-3xl' : 'w-full'}`}>
         <div ref={scroller} onScroll={onScroll} className="flex-1 overflow-y-auto px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
           {whisperOff && realEngine === 'private' && (
             <p className="mb-3 rounded-xl bg-amber-950/80 p-3 text-xs text-amber-200">Private captions need Whisper on the Lumen brain, and it isn’t running.{mode !== 'outside' && ' Switch to Instant.'}</p>
