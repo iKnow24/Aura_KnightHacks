@@ -5,12 +5,17 @@ either on Groq's free API (WHISPER_PROVIDER=groq plus GROQ_API_KEY: large-v3 qua
 needed, but the audio clip goes to Groq) or locally, loading lazily like the AST model and
 switching itself off if transformers/torch are missing.
 
-Whisper invents text on noise ("Thank you.", "you"). Those known ghosts are dropped.
+Whisper invents text on noise ("Thank you.", "you"). Those known ghosts are dropped, and so are
+its stuck-record loops ("I mean, I mean, I mean, ...") which get cut down to one copy.
+
+While someone is still talking, `Segmenter.so_far()` hands out the audio heard so far, so the brain
+can send a rough "partial" caption every second instead of making people wait for the pause.
 """
 import io
 import logging
 import os
 import re
+import threading
 import wave
 
 import numpy as np
@@ -20,9 +25,10 @@ log = logging.getLogger(__name__)
 SAMPLE_RATE = 16_000
 # Phones stream with auto-gain off, so speech is quiet. Raise this if fans or traffic get transcribed.
 SPEECH_RMS = float(os.environ.get("SPEECH_RMS", "0.012"))
-END_SILENCE_S = 0.8
+END_SILENCE_S = 0.6
 MIN_SPEECH_S = 0.6
-MAX_SEGMENT_S = 12
+MAX_SEGMENT_S = 8  # long monologues get cut here; partial captions cover the wait
+
 
 GHOSTS = {"", "you", "thank you", "thanks for watching", "thank you for watching", "bye", "okay", "so"}
 
@@ -35,6 +41,7 @@ class Segmenter:
         self.buf: list[np.ndarray] = []
         self.voiced = 0  # samples above threshold in this segment
         self.silence = 0  # trailing quiet samples
+        self.done = 0  # counts finished utterances, so a slow partial can tell it's out of date
 
     def feed(self, chunk: np.ndarray) -> np.ndarray | None:
         loud = float(np.sqrt(np.mean(chunk ** 2))) > self.threshold if len(chunk) else False
@@ -50,13 +57,25 @@ class Segmenter:
         if self.silence >= END_SILENCE_S * SAMPLE_RATE or total >= MAX_SEGMENT_S * SAMPLE_RATE:
             audio, voiced = np.concatenate(self.buf), self.voiced
             self.buf, self.voiced, self.silence = [], 0, 0
+            self.done += 1
             if voiced >= MIN_SPEECH_S * SAMPLE_RATE:
                 return audio
         return None
 
+    def so_far(self) -> np.ndarray | None:
+        """The current utterance up to now, once there's enough speech in it to be worth a partial."""
+        if self.voiced < MIN_SPEECH_S * SAMPLE_RATE:
+            return None
+        return np.concatenate(self.buf)
+
+
+# The same 1 to 6 words said 4+ times in a row ("That's it. That's it. That's it. That's it.").
+# People do say "no, no, no", so three in a row is left alone.
+LOOP = re.compile(r"((?:\S+\s+){1,6}?)\1{3,}", re.IGNORECASE)
+
 
 def clean(text: str) -> str | None:
-    text = text.strip()
+    text = LOOP.sub(r"\1", text.strip() + " ").strip()
     if re.sub(r"[^a-z ]", "", text.lower()).strip() in GHOSTS:
         return None
     return text
@@ -66,6 +85,7 @@ class Transcriber:
     def __init__(self):
         self._pipe = None
         self._failed = False
+        self._lock = threading.Lock()  # partials and finals share one model; take turns on the GPU
 
     def available(self) -> bool:
         return self._load() is not None
@@ -100,7 +120,8 @@ class Transcriber:
         pipe = self._load()
         if pipe is None:
             return None
-        return clean(pipe({"raw": audio, "sampling_rate": SAMPLE_RATE})["text"])
+        with self._lock:
+            return clean(pipe({"raw": audio, "sampling_rate": SAMPLE_RATE})["text"])
 
 
 def to_wav(audio: np.ndarray) -> bytes:

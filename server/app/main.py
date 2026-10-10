@@ -91,12 +91,35 @@ def caption_id(entry: dict) -> str:
 WEARER = "wearer"  # zone name the headset uses for its own mic
 
 
+PARTIAL_EVERY_S = 1.0  # while someone talks, a rough caption this often (0 turns partials off)
+partial_at: dict[str, float] = {}
+partial_busy: set[str] = set()  # one partial per phone at a time, so a slow CPU never backs up
+
+
 def feed_speech(node_id: str, zone: str, chunk: np.ndarray):
     if transcriber._failed:
         return
-    utterance = segmenters.setdefault(node_id, Segmenter()).feed(chunk)
+    seg = segmenters.setdefault(node_id, Segmenter())
+    utterance = seg.feed(chunk)
     if utterance is not None:
         asyncio.create_task(run_speech(zone, utterance))
+    elif PARTIAL_EVERY_S and node_id not in partial_busy and time.time() - partial_at.get(node_id, 0) >= PARTIAL_EVERY_S:
+        audio = seg.so_far()
+        if audio is not None:
+            partial_at[node_id] = time.time()
+            partial_busy.add(node_id)
+            asyncio.create_task(run_partial(node_id, seg, zone, audio))
+
+
+async def run_partial(node_id: str, seg: Segmenter, zone: str, audio: np.ndarray):
+    """Words so far, shown greyed out on the caption screens until the finished line replaces them."""
+    done = seg.done
+    try:
+        text = await asyncio.to_thread(transcriber.transcribe, audio)
+    finally:
+        partial_busy.discard(node_id)
+    if text and seg.done == done:  # skip it if the sentence already finished while Whisper ran
+        await hub.broadcast(["hud"], {"type": "caption_partial", "zone": zone, "text": text, "ts": time.time()})
 
 
 async def run_speech(zone: str, audio: np.ndarray):
