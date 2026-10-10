@@ -23,16 +23,18 @@ import sys
 import uuid
 from datetime import datetime, timezone
 
-import aiohttp
-from aiohttp import web
-from multidict import CIMultiDict
+import ssl
 
 try:
     import truststore  # trust the same certificates Safari does (python.org's Python ships with none)
 
-    truststore.inject_into_ssl()
+    SSL_CONTEXT = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 except ImportError:
-    pass
+    SSL_CONTEXT = ssl.create_default_context()
+
+import aiohttp
+from aiohttp import web
+from multidict import CIMultiDict
 
 # Runs inside a Python kernel on the box. Turns messages from this script into requests to Lumen there.
 KERNEL_CODE = r'''
@@ -144,7 +146,7 @@ class Bridge:
         await self.send(self.msg("comm_msg", {"comm_id": self.comm_id, "data": data}))
 
     async def connect(self):
-        self.http = aiohttp.ClientSession(headers=self.headers)
+        self.http = aiohttp.ClientSession(headers=self.headers, connector=aiohttp.TCPConnector(ssl=SSL_CONTEXT))
         r = await self.http.post(f"{self.base}/api/kernels", json={"name": "python3"})
         if r.status >= 300:
             sys.exit(f"Jupyter said {r.status} when starting a kernel: {(await r.text())[:300]}\n"
