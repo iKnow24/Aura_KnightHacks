@@ -13,12 +13,15 @@ headset glows toward where they are. When someone falls, the caregiver knows.
 |---|---|
 | `server/` | The brain. FastAPI + WebSockets. Receives audio/pose from nodes, runs detectors, routes alerts by mode |
 | `server/app/detectors/alarm_dsp.py` | Smoke alarm detector with no AI: 3 kHz beep pattern. The one we trust on stage |
+| `server/app/detectors/fall.py` | Fall detector from pose keypoints: fast drop, then lying still |
+| `server/app/detectors/ast_sound.py` | AI sound classifier (doorbell, glass, baby crying, alarms) on the GPU |
 | `server/app/modes.py` | Watch, Wearer and Night modes, as config |
 | `web/` | One React app (Vite, Tailwind, Framer Motion) with a page per device |
 | `web/src/pages/Dashboard.jsx` | Caregiver floor plan, timeline, mode switch, fake-alert buttons |
 | `web/src/pages/Headset.jsx` | Phone-in-headset passthrough view with directional glow |
-| `web/src/pages/Node.jsx` | Spare phone in a room, streams mic audio |
+| `web/src/pages/Node.jsx` | Spare phone in a room, streams mic audio and body keypoints (never video) |
 | `web/src/pages/Strobe.jsx` | Bedside phone: red flash, vibration, flashlight strobe |
+| `docs/demo.md` | What to test first, the 2-minute demo script, and answers to judge questions |
 | `docs/agent-line.md` | How the team splits work and uses AI agents cheaply |
 | `setup.sh`, `run.sh` | Set up and start on the AMD cloud box or a laptop |
 
@@ -53,7 +56,7 @@ Each credit is one hour. **Delete the machine whenever nobody is using it**; set
 ## Tests
 
 ```bash
-cd server && python -m pytest -q    # alarm detector + alert routing
+cd server && python -m pytest -q    # alarm, fall and sound detectors + alert routing
 cd web && npm run build
 ```
 
