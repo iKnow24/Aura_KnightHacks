@@ -25,7 +25,8 @@ export default function History() {
 
   const { days, status: s } = data
   const week = days.slice(-7)
-  const sum = (key) => week.reduce((n, d) => n + d[key], 0)
+  const sum = (key, rows = week) => rows.reduce((n, d) => n + d[key], 0)
+  const weekBefore = days.slice(-14, -7)
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-4">
@@ -35,7 +36,7 @@ export default function History() {
         <Stat label="Time to notice" value={secs(s?.median_seconds_this_week)} sub={`usual ${secs(s?.median_seconds_week_before)}`} warn={s?.median_seconds_this_week > 1.25 * s?.median_seconds_week_before} />
         <Stat label="Missed this week" value={s?.missed_this_week ?? '–'} sub={`${s?.missed_week_before ?? '–'} the week before`} warn={s?.flagged && s.missed_this_week > s.missed_week_before} />
         <Stat label="Alerts, last 7 days" value={sum('alerts')} sub="info alerts left out" />
-        <Stat label="At night, last 7 days" value={sum('night_alerts')} sub={`${sum('missed_at_night')} missed`} />
+        <Stat label="At night, last 7 days" value={sum('night_alerts')} sub={`${sum('missed_at_night')} missed (${sum('missed_at_night', weekBefore)} the week before)`} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

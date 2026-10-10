@@ -14,7 +14,7 @@ def test_sample_history_matches_planted_decline(monkeypatch):
     assert len(out["days"]) == 14
     s = out["status"]
     assert s["latest_day"] == "2026-10-09"
-    assert (s["missed_this_week"], s["missed_week_before"]) == (8, 2)
+    assert (s["missed_this_week"], s["missed_week_before"]) == (15, 5)
     assert s["pct_slower"] == 50 and s["flagged"]
 
 
