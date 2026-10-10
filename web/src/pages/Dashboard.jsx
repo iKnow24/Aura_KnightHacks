@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { api, useBrain } from '../lib/useBrain'
 import AlertIcon from '../lib/AlertIcon'
 import AskLumen from '../lib/AskLumen'
+import History from '../lib/History'
 import Conversation, { useCaptions } from '../lib/Conversation'
 import QrPanel from '../lib/QrPanel'
 import { Wordmark } from '../lib/Logo'
@@ -35,6 +36,7 @@ const FloorPlan = () => (
 export default function Dashboard() {
   const [ripples, setRipples] = useState([])
   const [showQr, setShowQr] = useState(false)
+  const [tab, setTab] = useState('live')
   const user = getUser()
   const captions = useCaptions()
   const { state, connected } = useBrain('dashboard', (alert) => {
@@ -43,29 +45,50 @@ export default function Dashboard() {
   }, (msg) => msg.type === 'caption' && captions.add(msg))
   const now = Date.now() / 1000
 
+  const header = (
+    <header className="mb-3 flex flex-wrap items-center gap-3">
+      <h1 className="flex items-center gap-3"><Wordmark size={13} /><span className="text-sm text-zinc-500">{user?.household ?? 'Home'}</span></h1>
+      <span className={`glass flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${connected ? 'text-emerald-300' : 'text-red-300'}`}>
+        <span className={`h-2 w-2 rounded-full ${connected ? 'live-dot bg-emerald-400' : 'bg-red-500'}`} />
+        {connected ? 'Brain connected' : 'Brain offline'}
+      </span>
+      <div className="glass flex rounded-full p-0.5 text-sm font-medium">
+        {[['live', 'Live'], ['history', 'History']].map(([id, label]) => (
+          <button key={id} onClick={() => setTab(id)} aria-pressed={tab === id}
+            className={`rounded-full px-3 py-1 transition-colors ${tab === id ? 'bg-zinc-100 text-ink' : 'text-zinc-400 hover:text-zinc-200'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <button onClick={() => setShowQr((v) => !v)} className="glass ml-auto rounded-full px-4 py-1.5 text-sm font-medium hover:border-white/20">
+        {showQr ? 'Hide' : 'Add phones'}
+      </button>
+      <select
+        className="glass rounded-full px-3 py-1.5 text-sm font-medium"
+        value={state.mode}
+        onChange={(e) => api('/api/mode', { mode: e.target.value })}
+      >
+        {Object.entries(state.modes).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+      </select>
+      <button onClick={() => { signOut(); location.href = import.meta.env.BASE_URL }} className="text-sm text-zinc-500 hover:text-zinc-300">
+        {user?.name} · Sign out
+      </button>
+    </header>
+  )
+
+  if (tab === 'history') {
+    return (
+      <main className="min-h-full overflow-x-hidden p-4">
+        {header}
+        <History />
+      </main>
+    )
+  }
+
   return (
     <main className="grid min-h-full grid-cols-1 gap-4 overflow-x-hidden p-4 lg:grid-cols-[1fr_360px]">
       <section className="min-w-0">
-        <header className="mb-3 flex flex-wrap items-center gap-3">
-          <h1 className="flex items-center gap-3"><Wordmark size={13} /><span className="text-sm text-zinc-500">{user?.household ?? 'Home'}</span></h1>
-          <span className={`glass flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${connected ? 'text-emerald-300' : 'text-red-300'}`}>
-            <span className={`h-2 w-2 rounded-full ${connected ? 'live-dot bg-emerald-400' : 'bg-red-500'}`} />
-            {connected ? 'Brain connected' : 'Brain offline'}
-          </span>
-          <button onClick={() => setShowQr((v) => !v)} className="glass ml-auto rounded-full px-4 py-1.5 text-sm font-medium hover:border-white/20">
-            {showQr ? 'Hide' : 'Add phones'}
-          </button>
-          <select
-            className="glass rounded-full px-3 py-1.5 text-sm font-medium"
-            value={state.mode}
-            onChange={(e) => api('/api/mode', { mode: e.target.value })}
-          >
-            {Object.entries(state.modes).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-          </select>
-          <button onClick={() => { signOut(); location.href = import.meta.env.BASE_URL }} className="text-sm text-zinc-500 hover:text-zinc-300">
-            {user?.name} · Sign out
-          </button>
-        </header>
+        {header}
 
         {showQr && <QrPanel />}
 

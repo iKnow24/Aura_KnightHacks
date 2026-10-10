@@ -18,6 +18,7 @@ from .agent import answer
 from .llm import local as local_llm
 from .recap import recap
 from .speakers import CrossTalk
+from .history import history
 from .hub import Hub
 from .memory import Memory, seed_demo
 from .modes import DEFAULT_MODE, MODES, make_mode
@@ -199,6 +200,12 @@ class RecapRequest(BaseModel):
 @app.get("/api/health")
 def health():
     return {"ok": True, "mode": hub.mode}
+
+
+@app.get("/api/history")
+def get_history(household: str | None = None):
+    """History tab: Databricks Gold tables when configured, else the committed sample week."""
+    return history(household)
 
 
 @app.get("/api/state")
