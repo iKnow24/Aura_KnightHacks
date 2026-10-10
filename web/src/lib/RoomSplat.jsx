@@ -1,5 +1,5 @@
 import { DropInViewer, SceneRevealMode } from '@mkkellogg/gaussian-splats-3d'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 // The Room view's backdrop: a Gaussian splat scan of a real room, drawn inside WalkScene's canvas
 // so the figure, cameras' cones and detected things sit in it. Which file and how it lines up
@@ -8,6 +8,8 @@ const DIR = `${import.meta.env.BASE_URL}splats/`
 
 export default function RoomSplat({ onFail }) {
   const [viewer, setViewer] = useState(null)
+  const fail = useRef(onFail)
+  fail.current = onFail // parents may pass a new function each render; don't reload the scan for that
   useEffect(() => {
     // Phone-friendly settings: sort on the CPU worker without SharedArrayBuffer (the tunnel doesn't
     // send the headers it needs), no view-dependent color.
@@ -27,8 +29,8 @@ export default function RoomSplat({ onFail }) {
           showLoadingUI: false, position: cfg.position, rotation: cfg.rotation, scale: [s, s, s],
         })
       })
-      .catch((e) => { if (!dead) onFail(e) })
+      .catch((e) => { if (!dead) fail.current(e) })
     return () => { dead = true; v.dispose().catch(() => {}) }
-  }, [onFail])
+  }, [])
   return viewer && <primitive object={viewer} />
 }

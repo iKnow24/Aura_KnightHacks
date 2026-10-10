@@ -14,3 +14,9 @@ To use a real scan of the demo room:
    You stand at `[0, 0, 0]`, facing `-z`.
 
 If the file is missing or the phone can't draw it, the corner goes back to the street view on its own.
+
+## Dashboard (3D button on the floor plan)
+
+The caregiver dashboard shows the same scan full size, slowly turning, with a dot for each room the
+phones watch. `zones` in `room.json` says where each dot sits in the scan (meters, same frame as the
+scan after `position`/`rotation`/`scale`). When an alert fires, its room's dot ripples in the alert color.
