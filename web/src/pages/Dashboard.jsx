@@ -4,13 +4,16 @@ import { api, useBrain } from '../lib/useBrain'
 import AskLumen from '../lib/AskLumen'
 import QrPanel from '../lib/QrPanel'
 import { getUser, signOut } from '../lib/user'
-import { ALERT_TEXT, SEVERITY_COLOR, ZONES } from '../lib/zones'
+import { alertText, SEVERITY_COLOR, ZONES, zoneLabel } from '../lib/zones'
 
 const FAKES = [
   ['smoke_alarm', 'kitchen', 'critical'],
   ['doorbell', 'hallway', 'warning'],
   ['name_called', 'kitchen', 'warning'],
   ['fall', 'bedroom', 'critical'],
+  ['timer', 'kitchen', 'warning'],
+  ['car_horn', 'wearer', 'critical'],
+  ['person_behind', 'behind', 'warning'],
 ]
 
 export default function Dashboard() {
@@ -50,7 +53,7 @@ export default function Dashboard() {
 
         {/* Floor plan. Skeletons and zone status only: no live video, for privacy. */}
         <div className="relative aspect-[16/10] rounded-2xl border border-zinc-800 bg-zinc-950">
-          {Object.entries(ZONES).map(([id, z]) => {
+          {Object.entries(ZONES).filter(([, z]) => z.map !== false).map(([id, z]) => {
             const node = Object.values(state.nodes).find((n) => n.zone === id)
             const alive = node && now - node.last_seen < 10
             return (
@@ -63,7 +66,7 @@ export default function Dashboard() {
           <AnimatePresence>
             {ripples.map((a) => {
               const z = ZONES[a.zone]
-              if (!z) return null
+              if (!z || z.map === false) return null
               return (
                 <motion.div
                   key={a.id}
@@ -84,7 +87,7 @@ export default function Dashboard() {
           {FAKES.map(([kind, zone, severity]) => (
             <button key={kind} onClick={() => api('/api/fake-alert', { kind, zone, severity })}
               className="rounded-lg bg-zinc-800 px-3 py-1.5 text-sm hover:bg-zinc-700">
-              {ALERT_TEXT[kind].icon} {ALERT_TEXT[kind].text} · {ZONES[zone].label}
+              {alertText(kind).icon} {alertText(kind).text} · {zoneLabel(zone)}
             </button>
           ))}
           <button onClick={() => api('/api/memory/seed', {})} className="rounded-lg bg-zinc-800 px-3 py-1.5 text-sm hover:bg-zinc-700">
@@ -100,9 +103,10 @@ export default function Dashboard() {
         <ul className="space-y-2">
           {[...state.events].reverse().map((e) => (
             <li key={e.id} className="rounded-lg bg-zinc-900 p-2 text-sm" style={{ borderLeft: `4px solid ${SEVERITY_COLOR[e.severity]}` }}>
-              <div>{ALERT_TEXT[e.kind]?.icon} {ALERT_TEXT[e.kind]?.text ?? e.kind} · {ZONES[e.zone]?.label ?? e.zone}</div>
+              <div>{alertText(e.kind).icon} {alertText(e.kind).text} · {zoneLabel(e.zone)}</div>
               <div className="text-xs text-zinc-500">
                 {new Date(e.ts * 1000).toLocaleTimeString()} · {e.source}{e.routed === false ? ' · logged only' : ''}
+                {e.acked && <span className="text-green-400"> · ✓ seen {new Date(e.acked.ts * 1000).toLocaleTimeString()}</span>}
               </div>
             </li>
           ))}

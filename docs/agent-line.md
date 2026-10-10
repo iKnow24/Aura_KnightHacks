@@ -47,6 +47,10 @@ Every alert in the system is this JSON, and nothing else (see `server/app/hub.py
 ```
 
 - `kind`: smoke_alarm, doorbell, name_called, fall, glass_break, baby_cry
+  - everyday (home): timer, kettle, phone_ring, knock, alarm_clock, water_running, dog_bark, car_alarm
+  - outside: car_horn, siren, vehicle (only when getting louder), bike_bell, reversing,
+    person_behind, vehicle_behind, bike_behind (from the rear camera phone, zone `behind`)
+  - Each mode's `sound_kinds` in `server/app/modes.py` decides which of these it listens for.
 - `severity`: critical, warning, info. The current mode decides which screens get each one (`server/app/modes.py`).
 - Branch A produces these. Branch B produces raw audio and pose keypoints. Branch C only consumes alerts.
 - Branch C never waits on A: the dashboard's fake-alert buttons call `POST /api/fake-alert`.
@@ -61,6 +65,11 @@ Two more message types go out on the same sockets. They are not alerts, so scree
 ```
 
 Nodes send `{"type": "snapshot", "ts": ..., "jpeg": "data:image/jpeg;base64,..."}` every 5 s (turn off with `?items=0`).
+Acknowledging: any screen calls `POST /api/ack {"id": alert_id, "by": "wearer"}`; every screen gets
+`{"type": "ack", "id", "ts", "by"}` and drops the alert, and the dashboard timeline shows "seen at".
+Rear guard phone sends `{"type": "approach", "label": "person" | "car" | ..., "score", "area"}` on its node socket.
+Lecture recap: `POST /api/recap {"segments": [{"text", "ts"}], "title"}` returns
+`{"title", "summary", "points", "map": {"center", "branches": [{"label", "ts", "details"}]}, "quiz": [{"q", "choices", "answer"}], "people", "brain": "local" | "hf" | "claude" | "rules"}`.
 Ask Lumen: `POST /api/ask {"question": "..."}` returns `{"answer", "evidence": [log entries], "brain": "claude" | "rules"}`.
 
 ## Git, plainly

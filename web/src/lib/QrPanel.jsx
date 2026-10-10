@@ -5,8 +5,10 @@ import { ZONES } from './zones'
 // Scan-to-join codes. They use whatever address this dashboard was opened from,
 // so open the dashboard through the https tunnel link and the codes work on any phone.
 const DEVICES = [
-  ...Object.entries(ZONES).map(([id, z]) => [`${z.label} node`, `/node?zone=${id}&id=${id}`]),
+  ...Object.entries(ZONES).filter(([, z]) => z.map !== false).map(([id, z]) => [`${z.label} node`, `/node?zone=${id}&id=${id}`]),
+  ['Live captions', '/captions'],
   ['Headset', '/headset'],
+  ['Rear guard', '/rear'],
   ['Bedside strobe', '/strobe'],
 ]
 

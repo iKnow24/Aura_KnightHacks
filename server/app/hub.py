@@ -60,6 +60,16 @@ class Hub:
             await self.broadcast(["dashboard"], {**event, "routed": False})
         return event
 
+    async def ack(self, alert_id: str, by: str = "wearer") -> dict | None:
+        """Someone tapped the alert. Every screen drops it, and the dashboard shows when it was seen."""
+        event = next((e for e in reversed(self.events) if e["id"] == alert_id), None)
+        if event is None:
+            return None
+        if "acked" not in event:
+            event["acked"] = {"ts": time.time(), "by": by}
+            await self.broadcast(list(self.clients), {"type": "ack", "id": alert_id, **event["acked"]})
+        return event
+
     async def set_mode(self, mode: str):
         self.mode = mode
         await self.broadcast(list(self.clients), {"type": "state", **self.state()})

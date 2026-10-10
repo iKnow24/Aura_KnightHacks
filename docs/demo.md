@@ -37,7 +37,9 @@ Every item here is something code can't fix. Find out early.
 4. **Fall (30 s).** Teammate falls on the mat, lies still; caregiver dashboard shows "Possible fall · Bedroom".
 5. **Ask Lumen (20 s).** "Lumen also remembers." Ask "What was the last thing said?" (a teammate spoke
    in the kitchen earlier) and "Where are my keys?" (answer comes with the photo crop).
-6. **Close (15 s).** "No video leaves a phone. The alarm path has no AI guessing in it. And it runs on
+6. **Optional, if there's time: Lecture (20 s).** On `/captions`, tap Lecture, let a teammate talk for
+   20 seconds (or tap Sample), then End → Recap: memory map with "when it was said", and a quiz.
+7. **Close (15 s).** "No video leaves a phone. The alarm path has no AI guessing in it. And it runs on
    phones people already own."
 
 ## Questions judges will ask
@@ -55,6 +57,13 @@ Every item here is something code can't fix. Find out early.
 - **"Where's the AI?"** Audio Spectrogram Transformer on the AMD GPU for sound classes, MediaPipe pose on
   each phone, deterministic rules on top. We kept AI out of the yes/no decision for smoke alarms on
   purpose: it's the one path that has to be instant and predictable.
+
+- **"Why not use Live Transcribe for captions?"** For plain captions, you should. Ours exist so alerts
+  can land on top of the words you're already reading, and so a lecture ends with a recap and quiz.
+  Instant mode uses the browser's recognizer (Google's servers); Private mode runs Whisper on our box.
+- **"Can it tell me who I'm talking to?"** Only names people say out loud. We chose not to recognize
+  strangers' faces: it's illegal to do without consent in several states, and it's the first thing
+  that makes people afraid of the person wearing the device.
 
 ## Backup plan
 

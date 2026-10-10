@@ -4,11 +4,14 @@ const wsUrl = (path) => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${lo
 
 // Connects a screen to the brain and keeps reconnecting if Wi-Fi blips.
 // role: 'dashboard' | 'hud' | 'strobe'
-export function useBrain(role, onAlert) {
+// onMessage gets everything else (captions, acks) if a screen wants it.
+export function useBrain(role, onAlert, onMessage) {
   const [state, setState] = useState({ mode: '?', modes: {}, nodes: {}, events: [] })
   const [connected, setConnected] = useState(false)
   const alertRef = useRef(onAlert)
   alertRef.current = onAlert
+  const msgRef = useRef(onMessage)
+  msgRef.current = onMessage
 
   useEffect(() => {
     let ws, retry, ping, closed = false
@@ -24,7 +27,10 @@ export function useBrain(role, onAlert) {
         if (msg.type === 'alert') {
           setState((s) => ({ ...s, events: [...s.events, msg].slice(-50) }))
           alertRef.current?.(msg)
+        } else if (msg.type === 'ack') {
+          setState((s) => ({ ...s, events: s.events.map((e) => (e.id === msg.id ? { ...e, acked: { ts: msg.ts, by: msg.by } } : e)) }))
         }
+        if (msg.type !== 'alert' && msg.type !== 'state') msgRef.current?.(msg)
       }
       ws.onclose = () => {
         setConnected(false)
