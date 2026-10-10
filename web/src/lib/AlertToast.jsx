@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useCallback, useEffect, useState } from 'react'
+import AlertIcon from './AlertIcon'
 import Logo from './Logo'
 import { api } from './useBrain'
 import { alertText, SEVERITY_COLOR, zoneLabel } from './zones'
@@ -33,7 +34,7 @@ function Toast({ alert, onAck }) {
   const [, tick] = useState(0)
   const [gone, setGone] = useState(false) // hide at once; the full-screen exit animation can hang
   const color = SEVERITY_COLOR[alert.severity] ?? SEVERITY_COLOR.info
-  const { icon, text } = alertText(alert.kind)
+  const { text } = alertText(alert.kind)
 
   useEffect(() => {
     const [big, full] = ESCALATE[alert.severity] ?? ESCALATE.info
@@ -57,7 +58,7 @@ function Toast({ alert, onAck }) {
         transition={{ backgroundColor: { duration: 0.8, repeat: Infinity } }}
       >
         <div>
-          <motion.div className="text-8xl" animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 0.8, repeat: Infinity }}>{icon}</motion.div>
+          <motion.div className="mx-auto w-fit text-8xl" animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 0.8, repeat: Infinity }}><AlertIcon kind={alert.kind} strokeWidth={2.4} /></motion.div>
           <div className="mt-6 px-6 text-5xl font-black tracking-tight">{text}</div>
           <div className="mt-3 text-2xl opacity-90">{zoneLabel(alert.zone)}</div>
           <div className="mt-10 rounded-full bg-black/40 px-5 py-2 text-base">Tap anywhere: I've got it</div>
@@ -77,7 +78,7 @@ function Toast({ alert, onAck }) {
       transition={{ type: 'spring', stiffness: 380, damping: 28 }}
       className={`pointer-events-auto relative flex items-center overflow-hidden border text-left shadow-2xl backdrop-blur-xl
         ${stage === 0 ? 'h-14 w-14 justify-center rounded-full' : big ? 'w-[min(92vw,560px)] gap-5 rounded-3xl p-5' : 'gap-3 rounded-full py-2 pl-2 pr-6'}`}
-      style={{ borderColor: `${color}aa`, background: 'linear-gradient(135deg, rgba(24,24,27,.92), rgba(9,9,11,.92))',
+      style={{ borderColor: `${color}aa`, background: `linear-gradient(135deg, ${color}26, rgba(10,9,16,.9) 45%), rgba(10,9,16,.88)`,
         boxShadow: `0 0 ${big ? 60 : 30}px ${color}55` }}
     >
       {big && (
@@ -85,8 +86,8 @@ function Toast({ alert, onAck }) {
           animate={{ opacity: [0.2, 1, 0.2] }} transition={{ duration: 1.1, repeat: Infinity }} />
       )}
       <motion.span layout className={`relative grid shrink-0 place-items-center rounded-full ${big ? 'h-20 w-20 text-5xl' : 'h-10 w-10 text-2xl'}`}
-        style={{ background: `radial-gradient(circle, ${color}55, ${color}11)` }}>
-        {stage === 0 ? <Logo size={26} color={color} /> : icon}
+        style={{ background: `radial-gradient(circle, ${color}55, ${color}11)`, color }}>
+        {stage === 0 ? <Logo size={26} color={color} /> : <AlertIcon kind={alert.kind} className="text-[0.8em]" />}
         <motion.span className="absolute inset-0 rounded-full border-2" style={{ borderColor: color }}
           animate={{ scale: [1, 1.6], opacity: [0.8, 0] }} transition={{ duration: 1.4, repeat: Infinity }} />
       </motion.span>

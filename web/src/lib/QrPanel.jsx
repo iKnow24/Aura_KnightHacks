@@ -22,14 +22,14 @@ export default function QrPanel() {
   }, [])
 
   return (
-    <div className="mb-4 rounded-2xl border border-zinc-800 p-4">
+    <div className="glass mb-4 rounded-xl p-4">
       {location.protocol !== 'https:' && location.hostname !== 'localhost' && (
         <p className="mb-3 text-sm text-amber-400">Phones need https for camera and mic. Open this dashboard from the tunnel link.</p>
       )}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {codes.map((c) => (
           <a key={c.path} href={c.path} target="_blank" rel="noreferrer" className="text-center text-sm">
-            <img src={c.src} alt={`QR code for ${c.label}`} className="mx-auto rounded bg-white" />
+            <img src={c.src} alt={`QR code for ${c.label}`} className="mx-auto rounded-xl bg-white p-1" />
             <div className="mt-1">{c.label}</div>
           </a>
         ))}
