@@ -5,8 +5,12 @@ import { detectFaces, FaceTracker, loadFaces, toScreen } from '../lib/faces'
 import { keepAwake, useBrain } from '../lib/useBrain'
 import { alertText, SEVERITY_COLOR, ZONES, zoneLabel } from '../lib/zones'
 
-// Fake AR: draw the rear camera twice side by side (one per eye) and put the HUD on top.
-// Works on iOS and Android without WebXR.
+// Camera passthrough with the HUD on top. Works on iOS and Android without WebXR.
+// Default is one full-screen view (hand-held, or a headset you look through with both eyes at one image).
+// "Headset" mode (?vr=1 or the toggle) draws it twice, one window per lens. The window is a centered
+// square, not the whole half-screen: the lens magnifies the edges most, so filling the half-screen is
+// what made the picture look like a fishbowl. We don't pre-distort the image (no WebGL shader), so a
+// little bend at the window edges is expected.
 // Direction uses 8 coarse sectors, not a precise arrow: indoor compass error is 15-30 degrees,
 // and "glow on the left" that's right beats an arrow that's visibly wrong.
 //
@@ -38,15 +42,15 @@ function useHeading() {
   return { heading: (heading - offset + 360) % 360, start, recenter }
 }
 
-function Eye({ stream, alert, sector, people, bubbles, speaking, rooms }) {
+function Eye({ stream, alert, sector, people, bubbles, speaking, rooms, stereo }) {
   const ref = useRef()
   const box = useRef()
   useEffect(() => { if (ref.current && stream) ref.current.srcObject = stream }, [stream])
   const angle = sector * 45
   const at = (p) => (ref.current && box.current ? toScreen(ref.current, box.current, p.x, p.y) : { left: 0, top: 0 })
   const placed = bubbles.map((b) => ({ ...b, person: people.find((p) => p.id === b.speaker) }))
-  return (
-    <div ref={box} className="relative h-full w-1/2 overflow-hidden">
+  const view = (
+    <div ref={box} className={stereo ? 'relative aspect-square h-[86%] max-w-[94%] overflow-hidden rounded-[28px]' : 'relative h-full w-full overflow-hidden'}>
       <video ref={ref} autoPlay playsInline muted className="h-full w-full object-cover" />
 
       {/* "…" over a face whose lips move while the mic hears speech: instant feedback before the words arrive. */}
@@ -103,6 +107,7 @@ function Eye({ stream, alert, sector, people, bubbles, speaking, rooms }) {
       </AnimatePresence>
     </div>
   )
+  return stereo ? <div className="grid h-full w-1/2 place-items-center">{view}</div> : view
 }
 
 export default function Headset() {
@@ -112,6 +117,7 @@ export default function Headset() {
   const [bubbles, setBubbles] = useState([])
   const [rooms, setRooms] = useState([])
   const [speaking, setSpeaking] = useState(false)
+  const [stereo, setStereo] = useState(() => new URLSearchParams(location.search).has('vr'))
   const tracker = useRef(new FaceTracker())
   const node = useRef(null)
   const level = useRef(0)
@@ -159,12 +165,38 @@ export default function Headset() {
     return () => { clearInterval(timer); stop?.(); node.current?.close() }
   }, [stream])
 
+  // Without a size the browser often hands back 640x480, which looks soft once it fills the screen.
+  const SIZE = { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } }
+  const [wide, setWide] = useState(false)
+
   const begin = async () => {
     await start()
     await keepAwake()
-    const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
-    setStream(s)
+    setStream(await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', ...SIZE }, audio: false }))
     document.documentElement.requestFullscreen?.().catch(() => {})
+  }
+
+  // Ultra-wide shows more of the room but is softer in dim light, so it's a button, not the default.
+  // Newer phones (Galaxy S2x, Pixel) expose it as zoom below 1x on the main camera; others list it as
+  // a separate back camera, so we fall back to stepping through those.
+  const toggleWide = async () => {
+    const track = stream.getVideoTracks()[0]
+    const zoom = track.getCapabilities?.().zoom
+    if (zoom && zoom.min < 1) {
+      await track.applyConstraints({ advanced: [{ zoom: wide ? 1 : zoom.min }] }).catch(() => {})
+      setWide(!wide)
+      return
+    }
+    const backs = (await navigator.mediaDevices.enumerateDevices())
+      .filter((d) => d.kind === 'videoinput' && /back|rear|environment/i.test(d.label))
+    if (backs.length < 2) return
+    const now = backs.findIndex((d) => d.deviceId === track.getSettings().deviceId)
+    const next = backs[(now + 1) % backs.length]
+    const s = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: next.deviceId }, ...SIZE }, audio: false }).catch(() => null)
+    if (!s) return
+    stream.getTracks().forEach((t) => t.stop())
+    setStream(s)
+    setWide((now + 1) % backs.length !== 0)
   }
 
   const bearing = alert ? (ZONES[alert.zone]?.bearing ?? 0) : 0
@@ -179,10 +211,16 @@ export default function Headset() {
     )
   }
   return (
-    <div className="flex h-full bg-black" onDoubleClick={recenter}>
+    <div className="relative flex h-full bg-black" onDoubleClick={recenter}>
       <video ref={detectVideo} playsInline muted className="pointer-events-none absolute h-px w-px opacity-0" />
-      <Eye stream={stream} alert={alert} sector={sector} people={people} bubbles={bubbles} speaking={speaking} rooms={rooms} />
-      <Eye stream={stream} alert={alert} sector={sector} people={people} bubbles={bubbles} speaking={speaking} rooms={rooms} />
+      <Eye stream={stream} alert={alert} sector={sector} people={people} bubbles={bubbles} speaking={speaking} rooms={rooms} stereo={stereo} />
+      {stereo && <Eye stream={stream} alert={alert} sector={sector} people={people} bubbles={bubbles} speaking={speaking} rooms={rooms} stereo />}
+      <div className="absolute right-3 top-3 flex gap-2 text-xs font-medium tracking-wide text-zinc-300">
+        <button onClick={toggleWide} className="rounded-full bg-black/60 px-3 py-1">{wide ? '1x' : 'Wide'}</button>
+        <button onClick={() => setStereo((v) => !v)} className="rounded-full bg-black/60 px-3 py-1">
+          {stereo ? 'Single view' : 'Headset'}
+        </button>
+      </div>
     </div>
   )
 }
