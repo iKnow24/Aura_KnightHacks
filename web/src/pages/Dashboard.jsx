@@ -22,7 +22,7 @@ export default function Dashboard() {
     <main className="grid min-h-full gap-4 p-4 lg:grid-cols-[1fr_360px]">
       <section>
         <header className="mb-3 flex flex-wrap items-center gap-3">
-          <h1 className="text-xl font-bold">Sightline · Home</h1>
+          <h1 className="text-xl font-bold">Lumen · Home</h1>
           <span className={`text-sm ${connected ? 'text-green-400' : 'text-red-400'}`}>
             ● {connected ? 'brain connected' : 'brain offline'}
           </span>

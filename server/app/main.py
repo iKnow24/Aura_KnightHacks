@@ -9,7 +9,7 @@ from .detectors import alarm_dsp
 from .hub import Hub
 from .modes import DEFAULT_MODE, MODES
 
-app = FastAPI(title="Sightline brain")
+app = FastAPI(title="Lumen brain")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 hub = Hub(os.environ.get("MODE", DEFAULT_MODE))
 

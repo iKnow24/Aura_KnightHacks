@@ -1,9 +1,9 @@
-# Sightline
+# Lumen
 
-**Sound, in your line of sight.** Home safety alerts for deaf and hard-of-hearing people.
+**Sound you can see.** Home safety alerts for deaf and hard-of-hearing people.
 
 Your phone already knows when a smoke alarm goes off *next to it*. It has no idea the alarm two rooms away is
-going off while you're asleep. Sightline turns spare phones into listening and watching nodes around the
+going off while you're asleep. Lumen turns spare phones into listening and watching nodes around the
 house. When the kitchen hears an alarm, the bedroom phone strobes. When someone calls your name, the
 headset glows toward where they are. When someone falls, the caregiver knows.
 
