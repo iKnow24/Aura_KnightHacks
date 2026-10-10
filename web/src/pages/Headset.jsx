@@ -165,16 +165,38 @@ export default function Headset() {
     return () => { clearInterval(timer); stop?.(); node.current?.close() }
   }, [stream])
 
+  // Without a size the browser often hands back 640x480, which looks soft once it fills the screen.
+  const SIZE = { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } }
+  const [wide, setWide] = useState(false)
+
   const begin = async () => {
     await start()
     await keepAwake()
-    const s = await navigator.mediaDevices.getUserMedia({
-      // Without a size the browser often hands back 640x480, which looks soft once it fills the screen.
-      video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
-      audio: false,
-    })
-    setStream(s)
+    setStream(await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', ...SIZE }, audio: false }))
     document.documentElement.requestFullscreen?.().catch(() => {})
+  }
+
+  // Ultra-wide shows more of the room but is softer in dim light, so it's a button, not the default.
+  // Newer phones (Galaxy S2x, Pixel) expose it as zoom below 1x on the main camera; others list it as
+  // a separate back camera, so we fall back to stepping through those.
+  const toggleWide = async () => {
+    const track = stream.getVideoTracks()[0]
+    const zoom = track.getCapabilities?.().zoom
+    if (zoom && zoom.min < 1) {
+      await track.applyConstraints({ advanced: [{ zoom: wide ? 1 : zoom.min }] }).catch(() => {})
+      setWide(!wide)
+      return
+    }
+    const backs = (await navigator.mediaDevices.enumerateDevices())
+      .filter((d) => d.kind === 'videoinput' && /back|rear|environment/i.test(d.label))
+    if (backs.length < 2) return
+    const now = backs.findIndex((d) => d.deviceId === track.getSettings().deviceId)
+    const next = backs[(now + 1) % backs.length]
+    const s = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: next.deviceId }, ...SIZE }, audio: false }).catch(() => null)
+    if (!s) return
+    stream.getTracks().forEach((t) => t.stop())
+    setStream(s)
+    setWide((now + 1) % backs.length !== 0)
   }
 
   const bearing = alert ? (ZONES[alert.zone]?.bearing ?? 0) : 0
@@ -193,10 +215,12 @@ export default function Headset() {
       <video ref={detectVideo} playsInline muted className="pointer-events-none absolute h-px w-px opacity-0" />
       <Eye stream={stream} alert={alert} sector={sector} people={people} bubbles={bubbles} speaking={speaking} rooms={rooms} stereo={stereo} />
       {stereo && <Eye stream={stream} alert={alert} sector={sector} people={people} bubbles={bubbles} speaking={speaking} rooms={rooms} stereo />}
-      <button onClick={() => setStereo((v) => !v)}
-        className="absolute right-3 top-3 rounded-full bg-black/60 px-3 py-1 text-xs font-medium tracking-wide text-zinc-300">
-        {stereo ? 'Single view' : 'Headset'}
-      </button>
+      <div className="absolute right-3 top-3 flex gap-2 text-xs font-medium tracking-wide text-zinc-300">
+        <button onClick={toggleWide} className="rounded-full bg-black/60 px-3 py-1">{wide ? '1x' : 'Wide'}</button>
+        <button onClick={() => setStereo((v) => !v)} className="rounded-full bg-black/60 px-3 py-1">
+          {stereo ? 'Single view' : 'Headset'}
+        </button>
+      </div>
     </div>
   )
 }
