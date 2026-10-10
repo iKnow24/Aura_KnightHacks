@@ -19,3 +19,4 @@ models/
 .vscode/
 .idea/
 web/public/mediapipe/wasm/
+event_log/

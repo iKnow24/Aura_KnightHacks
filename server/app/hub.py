@@ -2,6 +2,7 @@
 import time
 from fastapi import WebSocket
 
+from .eventlog import record
 from .modes import MODES
 
 
@@ -53,6 +54,7 @@ class Hub:
             "ts": time.time(),
         }
         self.events.append(event)
+        record(event)
         routes = MODES[self.mode]["routes"].get(severity, [])
         await self.broadcast(routes, event)
         # The dashboard always gets the timeline, even when the mode doesn't route there.
@@ -67,9 +69,11 @@ class Hub:
             return None
         if "acked" not in event:
             event["acked"] = {"ts": time.time(), "by": by}
+            record({"type": "ack", "id": alert_id, **event["acked"]})
             await self.broadcast(list(self.clients), {"type": "ack", "id": alert_id, **event["acked"]})
         return event
 
     async def set_mode(self, mode: str):
         self.mode = mode
+        record({"type": "mode", "mode": mode})
         await self.broadcast(list(self.clients), {"type": "state", **self.state()})
