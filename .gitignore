@@ -17,3 +17,4 @@ models/
 .DS_Store
 .vscode/
 .idea/
+web/public/mediapipe/wasm/
