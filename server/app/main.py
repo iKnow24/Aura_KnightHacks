@@ -1,3 +1,4 @@
+import json
 import os
 
 import numpy as np
@@ -6,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .detectors import alarm_dsp
+from .detectors.fall import FallDetector
 from .hub import Hub
 from .modes import DEFAULT_MODE, MODES
 
@@ -16,6 +18,11 @@ hub = Hub(os.environ.get("MODE", DEFAULT_MODE))
 # Rolling ~3 s audio buffer per node for the alarm detector.
 audio_buffers: dict[str, np.ndarray] = {}
 AUDIO_WINDOW = alarm_dsp.SAMPLE_RATE * 3
+fall_detectors: dict[str, FallDetector] = {}
+
+
+def enabled(detector: str) -> bool:
+    return detector in MODES[hub.mode]["detectors"]
 
 
 class FakeAlert(BaseModel):
@@ -77,9 +84,17 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
                 chunk = np.frombuffer(msg["bytes"], dtype=np.float32)
                 buf = np.concatenate([audio_buffers.get(node_id, np.zeros(0, np.float32)), chunk])[-AUDIO_WINDOW:]
                 audio_buffers[node_id] = buf
-                if len(buf) == AUDIO_WINDOW and alarm_dsp.is_alarm(buf):
+                if len(buf) == AUDIO_WINDOW and enabled("alarm_dsp") and alarm_dsp.is_alarm(buf):
                     await hub.emit_alert("smoke_alarm", zone, "critical", source="alarm_dsp")
                     audio_buffers[node_id] = np.zeros(0, np.float32)  # don't re-fire on the same beeps
+            elif msg.get("text"):
+                data = json.loads(msg["text"])
+                if data.get("type") == "pose" and enabled("fall"):
+                    stillness = MODES[hub.mode].get("fall_stillness_s", 8)
+                    det = fall_detectors.setdefault(node_id, FallDetector(stillness))
+                    det.stillness_s = stillness
+                    if det.update(data["ts"], data.get("landmarks")):
+                        await hub.emit_alert("fall", zone, "critical", source="fall")
             hub.heartbeat(node_id, zone)
     except WebSocketDisconnect:
         pass
