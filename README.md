@@ -198,7 +198,7 @@ cd web && npm run build
 | `server/app/detectors/` | Smoke alarm (DSP), fall, AST sounds, Whisper speech, OWLv2 item sightings |
 | `server/app/modes.py` | The modes, as config |
 | `server/app/agent.py`, `memory.py` | Ask Lumen |
-| `web/src/pages/` | One page per device: Dashboard, Captions, Node, Strobe, Rear, Mic, Headset |
+| `web/src/pages/` | One page per device: Dashboard, Captions, Node, Strobe, Rear, Mic |
 | `server/app/eventlog.py` | Daily event files for Databricks (opt-in) |
 | `databricks/` | Pipeline SQL, data generator, sample data, dashboard and Genie setup |
 | `server/app/history.py`, `web/src/lib/History.jsx` | The History tab |
