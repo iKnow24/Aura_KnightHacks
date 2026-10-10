@@ -1,0 +1,3 @@
+# Heavy model deps. Install on the AMD box only (PyTorch already comes with the ROCm image).
+transformers>=4.44
+librosa>=0.10
