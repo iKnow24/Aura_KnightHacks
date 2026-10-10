@@ -3,12 +3,16 @@ description: Lumen project rules for Cursor's agent
 alwaysApply: true
 ---
 
-Read `AGENTS.md` at the repo root before making changes and follow it. The short version:
+Read `AGENTS.md` at the repo root before making changes and follow it. It has the architecture
+(AMD box runs the brain and models, the Mac runs `scripts/jupyter_bridge.py` + cloudflared), the page map
+(`/captions` is the one wearer page; `/headset` redirects there), the Databricks paths and the known gaps.
+The short version:
 
-- Never push to `main`; work on a branch and open a PR.
+- Never push to `main`. Draft PR while working, mark Ready when done; the auto-merge robot merges when CI is green.
+  From Sun Oct 11, 8:00 AM ET only PRs labeled `hotfix` merge.
 - Before saying you're done, run `cd server && python -m pytest -q` and `cd web && npm run build`.
 - The alert JSON in `docs/agent-line.md` is a contract; don't change it unless asked.
-- No LLM decides whether a safety alert fires. No face recognition of strangers. No live video leaves a phone.
+- No LLM decides whether a safety alert fires. No face recognition. No live video leaves a phone.
 - Captions and alerts stay large, plain and high contrast. Black/gray/white design; the Eclipse logo is the only color.
-- Never use `sudo` or reinstall `torch` on the AMD box. Never commit API keys.
+- Never use `sudo` or reinstall `torch` on the AMD box. Never commit tokens or API keys.
 - Keep changes small and explain them in plain words.
