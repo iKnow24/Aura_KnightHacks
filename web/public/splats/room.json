@@ -1,0 +1,12 @@
+{
+  "file": "sample-room.splat",
+  "position": [0, 0, 0],
+  "rotation": [0, 0, 0, 1],
+  "scale": 1,
+  "zones": {
+    "kitchen": [2.25, 0.9, -1.9],
+    "living": [-1.7, 0.45, -2.4],
+    "bedroom": [1.9, 0.5, 1.25],
+    "hallway": [-1.5, 0, 2.0]
+  }
+}

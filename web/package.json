@@ -12,6 +12,7 @@
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",
     "@mediapipe/tasks-vision": "0.10.21",
+    "@mkkellogg/gaussian-splats-3d": "^0.4.7",
     "@react-three/fiber": "^8.17.10",
     "framer-motion": "^11.11.0",
     "lucide-react": "^0.460.0",

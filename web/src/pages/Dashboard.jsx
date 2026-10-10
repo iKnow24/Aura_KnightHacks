@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { api, useBrain } from '../lib/useBrain'
 import AlertIcon from '../lib/AlertIcon'
 import AskLumen from '../lib/AskLumen'
@@ -8,6 +8,8 @@ import Conversation, { useCaptions } from '../lib/Conversation'
 import QrPanel from '../lib/QrPanel'
 import { Wordmark } from '../lib/Logo'
 import { getUser, signOut } from '../lib/user'
+// 3D view of the home (Gaussian splat scan). Three.js only loads when someone taps 3D.
+const HomeScan = lazy(() => import('../lib/HomeScan'))
 import { alertText, SEVERITY_COLOR, ZONES, zoneLabel } from '../lib/zones'
 
 const FAKES = [
@@ -37,6 +39,7 @@ export default function Dashboard() {
   const [ripples, setRipples] = useState([])
   const [showQr, setShowQr] = useState(false)
   const [tab, setTab] = useState('live')
+  const [scan, setScan] = useState(false)
   const user = getUser()
   const captions = useCaptions()
   const { state, connected } = useBrain('dashboard', (alert) => {
@@ -94,6 +97,16 @@ export default function Dashboard() {
 
         {/* Floor plan. Skeletons and zone status only: no live video, for privacy. */}
         <div className="glass relative aspect-[4/3] overflow-hidden sm:aspect-[16/10] rounded-xl">
+          <button onClick={() => setScan((v) => !v)} aria-pressed={scan}
+            className="glass absolute right-3 top-3 z-10 rounded-full px-3 py-1 text-xs font-semibold tracking-wide hover:border-white/20">
+            {scan ? 'PLAN' : '3D'}
+          </button>
+          {scan ? (
+            <Suspense fallback={null}>
+              <HomeScan ripples={ripples} onFail={() => setScan(false)}
+                live={new Set(Object.values(state.nodes).filter((n) => now - n.last_seen < 10).map((n) => n.zone))} />
+            </Suspense>
+          ) : <>
           <FloorPlan />
           {Object.entries(ZONES).filter(([, z]) => z.map !== false).map(([id, z]) => {
             const node = Object.values(state.nodes).find((n) => n.zone === id)
@@ -123,6 +136,7 @@ export default function Dashboard() {
               )
             })}
           </AnimatePresence>
+          </>}
         </div>
 
         <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
