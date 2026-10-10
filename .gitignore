@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+# Node
+node_modules/
+dist/
+# Models and recordings (too big for git)
+models/
+*.wav
+*.mp3
+*.pt
+*.onnx
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
