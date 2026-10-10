@@ -376,12 +376,18 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
     """Camera/mic phones. Binary messages = 16 kHz mono float32 audio.
     Text = JSON: {"type": "pose", ...} at 10 fps, {"type": "snapshot", "jpeg": dataURL} every few seconds."""
     await hub.connect(ws, "node")
-    hub.heartbeat(node_id, zone)
+    await hub.register_node(ws, node_id, zone)
+    last_status = 0
+    last_preview = 0
     try:
         while True:
             msg = await ws.receive()
             if msg["type"] == "websocket.disconnect":
                 break
+            hub.heartbeat(node_id, zone)
+            if time.monotonic() - last_status >= 2:
+                last_status = time.monotonic()
+                await hub.broadcast(["dashboard"], {"type": "state", **hub.state()})
             if msg.get("bytes"):
                 chunk = np.frombuffer(msg["bytes"], dtype=np.float32)
                 # The wearer's own mic: speech only, alarms are the room nodes' job. Except Outside,
@@ -402,7 +408,16 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
                 feed_speech(node_id, zone, chunk)
             elif msg.get("text"):
                 data = json.loads(msg["text"])
-                if data.get("type") == "pose" and enabled("fall"):
+                if data.get("type") == "camera_preview":
+                    # Explicit demo-only opt-in. Never pass full frames to memory or the event log.
+                    jpeg = data.get("jpeg")
+                    if (os.environ.get("LUMEN_DEMO_PREVIEW") == "1"
+                            and isinstance(jpeg, str) and jpeg.startswith("data:image/jpeg;base64,")
+                            and len(jpeg) <= 400_000 and time.monotonic() - last_preview >= 0.9):
+                        last_preview = time.monotonic()
+                        await hub.broadcast(["dashboard"], {"type": "camera_preview", "node_id": node_id,
+                                                            "zone": zone, "ts": time.time(), "jpeg": jpeg})
+                elif data.get("type") == "pose" and enabled("fall"):
                     stillness = MODES[hub.mode].get("fall_stillness_s", 8)
                     det = fall_detectors.setdefault(node_id, FallDetector(stillness))
                     det.stillness_s = stillness
@@ -421,8 +436,11 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
                         await hub.broadcast(["dashboard"], {**entry, "type": "caption"})
                 elif data.get("type") == "snapshot" and node_id not in items_busy and not item_finder._failed:
                     asyncio.create_task(run_items(node_id, zone, data["jpeg"]))
-            hub.heartbeat(node_id, zone)
     except WebSocketDisconnect:
         pass
     finally:
         hub.disconnect(ws, "node")
+        if await hub.unregister_node(ws, node_id):
+            # Do not join audio or pose from before a disconnect to a new session.
+            for cache in (audio_buffers, fall_detectors, ast_pending, segmenters):
+                cache.pop(node_id, None)

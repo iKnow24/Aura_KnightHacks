@@ -6,7 +6,7 @@ import { BONES, detectPose, loadPose } from '../lib/pose'
 // A spare phone in a room. Streams 16 kHz mono audio and, unless ?pose=0, body keypoints
 // at 10 fps for fall detection. Unless ?items=0, it also sends one small still photo every
 // SNAPSHOT_S seconds so the brain can remember where keys, wallet, glasses were last seen.
-// Live video never leaves the phone; the brain keeps only a crop of each item it finds.
+// Optional demo preview sends a small still each second to the dashboard, without saving it.
 // Mount the phone high (about 1.8 m) and angled down so a person on the floor stays in frame.
 
 const POSE_FPS = 10
@@ -15,10 +15,11 @@ const SNAPSHOT_S = 5
 export default function Node() {
   const params = new URLSearchParams(location.search)
   const zone = params.get('zone') || 'living'
-  const nodeId = params.get('id') || `${zone}-${Math.random().toString(36).slice(2, 6)}`
+  const [nodeId] = useState(() => `${params.get('id') || zone}-${Math.random().toString(36).slice(2, 8)}`)
+  const [preview, setPreview] = useState(false)
   const usePose = params.get('pose') !== '0'
   const useItems = params.get('items') !== '0'
-  const useCamera = usePose || useItems
+  const useCamera = usePose || useItems || preview
   const [status, setStatus] = useState('idle')
   const [level, setLevel] = useState(0)
   const [personSeen, setPersonSeen] = useState(false)
@@ -27,21 +28,36 @@ export default function Node() {
   const videoRef = useRef()
   const canvasRef = useRef()
   const timers = useRef([])
+  const sessionRef = useRef(null)
 
-  useEffect(() => () => timers.current.forEach(clearInterval), [])
+  const cleanup = () => {
+    const session = sessionRef.current
+    if (session) { session.active = false; session.stopMic?.(); session.camera?.getTracks().forEach((t) => t.stop()) }
+    sessionRef.current = null
+    timers.current.forEach(clearInterval)
+    timers.current = []
+    wsRef.current?.close()
+    wsRef.current = null
+  }
+  useEffect(() => cleanup, [])
 
   const send = (data) => wsRef.current?.send(data)
 
-  const startCamera = async () => {
+  const startCamera = async (session) => {
     try {
       const cam = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: 640, height: 480 },
       })
+      if (!session.active) { cam.getTracks().forEach((t) => t.stop()); return }
+      session.camera = cam
       videoRef.current.srcObject = cam
       await videoRef.current.play()
+      if (!session.active) return
       if (useItems) timers.current.push(setInterval(sendSnapshot, SNAPSHOT_S * 1000))
+      if (preview) timers.current.push(setInterval(() => sendSnapshot('camera_preview'), 1000))
       if (!usePose) return
       await loadPose()
+      if (!session.active) return
       timers.current.push(setInterval(() => {
         const now = performance.now()
         const landmarks = detectPose(videoRef.current, now)
@@ -50,42 +66,70 @@ export default function Node() {
         send(JSON.stringify({ type: 'pose', ts: Date.now() / 1000, landmarks }))
       }, 1000 / POSE_FPS))
     } catch (e) {
-      setPoseError(e.message || String(e))
+      if (session.active) setPoseError(e.message || String(e))
     }
   }
 
-  const sendSnapshot = () => {
+  const sendSnapshot = (type = 'snapshot') => {
     const v = videoRef.current
     if (!v?.videoWidth) return
     const c = document.createElement('canvas')
     c.width = 640
     c.height = Math.round((640 * v.videoHeight) / v.videoWidth)
     c.getContext('2d').drawImage(v, 0, 0, c.width, c.height)
-    send(JSON.stringify({ type: 'snapshot', ts: Date.now() / 1000, jpeg: c.toDataURL('image/jpeg', 0.7) }))
+    send(JSON.stringify({ type, ts: Date.now() / 1000, jpeg: c.toDataURL('image/jpeg', 0.6) }))
   }
 
   const start = async () => {
-    await keepAwake()
-    wsRef.current = nodeSocket(nodeId, zone, setStatus)
-    await streamMic(send, setLevel)
-    if (useCamera) await startCamera()
+    if (sessionRef.current) return
+    const session = { active: true }
+    sessionRef.current = session
+    setStatus('starting')
+    setPoseError(null)
+    try {
+      if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Open the shared HTTPS link to allow camera and microphone access.')
+      }
+      await keepAwake()
+      if (!session.active) return
+      const stopMic = await streamMic(send, setLevel)
+      if (!session.active) { stopMic(); return }
+      session.stopMic = stopMic
+      wsRef.current = nodeSocket(nodeId, zone, (next) => { if (session.active) setStatus(next) })
+      if (useCamera) await startCamera(session)
+    } catch (e) {
+      if (!session.active) return
+      cleanup()
+      setStatus('idle')
+      setPoseError(e.name === 'NotAllowedError' ? 'Allow camera and microphone access in this browser, then try again.' : e.message || String(e))
+    }
   }
 
   const color = status === 'streaming' ? 'bg-green-700' : status === 'idle' ? 'bg-zinc-800' : 'bg-amber-600'
   return (
-    <div onClick={status === 'idle' ? start : undefined} className={`flex h-full w-full flex-col items-center justify-center gap-4 p-4 ${color}`}>
+    <div className={`flex min-h-full w-full flex-col items-center justify-center gap-4 p-4 ${color}`}>
       <div className="text-4xl font-bold">{zone}</div>
       <div className="text-xl">{status === 'idle' ? 'Tap to start' : status}</div>
+      <div className="text-sm">Device: {nodeId}</div>
+      {status === 'idle' && <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={preview} onChange={(e) => setPreview(e.target.checked)} />
+        Show camera on laptop (demo, 1 image/sec)
+      </label>}
+      <button onClick={status === 'idle' ? start : () => { cleanup(); setStatus('idle'); setLevel(0); setPersonSeen(false) }}
+        className="rounded-xl bg-white px-6 py-3 text-lg font-semibold text-black">
+        {status === 'idle' ? 'Start camera and mic' : 'Stop'}
+      </button>
+      {poseError && <p role="alert" className="max-w-md text-center text-white">Camera / microphone: {poseError}. Audio continues if already connected.</p>}
       <div className="h-3 w-64 rounded bg-black/40">
         <div className="h-3 rounded bg-white" style={{ width: `${Math.min(100, level * 400)}%` }} />
       </div>
       {useCamera && (
         <div className={`relative w-64 overflow-hidden rounded-lg bg-black ${status === 'idle' ? 'hidden' : ''}`}>
-          {/* Preview to aim the camera. Only a still every few seconds is sent, for item memory. */}
+          {/* Local aiming view; laptop preview is a separate, explicit demo option. */}
           <video ref={videoRef} playsInline muted className="w-full opacity-60" />
           <canvas ref={canvasRef} width={640} height={480} className="absolute inset-0 h-full w-full" />
           <div className="absolute left-2 top-2 rounded bg-black/60 px-2 text-xs">
-            {poseError ? `camera off: ${poseError}` : !usePose ? '● watching for items' : personSeen ? '● person tracked' : '○ no person'}
+            {poseError ? 'Camera or pose unavailable' : !usePose ? '● camera on' : personSeen ? '● person tracked' : '○ no person'}
           </div>
         </div>
       )}

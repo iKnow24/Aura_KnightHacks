@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { api, useBrain } from '../lib/useBrain'
 import AlertIcon from '../lib/AlertIcon'
 import AskLumen from '../lib/AskLumen'
@@ -40,13 +40,24 @@ export default function Dashboard() {
   const [showQr, setShowQr] = useState(false)
   const [tab, setTab] = useState('live')
   const [scan, setScan] = useState(false)
+  const [previews, setPreviews] = useState({})
   const user = getUser()
   const captions = useCaptions()
   const { state, connected } = useBrain('dashboard', (alert) => {
     setRipples((r) => [...r, alert])
     setTimeout(() => setRipples((r) => r.filter((x) => x.id !== alert.id)), 4000)
-  }, (msg) => msg.type === 'caption' && captions.add(msg))
-  const now = Date.now() / 1000
+  }, (msg) => {
+    if (msg.type === 'caption') captions.add(msg)
+    if (msg.type === 'camera_preview') setPreviews((previous) => {
+      const fresh = Object.fromEntries(Object.entries(previous).filter(([, p]) => Date.now() / 1000 - p.ts < 5))
+      return { ...fresh, [msg.node_id]: msg }
+    })
+  })
+  const [now, setNow] = useState(Date.now() / 1000)
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now() / 1000), 2000)
+    return () => clearInterval(timer)
+  }, [])
 
   const header = (
     <header className="mb-3 flex flex-wrap items-center gap-3">
@@ -95,6 +106,21 @@ export default function Dashboard() {
 
         {showQr && <QrPanel />}
 
+        {Object.values(previews).some((p) => connected && state.nodes[p.node_id] && now - p.ts < 5) && (
+          <section className="glass mb-4 rounded-xl p-4">
+            <h2 className="mb-2 font-semibold">Camera demo previews</h2>
+            <p className="mb-3 text-sm text-zinc-300">Updates once a second. Images are not saved.</p>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {Object.values(previews).filter((p) => connected && state.nodes[p.node_id] && now - p.ts < 5).map((p) => (
+                <figure key={p.node_id}>
+                  <img src={p.jpeg} alt={`${zoneLabel(p.zone)} camera preview`} className="aspect-[4/3] w-full rounded-lg bg-black object-contain" />
+                  <figcaption className="mt-1 text-sm">{zoneLabel(p.zone)} · {p.node_id}</figcaption>
+                </figure>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Floor plan. Skeletons and zone status only: no live video, for privacy. */}
         <div className="glass relative aspect-[4/3] overflow-hidden sm:aspect-[16/10] rounded-xl">
           <button onClick={() => setScan((v) => !v)} aria-pressed={scan}
@@ -109,8 +135,7 @@ export default function Dashboard() {
           ) : <>
           <FloorPlan />
           {Object.entries(ZONES).filter(([, z]) => z.map !== false).map(([id, z]) => {
-            const node = Object.values(state.nodes).find((n) => n.zone === id)
-            const alive = node && now - node.last_seen < 10
+            const alive = Object.values(state.nodes).some((n) => n.zone === id && now - n.last_seen < 10)
             return (
               <div key={id} className="absolute -translate-x-1/2 -translate-y-1/2 text-center" style={{ left: `${z.x}%`, top: `${z.y}%` }}>
                 <div className={`mx-auto mb-2 h-2 w-2 rounded-full ${alive ? 'live-dot bg-emerald-400' : 'border border-zinc-600'}`} />
