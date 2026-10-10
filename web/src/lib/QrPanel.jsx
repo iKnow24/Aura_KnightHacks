@@ -7,7 +7,6 @@ import { ZONES } from './zones'
 const DEVICES = [
   ...Object.entries(ZONES).filter(([, z]) => z.map !== false).map(([id, z]) => [`${z.label} node`, `/node?zone=${id}&id=${id}`]),
   ['Live captions', '/captions'],
-  ['Headset', '/headset'],
   ['Rear guard', '/rear'],
   ['Speaker mic', '/mic'],
   ['Bedside strobe', '/strobe'],

@@ -28,7 +28,7 @@ server/                 FastAPI brain (Python), port 8000
   app/eventlog.py       optional JSONL event export (feeds databricks/)
   tests/                pytest
 web/                    React app (Vite, Tailwind, Framer Motion, three.js), port 5173
-  src/pages/            Login, Home (/devices), Dashboard, Captions, Headset, Node, Strobe, Rear, Mic
+  src/pages/            Login, Home (/devices), Dashboard, Captions, Node, Strobe, Rear, Mic
   src/lib/              shared pieces: useBrain (WebSocket), AlertToast, Logo, WalkScene (3D walker), pose, mic
   vite.config.js        proxies /api and /ws to the brain on :8000
 databricks/             caregiver history pipeline (Bronze/Silver/Gold SQL, fake household data, Genie guide)
