@@ -1,14 +1,13 @@
 import { motion, useReducedMotion } from 'framer-motion'
 import { useId } from 'react'
 
-// The Lumen mark, "Eclipse": a ring of light around a dark disk, with a bright bead where the light
-// breaks through. The room goes quiet; Lumen is the light at the edge of it.
+// The Lumen mark, "Settle": an L whose foot is a sound wave calming into a flat line of text.
+// Noise in, words out. The "eclipse" variant (a ring of light with a bright bead) is the runner-up.
 // `color` paints it one solid color (alerts tint it by severity); otherwise it uses the brand gradient.
-// `live` slowly orbits the bead and breathes the glow, for hero spots and "listening" states.
-// Two alternates from the logo exploration are kept behind `variant` so swapping is one prop.
+// `live` draws the wave in and keeps a soft glow breathing, for hero spots and "listening" states.
 const STOPS = [['0', '#FF8A3D'], ['.5', '#FF4F7B'], ['1', '#8B6CFF']]
 
-export default function Logo({ size = 28, color, live = false, variant = 'eclipse', className = '' }) {
+export default function Logo({ size = 28, color, live = false, variant = 'settle', className = '' }) {
   const id = useId().replace(/:/g, '')
   const still = useReducedMotion()
   const paint = color ?? `url(#g${id})`
@@ -21,8 +20,16 @@ export default function Logo({ size = 28, color, live = false, variant = 'eclips
   if (variant === 'settle') {
     return (
       <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true" className={className}>
-        <defs>{grad}</defs>
-        <path d={SETTLE} stroke={paint} strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
+        <defs>
+          {grad}
+          <filter id={`b${id}`} x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.6" /></filter>
+        </defs>
+        {live && !still && (
+          <motion.path d={SETTLE} stroke={paint} strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" filter={`url(#b${id})`}
+            animate={{ opacity: [0.25, 0.75, 0.25] }} transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }} />
+        )}
+        <motion.path d={SETTLE} stroke={paint} strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round"
+          initial={live && !still ? { pathLength: 0 } : false} animate={{ pathLength: 1 }} transition={{ duration: 1.4, ease: [0.3, 0.7, 0.2, 1] }} />
       </svg>
     )
   }
@@ -55,17 +62,17 @@ export default function Logo({ size = 28, color, live = false, variant = 'eclips
   )
 }
 
-// Logo plus the lowercase wordmark, for headers and the sign-in screen.
+// The wordmark: the Settle mark stands in for the "l", its wave running straight into "umen".
 export function Wordmark({ size = 28, live = false, className = '' }) {
   return (
-    <span className={`inline-flex items-center gap-[0.32em] font-extrabold tracking-[-0.05em] ${className}`} style={{ fontSize: size }}>
-      <Logo size={size * 1.05} live={live} />
-      <span className="leading-none">lumen</span>
+    <span className={`inline-flex items-end font-extrabold tracking-[-0.05em] ${className}`} style={{ fontSize: size }} aria-label="lumen">
+      <Logo size={size * 1.3} live={live} className="-mr-[0.08em] -ml-[0.2em] translate-y-[0.25em]" />
+      <span className="leading-none" aria-hidden="true">umen</span>
     </span>
   )
 }
 
-// "Settle" alternate: the L's foot is a sound wave calming into a flat line of text.
+// Settle geometry: the L's foot is a sound wave calming into a flat line of text.
 const SETTLE = (() => {
   const pts = []
   for (let k = 0; k <= 120; k++) {

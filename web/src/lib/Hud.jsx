@@ -39,7 +39,7 @@ export function Reactor({ size = 200, color = '#ffd2b0' }) {
           <g strokeWidth=".6" opacity=".45" strokeDasharray="1 2.4"><circle cx="50" cy="50" r="37" /></g>
         </Spin>
       </svg>
-      <Logo size={size * 0.52} live />
+      <Logo size={size * 0.52} live className="-translate-x-[3%] translate-y-[5%]" />
     </div>
   )
 }
