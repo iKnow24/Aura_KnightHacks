@@ -19,6 +19,7 @@ import argparse
 import asyncio
 import base64
 import json
+import re
 import sys
 import uuid
 from datetime import datetime, timezone
@@ -119,6 +120,14 @@ class Bridge:
         headers = {}
         if token:
             headers["Authorization"] = f"token {token}"
+        if cookie.lstrip().startswith("curl "):
+            # A request copied from Safari's Web Inspector ("Copy as cURL"): reuse the browser's login.
+            for name, value in re.findall(r"-H '([^:']+): ([^']*)'", cookie):
+                if name.lower() not in HOP | {"content-type", "accept"}:
+                    headers[name] = value
+            b = re.search(r"(?:-b|--cookie) '([^']*)'", cookie)
+            cookie = headers.pop("Cookie", None) or headers.pop("cookie", None) or (b.group(1) if b else "")
+            print("Using the browser login from Safari" if cookie else "No cookie found in what you copied.")
         if cookie:
             headers["Cookie"] = cookie
             xsrf = dict(p.strip().split("=", 1) for p in cookie.split(";") if "=" in p).get("_xsrf")
@@ -229,7 +238,8 @@ async def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("url", help="Jupyter address, e.g. https://jupyter.anruicloud.com/instances/<id>")
     p.add_argument("token", nargs="?", default="", help="Jupyter token from `jupyter server list` on the box")
-    p.add_argument("--cookie", default="", help="browser Cookie header, if the token alone is refused")
+    p.add_argument("--cookie", default="", help='browser login, if the token alone is refused: a Cookie header, or a whole "Copy as cURL" from Safari'
+)
     p.add_argument("--box-port", type=int, default=5173, help="Lumen's web port on the box (default 5173)")
     p.add_argument("--listen", type=int, default=5173, help="port on this Mac (default 5173)")
     a = p.parse_args()
