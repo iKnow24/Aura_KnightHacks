@@ -77,4 +77,4 @@ def look(jpeg: str) -> dict:
         return {"enabled": True, "notes": parse(reply.choices[0].message.content), "model": model}
     except Exception as e:  # a bad key or no network must not take the dashboard down
         log.warning("hazard note failed (%s)", e)
-        return {"enabled": True, "notes": [], "error": "Gemini didn't answer"}
+        return {"enabled": True, "notes": [], "error": "Luma didn't answer"}
