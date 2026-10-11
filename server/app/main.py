@@ -124,6 +124,11 @@ async def _maybe_direction():
         zone = hub.nodes.get(nid, {}).get("zone")
         if zone and len(audio) >= 4000:
             tails[zone] = audio
+    if not tails:
+        return
+    # How loud each device is right now (last half second), so the dashboard can show which one hears it.
+    levels = {zone: round(float(np.sqrt(np.mean(np.square(a[-8000:])))), 4) for zone, a in tails.items()}
+    await hub.broadcast(["dashboard"], {"type": "mic_levels", "levels": levels, "ts": time.time()})
     if len(tails) < 2:
         return
     found = locate(tails)

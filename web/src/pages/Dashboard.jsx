@@ -13,6 +13,7 @@ const Avatar3D = lazy(() => import('../lib/Avatar3D'))
 const SoundField = lazy(() => import('../lib/SoundField'))
 import CornerMark, { usePresenterKeys } from '../lib/CornerMark'
 import QrPanel from '../lib/QrPanel'
+import MicMeters from '../lib/MicMeters'
 import { playDemoSound } from '../lib/demoSounds'
 import { alertText, SEVERITY_COLOR, zoneLabel } from '../lib/zones'
 
@@ -34,6 +35,7 @@ export default function Dashboard() {
   const [previews, setPreviews] = useState({})
   const [vision, setVision] = useState({})
   const [direction, setDirection] = useState(null)
+  const [levels, setLevels] = useState(null)
   const user = getUser()
   const captions = useCaptions()
   usePresenterKeys()
@@ -51,6 +53,7 @@ export default function Dashboard() {
     }
     if (msg.type === 'vision') setVision((v) => ({ ...v, [msg.node_id]: msg }))
     if (msg.type === 'direction') setDirection(msg)
+    if (msg.type === 'mic_levels') setLevels(msg)
     if (msg.type === 'presenter_dir') {
       setCorner(msg.corner)
       clearTimeout(cornerTimer.current)
@@ -149,6 +152,8 @@ export default function Dashboard() {
           </Stage>
         </div>
       </Stage>
+
+      <div className="mt-4"><MicMeters levels={levels} direction={direction} /></div>
 
       {/* Scene JSON from each camera (server/app/detectors/scene.py): labels only, the photos are already gone. */}
       <section className="glass mt-4 rounded-xl p-4">

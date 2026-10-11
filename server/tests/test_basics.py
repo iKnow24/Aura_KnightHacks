@@ -1,3 +1,4 @@
+import asyncio
 import numpy as np
 from fastapi.testclient import TestClient
 
@@ -167,3 +168,24 @@ def test_ask_falls_back_to_another_key(monkeypatch):
     assert [p[0] for p in agent.backup_providers("gemini")] == ["groq"]
     monkeypatch.setenv("LUMEN_LLM", "off")
     assert agent.backup_providers("gemini") == []
+
+
+def test_mic_levels_name_the_loudest_device(monkeypatch):
+    """Twice a second the screens get how loud each device is, so they can show which one hears it."""
+    import numpy as np
+
+    from app import main
+
+    sent = []
+
+    async def fake_broadcast(targets, msg):
+        sent.append((targets, msg))
+
+    monkeypatch.setattr(main.hub, "broadcast", fake_broadcast)
+    monkeypatch.setattr(main, "last_direction", 0)
+    monkeypatch.setattr(main, "audio_buffers", {"mac": np.full(8000, 0.3, np.float32), "head": np.full(8000, 0.01, np.float32)})
+    monkeypatch.setattr(main.hub, "nodes", {"mac": {"zone": "living"}, "head": {"zone": "wearer"}})
+    asyncio.run(main._maybe_direction())
+    levels = next(m for t, m in sent if m["type"] == "mic_levels")
+    assert "dashboard" in next(t for t, m in sent if m["type"] == "mic_levels")
+    assert levels["levels"]["living"] > levels["levels"]["wearer"]
