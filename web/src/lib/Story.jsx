@@ -2,9 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import AlertIcon from './AlertIcon'
 import { alertText, zoneLabel } from './zones'
 
-// Under the live control center: a calendar of what this household went through, and a
-// simple map of Orlando. Home is always there. Dr. Patel's office appears only when the
-// history log actually has that call.
+// Under the live control center: a calendar of what this household went through, with the
+// chosen day's alerts and moments beside it.
 
 const WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const TZ = 'America/New_York'
@@ -15,14 +14,12 @@ export default function Story() {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [day, setDay] = useState(null)
-  const [pin, setPin] = useState('home')
 
   useEffect(() => {
     fetch('/api/history').then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status)))).then((d) => {
       setData(d)
       const days = d.days || []
       setDay(days.at(-1)?.day ?? d.moments?.at(-1)?.day ?? null)
-      if ((d.places || []).some((p) => p.id === 'clinic')) setPin('clinic')
     }).catch((e) => setError(`Couldn't load the calendar (${e.message}). Is the brain running?`))
   }, [])
 
@@ -34,17 +31,16 @@ export default function Story() {
       <header>
         <h2 className="text-lg font-semibold">What this household has been through</h2>
         <p className="mt-1 max-w-3xl text-sm text-zinc-400">
-          Scroll the calendar for each day. The map is Orlando. The clinic pin is only there when the log has a call from the doctor’s office.
+          Pick a day to see what happened. The bar under each date is how busy it was.
           {data.source === 'sample' && ' These two weeks are the made-up Maria household, with a slowdown planted on purpose.'}
           {data.source === 'databricks' && ' These rows are live from Databricks.'}
           {data.source === 'event_log' && ' These rows are this home’s own event log.'}
         </p>
       </header>
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <Calendar data={data} day={day} onDay={setDay} />
-        <CityMap places={data.places || []} pin={pin} onPin={setPin} day={day} moments={data.moments || []} />
+        <DayList day={day} moments={data.moments || []} />
       </div>
-      <DayList day={day} moments={data.moments || []} />
       {data.note && <p className="text-xs text-zinc-500">{data.note}</p>}
     </section>
   )
@@ -55,27 +51,42 @@ function Calendar({ data, day, onDay }) {
   if (months.length === 0) {
     return <div className="glass rounded-xl p-6 text-sm text-zinc-400">No days logged yet. Alerts land here as they happen.</div>
   }
+  const most = Math.max(1, ...months.flatMap((m) => m.cells.map((c) => c?.alerts || 0)))
   return (
-    <div className="space-y-4">
-      {months.map((month) => (
-        <div key={month.key} className="glass rounded-xl p-4">
-          <h3 className="mb-3 font-semibold">{month.label}</h3>
-          <div className="grid grid-cols-7 gap-1 text-center text-[10px] uppercase tracking-widest text-zinc-500">
-            {WEEK.map((w) => <div key={w}>{w}</div>)}
+    <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgb(255_255_255/0.08),0_30px_80px_-40px_rgb(0_0_0/0.9)] backdrop-blur-2xl sm:p-6">
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+      <div className="space-y-7">
+        {months.map((month) => (
+          <div key={month.key}>
+            <h3 className="mb-4 text-[15px] font-medium tracking-tight text-white">{month.label}</h3>
+            <div className="grid grid-cols-7 gap-1.5 text-center text-[10px] font-medium uppercase tracking-[0.18em] text-zinc-500">
+              {WEEK.map((w) => <div key={w}>{w}</div>)}
+            </div>
+            <div className="mt-2 grid grid-cols-7 gap-1.5">
+              {month.cells.map((cell, i) => {
+                if (!cell) return <div key={`pad-${month.key}-${i}`} />
+                const on = day === cell.day
+                return (
+                  <button key={cell.day} type="button" onClick={() => onDay(cell.day)} aria-pressed={on}
+                    className={`group relative flex aspect-square flex-col justify-between rounded-2xl border p-2 text-left transition duration-300 sm:aspect-[5/4] sm:p-2.5 ${on
+                      ? 'border-white/70 bg-white text-black shadow-[0_10px_40px_-10px_rgb(255_255_255/0.45)]'
+                      : 'border-white/[0.07] bg-white/[0.04] text-white hover:border-white/20 hover:bg-white/[0.08]'}`}>
+                    <span className="text-sm font-medium tabular-nums sm:text-base">{cell.date.getDate()}</span>
+                    <span className="block">
+                      <span className={`hidden text-[10px] sm:block ${on ? 'text-zinc-600' : 'text-zinc-500'}`}>
+                        {cell.alerts ? `${cell.alerts} alert${cell.alerts === 1 ? '' : 's'}` : cell.clinic ? 'Clinic' : ''}
+                      </span>
+                      <span className={`mt-1 block h-[3px] rounded-full ${on ? 'bg-black/10' : 'bg-white/[0.06]'}`}>
+                        <span className={`block h-full rounded-full ${on ? 'bg-black/70' : 'bg-white/50'}`} style={{ width: `${Math.round((cell.alerts / most) * 100)}%` }} />
+                      </span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
-          <div className="mt-1 grid grid-cols-7 gap-1">
-            {month.cells.map((cell, i) => cell ? (
-              <button key={cell.day} type="button" onClick={() => onDay(cell.day)} aria-pressed={day === cell.day}
-                className={`min-h-14 rounded-lg px-1 py-1.5 text-left ${day === cell.day ? 'bg-zinc-100 text-ink' : 'bg-white/5 hover:bg-white/10'}`}>
-                <div className="text-sm font-medium">{cell.date.getDate()}</div>
-                <div className={`text-[10px] ${day === cell.day ? 'text-zinc-600' : 'text-zinc-400'}`}>
-                  {cell.alerts ? `${cell.alerts} alert${cell.alerts === 1 ? '' : 's'}` : cell.clinic ? 'Clinic' : ''}
-                </div>
-              </button>
-            ) : <div key={`pad-${month.key}-${i}`} />)}
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   )
 }
@@ -104,48 +115,15 @@ function buildMonths(days, moments) {
   })
 }
 
-function CityMap({ places, pin, onPin, day, moments }) {
-  const active = places.find((p) => p.id === pin) || places[0]
-  const clinicToday = moments.some((m) => m.clinic && m.day === day)
-  return (
-    <div className="glass flex flex-col rounded-xl p-4">
-      <h3 className="font-semibold">Orlando</h3>
-      <p className="mb-3 text-xs text-zinc-500">A sketch of the city, not a street map. Pins come from the history log.</p>
-      <div className="relative min-h-64 flex-1 overflow-hidden rounded-xl bg-black">
-        <svg viewBox="0 0 100 80" className="absolute inset-0 h-full w-full" aria-hidden="true">
-          <path d="M8 50 C 20 38, 30 62, 48 48 S 70 30, 92 44" fill="none" stroke="rgb(255 255 255 / 0.18)" strokeWidth="1.2" />
-          <path d="M18 18 C 30 28, 40 16, 55 24 S 78 40, 88 22" fill="none" stroke="rgb(255 255 255 / 0.1)" strokeWidth="0.8" />
-          <ellipse cx="58" cy="58" rx="10" ry="4" fill="rgb(255 255 255 / 0.06)" />
-          <text x="58" y="59" textAnchor="middle" fill="rgb(255 255 255 / 0.35)" fontSize="3">Lake</text>
-          <text x="50" y="10" textAnchor="middle" fill="#f4f4f5" fontSize="4.5" fontWeight="600">Orlando</text>
-        </svg>
-        {places.map((p) => (
-          <button key={p.id} type="button" onClick={() => onPin(p.id)} aria-pressed={pin === p.id}
-            className="absolute -translate-x-1/2 -translate-y-full text-center" style={{ left: `${p.x}%`, top: `${p.y}%` }}>
-            <span className={`mx-auto block h-3 w-3 rounded-full border-2 border-white ${pin === p.id || (p.id === 'clinic' && clinicToday) ? 'bg-white' : 'bg-zinc-600'}`} />
-            <span className="mt-1 block max-w-28 text-xs font-medium leading-tight">{p.name}</span>
-          </button>
-        ))}
-      </div>
-      {active && (
-        <p className="mt-3 text-sm text-zinc-300">
-          <span className="font-medium text-white">{active.name}</span>
-          {' · '}{active.detail}
-        </p>
-      )}
-    </div>
-  )
-}
-
 function DayList({ day, moments }) {
   const rows = moments.filter((m) => m.day === day)
   return (
-    <div className="glass rounded-xl p-4">
-      <h3 className="font-semibold">{day ? new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) : 'Pick a day'}</h3>
+    <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgb(255_255_255/0.08)] backdrop-blur-2xl lg:sticky lg:top-6">
+      <h3 className="text-[15px] font-medium tracking-tight">{day ? new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) : 'Pick a day'}</h3>
       <ul className="mt-3 max-h-[28rem] space-y-2 overflow-y-auto">
         {rows.length === 0 && <li className="text-sm text-zinc-500">Nothing logged this day.</li>}
         {rows.map((m, i) => (
-          <li key={`${m.time}-${m.kind}-${i}`} className="flex gap-3 rounded-lg bg-white/5 p-3 text-sm">
+          <li key={`${m.time}-${m.kind}-${i}`} className="flex gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.04] p-3 text-sm">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/10 text-lg">
               {m.kind === 'alert' ? <AlertIcon kind={m.title} /> : <span className="text-xs font-semibold" aria-hidden="true">Dr</span>}
             </span>
