@@ -6,9 +6,9 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { openCamera } from './cameras'
-import { makeRig, poseRig, resetRig, withIdle } from './avatarRig'
+import { isWalking, makeRig, poseRig, resetRig, withIdle } from './avatarRig'
 import { dressAsWearer } from './outfit'
-import { detectPoseWorld, loadPose } from './pose'
+import { detectPeople, loadPose } from './pose'
 
 // Bottom-left of the control center: the person in the headset, as a 3D figure that copies their
 // pose. The laptop webcam faces them; MediaPipe finds 33 body points on this laptop and the figure's
@@ -42,7 +42,7 @@ function Stage({ ready, onSettled }) {
     c.enablePan = false
     c.enableDamping = false
     c.dampingFactor = 0.08
-    c.minDistance = 1.8
+    c.minDistance = 2.3
     c.maxDistance = 5.4
     c.minPolarAngle = 0.35
     c.maxPolarAngle = Math.PI / 2 + 0.08
@@ -96,7 +96,56 @@ async function loadFigure() {
   throw new Error('No 3D figure found')
 }
 
-function Figure({ poseRef, onReady }) {
+const LIMB = [
+  [11, 13], [13, 15], [12, 14], [14, 16], [11, 12], [11, 23], [12, 24],
+  [23, 24], [23, 25], [25, 27], [24, 26], [26, 28], [0, 11], [0, 12],
+]
+const up = new THREE.Vector3(0, 1, 0)
+const black = new THREE.MeshStandardMaterial({ color: '#0a0a0c', roughness: 1, side: THREE.DoubleSide })
+
+function mpPoint(p) {
+  return new THREE.Vector3(p[0], -p[1] + 0.95, -p[2])
+}
+
+// Other people in the same camera, drawn as solid black figures. No face, no color.
+function Bystanders({ peopleRef }) {
+  const limbs = useRef([])
+  useFrame(() => {
+    const people = (peopleRef.current || []).slice(1, 3)
+    limbs.current.forEach((mesh, i) => {
+      if (!mesh) return
+      const person = people[Math.floor(i / LIMB.length)]
+      const pair = LIMB[i % LIMB.length]
+      if (!person || person.world[pair[0]][3] < 0.4 || person.world[pair[1]][3] < 0.4) {
+        mesh.visible = false
+        return
+      }
+      const a = mpPoint(person.world[pair[0]])
+      const b = mpPoint(person.world[pair[1]])
+      const side = (person.x - 0.5) * 1.7
+      a.x += side
+      b.x += side
+      const mid = a.clone().add(b).multiplyScalar(0.5)
+      const dir = b.clone().sub(a)
+      const len = Math.max(0.04, dir.length())
+      mesh.visible = true
+      mesh.position.copy(mid)
+      mesh.quaternion.setFromUnitVectors(up, dir.normalize())
+      mesh.scale.set(1, len, 1)
+    })
+  })
+  return (
+    <group>
+      {Array.from({ length: LIMB.length * 2 }, (_, i) => (
+        <mesh key={i} ref={(el) => { limbs.current[i] = el }} material={black} visible={false}>
+          <cylinderGeometry args={[0.035, 0.035, 1, 6]} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+function Figure({ poseRef, onReady, onGait }) {
   const [fig, setFig] = useState(null)
   useEffect(() => {
     let live = true
@@ -107,9 +156,11 @@ function Figure({ poseRef, onReady }) {
       scene.traverse((o) => {
         if (!o.isMesh) return
         o.frustumCulled = false
-        // Blender exports: hair, brows and lashes as cut-outs, everything else solid, so layers never flicker.
+        // Draw both sides of every surface so the back of the shirt and hair stay solid as you orbit.
         for (const m of [o.material].flat()) {
-          if (!custom || !m) continue
+          if (!m) continue
+          m.side = THREE.DoubleSide
+          if (!custom) continue
           if (/hair|afro|eyebrow|eyelash/i.test(m.name)) Object.assign(m, { alphaTest: 0.45, transparent: false, depthWrite: true })
           else if (!/high-poly|cornea/i.test(m.name)) m.transparent = false
         }
@@ -127,13 +178,17 @@ function Figure({ poseRef, onReady }) {
     return () => { live = false }
   }, [])
 
+  const gait = useRef({})
+  const wasWalking = useRef(false)
   useFrame(({ clock }, dt) => {
     if (!fig) return
     dt = Math.min(dt, 0.1)
+    const walking = isWalking(poseRef.current, gait.current, dt)
+    if (walking !== wasWalking.current) { wasWalking.current = walking; onGait(walking) }
     resetRig(fig.rig)
     fig.mixer.update(dt)
-    // No idle clip in the file (the Blender avatar): stand relaxed and breathe, with the webcam on top.
-    const lm = fig.hasIdle ? poseRef.current : withIdle(poseRef.current, clock.elapsedTime)
+    // A walk cycle fills in the legs the camera cannot see. Tracked points still win, so a real step shows.
+    const lm = (poseRef.current || walking || !fig.hasIdle) ? withIdle(poseRef.current, clock.elapsedTime, walking) : null
     poseRig(fig.rig, fig.scene, lm, dt)
   })
   return fig ? <primitive object={fig.scene} /> : null
@@ -147,6 +202,7 @@ export default function Avatar3D({ cams }) {
   const [figureReady, setFigureReady] = useState(false)
   const video = useRef()
   const poseRef = useRef(null)
+  const peopleRef = useRef([])
   const cam = cams.find((c) => c.id === deviceId) ?? cams[0]
 
   useEffect(() => {
@@ -165,7 +221,9 @@ export default function Avatar3D({ cams }) {
         setStatus('Looking for the person…')
         let seen = null
         timer = setInterval(() => {
-          const lm = detectPoseWorld(video.current, performance.now())
+          const people = detectPeople(video.current, performance.now())
+          peopleRef.current = people
+          const lm = people[0]?.world ?? null
           poseRef.current = lm
           if (!!lm !== seen) { seen = !!lm; setStatus(lm ? 'Tracking' : 'Looking for the person…') }
         }, 1000 / POSE_FPS)
@@ -173,7 +231,7 @@ export default function Avatar3D({ cams }) {
         if (live) setStatus(e.name === 'NotAllowedError' ? 'Camera blocked: allow it in the browser.' : `Camera: ${e.message || e}`)
       }
     })()
-    return () => { live = false; clearInterval(timer); poseRef.current = null }
+    return () => { live = false; clearInterval(timer); poseRef.current = null; peopleRef.current = [] }
   }, [on, cam?.id])
 
   const pick = (id) => {
@@ -187,7 +245,8 @@ export default function Avatar3D({ cams }) {
         <Stage ready={figureReady} onSettled={() => setHint('Drag to turn')} />
         <hemisphereLight args={['#ffffff', '#222226', 1.4]} />
         <directionalLight position={[2, 4, 3]} intensity={1.6} />
-        <Figure poseRef={poseRef} onReady={() => setFigureReady(true)} />
+        <Figure poseRef={poseRef} onReady={() => setFigureReady(true)} onGait={(walking) => setStatus(walking ? 'Walking' : 'Tracking')} />
+        <Bystanders peopleRef={peopleRef} />
         <mesh rotation-x={-Math.PI / 2}><circleGeometry args={[0.9, 48]} /><meshBasicMaterial color="#18181b" /></mesh>
       </Canvas>
       {/* Small self-view so the person can see they're in frame. */}
