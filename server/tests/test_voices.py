@@ -80,13 +80,21 @@ def test_caption_carries_the_voice(monkeypatch):
     said = iter(["Hi, my name is Sharan and this is Lumen", "So the strobe flashes at night"])
     monkeypatch.setattr(main.transcriber, "transcribe", lambda audio: next(said))
     client = TestClient(main.app)
+
+    async def say():
+        """The words go out first, then naming the voice finishes in its own task."""
+        await main.run_speech("living", np.full(32000, 0.1, np.float32))
+        await asyncio.gather(*[t for t in asyncio.all_tasks() if t is not asyncio.current_task()])
+
     with client.websocket_connect("/ws/hud") as hud:
         hud.receive_json()
-        asyncio.run(main.run_speech("living", np.full(32000, 0.1, np.float32)))
-        first = hud.receive_json()
-        asyncio.run(main.run_speech("living", np.full(32000, 0.1, np.float32)))
+        asyncio.run(say())
+        words, first = hud.receive_json(), hud.receive_json()
+        asyncio.run(say())
+        hud.receive_json()
         second = hud.receive_json()
-    assert first["voice"] == "Sharan" and first["enrolled"]
+    assert words["type"] == "caption" and "voice" not in words  # the line doesn't wait for the name
+    assert first["type"] == "caption_voice" and first["voice"] == "Sharan" and first["enrolled"]
     assert second["voice"] == "Sharan" and second["voice_known"]
     assert main.memory.entries[-1]["voice"] == "Sharan"
     assert client.get("/api/voices").json()["people"] == [{"name": "Sharan", "lines": 2}]

@@ -74,3 +74,16 @@ def test_sync_endpoint_returns_only_new_full_lines(tmp_path, monkeypatch):
     assert first.count(b"\n") == 2 and first.endswith(b"\n")
     assert client.get(f"/api/eventlog/{name}?offset={len(first)}", headers=key).content == b""
     assert client.get("/api/eventlog/..%2Fsecrets.jsonl", headers=key).status_code == 404
+
+
+def test_voice_name_reaches_the_log_as_its_own_line(tmp_path, monkeypatch):
+    """Ask Lumen reads the log, so the late voice name has to land there too, not only on screen."""
+    monkeypatch.setenv("EVENT_LOG_DIR", str(tmp_path))
+    from app.memory import Memory
+
+    memory = Memory()
+    entry = memory.add_speech("living", "dinner is ready")
+    assert memory.set_voice(entry["ts"], "Sharan")["voice"] == "Sharan"
+    lines = [json.loads(l) for f in sorted(tmp_path.iterdir()) for l in f.read_text().splitlines()]
+    assert [l["type"] for l in lines] == ["speech", "caption_voice"]
+    assert lines[1]["voice"] == "Sharan" and lines[1]["ts"] == entry["ts"]

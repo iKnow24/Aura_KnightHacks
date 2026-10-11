@@ -61,9 +61,18 @@ Change the contract only with all three people agreeing, and change it in one co
 Two more message types go out on the same sockets. They are not alerts, so screens can ignore them:
 
 ```json
-{"type": "caption", "zone": "kitchen", "text": "Dinner's ready!", "ts": 1728540000.1}   // dashboard + hud
+{"type": "caption", "zone": "kitchen", "text": "Dinner's ready!", "ts": 1728540000.1,
+ "start_ts": 1728539998.4, "end_ts": 1728540000.0}                                     // dashboard + hud
+{"type": "caption_voice", "id": "<caption id>", "ts": <caption ts>, "voice": "Sharan", "voice_known": true}
 {"type": "sighting", "item": "keys", "zone": "living", "ts": 1728540000.1}             // dashboard
 ```
+
+`start_ts`/`end_ts` are when the words were *said* (brain clock), not when the caption was sent. A caption
+screen lines that up with its own clock (`web/src/lib/clock.js`) and gives the line to the face whose mouth
+moved during exactly that stretch. `caption_partial` carries the same two fields.
+
+Naming the voice is a second model pass, so the words go out first and `caption_voice` patches the line
+already on screen (matched by `id`, or by `ts` in the transcript). It is also written to the event log.
 
 The headset streams its own mic as node zone `"wearer"` (speech only, no alarm detectors). When a caption
 for it arrives, the headset works out who said it from lip movement and sends back

@@ -16,6 +16,7 @@ import logging
 import os
 import re
 import threading
+import time
 import wave
 
 import numpy as np
@@ -42,11 +43,18 @@ class Segmenter:
         self.voiced = 0  # samples above threshold in this segment
         self.silence = 0  # trailing quiet samples
         self.done = 0  # counts finished utterances, so a slow partial can tell it's out of date
+        self.start: float | None = None  # clock time this utterance started
+        self.span: tuple[float, float] | None = None  # (start, end) of the utterance just returned
 
-    def feed(self, chunk: np.ndarray) -> np.ndarray | None:
+    def feed(self, chunk: np.ndarray, ts: float | None = None) -> np.ndarray | None:
+        """`ts` is the clock time this chunk arrived (defaults to now); it times the utterance."""
+        ts = time.time() if ts is None else ts
         loud = float(np.sqrt(np.mean(chunk ** 2))) > self.threshold if len(chunk) else False
         if not self.buf and not loud:
             return None
+        if not self.buf:
+            # The chunk we're adding was recorded just before it arrived.
+            self.start = ts - len(chunk) / SAMPLE_RATE
         self.buf.append(chunk)
         if loud:
             self.voiced += len(chunk)
@@ -56,7 +64,9 @@ class Segmenter:
         total = sum(len(c) for c in self.buf)
         if self.silence >= END_SILENCE_S * SAMPLE_RATE or total >= MAX_SEGMENT_S * SAMPLE_RATE:
             audio, voiced = np.concatenate(self.buf), self.voiced
-            self.buf, self.voiced, self.silence = [], 0, 0
+            # The trailing quiet isn't speech, so the words ended before it.
+            self.span = (self.start if self.start is not None else ts, ts - self.silence / SAMPLE_RATE)
+            self.buf, self.voiced, self.silence, self.start = [], 0, 0, None
             self.done += 1
             if voiced >= MIN_SPEECH_S * SAMPLE_RATE:
                 return audio

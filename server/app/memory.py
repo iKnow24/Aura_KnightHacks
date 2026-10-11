@@ -106,6 +106,16 @@ class Memory:
                 return e
         return None
 
+    def set_voice(self, ts: float, voice: str) -> dict | None:
+        """The voiceprint match came in just after the line did ("Sharan", or "Person 4")."""
+        for e in reversed(self.entries):
+            if e["type"] == "speech" and abs(e["ts"] - ts) < 0.001:
+                e["voice"] = voice
+                record({"type": "caption_voice", "ts": ts, "voice": voice})
+                self.save()
+                return e
+        return None
+
     def speech(self, zone: str | None = None, since: float = 0, limit: int = 20) -> list[dict]:
         hits = [e for e in self.entries if e["type"] == "speech" and e["ts"] >= since
                 and (zone is None or e["zone"] == zone)]
