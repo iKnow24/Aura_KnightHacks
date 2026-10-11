@@ -430,6 +430,21 @@ async def hazard_note(body: Look):
     return result
 
 
+@app.post("/api/describe")
+async def describe_person(body: Look):
+    """Opt-in one-line "Luma sees" caption for the dashboard body map, written by Gemini. Never an alert,
+    never who someone is. The photo is answered and dropped; nothing is stored."""
+    if not body.jpeg.startswith("data:image/jpeg;base64,") or len(body.jpeg) > 400_000:
+        raise HTTPException(400, "send a small JPEG data URL")
+    if "describe" in items_busy:
+        return {"enabled": True, "text": "", "wait": True}
+    items_busy.add("describe")
+    try:
+        return await asyncio.to_thread(hazard.describe, body.jpeg)
+    finally:
+        items_busy.discard("describe")
+
+
 @app.post("/api/scene-boxes")
 async def scene_boxes(body: SceneBoxes):
     """The laptop camera measured its own boxes because the big vision model is off on this machine."""

@@ -78,3 +78,54 @@ def look(jpeg: str) -> dict:
     except Exception as e:  # a bad key or no network must not take the dashboard down
         log.warning("hazard note failed (%s)", e)
         return {"enabled": True, "notes": [], "error": "Luma didn't answer"}
+
+
+# ---- Body map caption --------------------------------------------------------------------------
+# One short line about what the person in view is doing ("standing, holding a can, facing the
+# camera"), shown under the dashboard's body-map overlay. Same opt-in and privacy rules as above:
+# nothing is sent until someone turns the body map on, and the photo is dropped after the answer.
+# CLAUDE.md: no face recognition, so the prompt forbids names, identity, age, race and gender.
+
+DESCRIBE_GAP_S = 6
+DESCRIBE_PROMPT = (
+    "This is one still from a home camera. In one short sentence (under 14 words), say what the main person "
+    "is doing: posture, what they hold, where they face. Do not guess who they are, their name, age, race or "
+    'gender. If nobody is visible, say so. Reply with JSON only: {"text": "..."}'
+)
+_last_describe = 0.0
+
+
+def describe(jpeg: str) -> dict:
+    """{"enabled": bool, "text": str, "wait": bool}. Blocking: run it in a thread."""
+    global _last_describe
+    provider = pick_provider()
+    if not provider or provider[0] != "gemini":
+        return {"enabled": False, "text": ""}
+    if time.time() - _last_describe < DESCRIBE_GAP_S:
+        return {"enabled": True, "text": "", "wait": True}
+    _last_describe = time.time()
+    try:
+        from openai import OpenAI
+    except ImportError:
+        return {"enabled": False, "text": "", "error": "the openai package isn't installed on the brain"}
+    _, url, key, model = provider
+    try:
+        reply = OpenAI(base_url=url, api_key=key, timeout=20, max_retries=0).chat.completions.create(
+            model=model, max_tokens=120,
+            messages=[{"role": "user", "content": [
+                {"type": "text", "text": DESCRIBE_PROMPT},
+                {"type": "image_url", "image_url": {"url": jpeg}},
+            ]}])
+        return {"enabled": True, "text": parse_line(reply.choices[0].message.content), "model": model}
+    except Exception as e:
+        log.warning("body map caption failed (%s)", e)
+        return {"enabled": True, "text": "", "error": "Luma didn't answer"}
+
+
+def parse_line(text: str) -> str:
+    match = re.search(r"\{.*\}", text or "", re.S)
+    try:
+        line = json.loads(match.group(0)).get("text", "") if match else ""
+    except (ValueError, AttributeError):
+        return ""
+    return str(line).strip()[:120]
