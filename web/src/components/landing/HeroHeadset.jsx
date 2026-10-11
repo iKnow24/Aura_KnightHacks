@@ -57,15 +57,17 @@ function headGeometry() {
   for (let i = 0; i < p.count; i++) {
     v.fromBufferAttribute(p, i)
     const { x, y, z } = v
-    let sx = 0.8, sy = 0.98, sz = 0.95
-    if (y < 0) { sx *= 1 - 0.3 * y * y; sz *= 1 - (z < 0 ? 0.25 : 0.1) * y * y }
+    let sx = 0.78, sy = 0.98, sz = 0.95
+    // A sharper, narrower jaw than a plain sphere gives (less "balloon", more chin).
+    if (y < 0) { sx *= 1 - 0.34 * y * y; sz *= 1 - (z < 0 ? 0.25 : 0.1) * y * y }
     if (z < 0 && y > -0.3) sz *= 1.07
+    sy *= 1 - 0.05 * smooth(0.3, 0.92, y) // flatten the crown a touch, less of a ball on top
     let X = x * sx, Y = y * sy, Z = z * sz
     const front = Math.max(0, z)
     const noseW = 0.07 + 0.05 * smooth(-0.05, -0.32, y)
     Z += 0.15 * front * Math.exp(-((x / noseW) ** 2)) * Math.exp(-(((y + 0.2) / 0.17) ** 2)) * (0.45 + 0.55 * smooth(0.05, -0.3, y))
     Z += 0.035 * front * Math.exp(-((x / 0.17) ** 2)) * Math.exp(-(((y + 0.53) / 0.06) ** 2)) // lips
-    Z += 0.05 * front * Math.exp(-((x / 0.2) ** 2)) * Math.exp(-(((y + 0.78) / 0.1) ** 2)) // chin
+    Z += 0.04 * front * Math.exp(-((x / 0.2) ** 2)) * Math.exp(-(((y + 0.78) / 0.1) ** 2)) // chin point
     p.setXYZ(i, X, Y, Z)
   }
   g.deleteAttribute('normal')
@@ -73,6 +75,30 @@ function headGeometry() {
   const m = mergeVertices(g)
   m.computeVertexNormals()
   return m
+}
+// A short curly cap: a thinned sphere that sits just outside the skull, from the crown down to
+// just above the ears, with a per-vertex wobble so it reads as curls rather than a smooth helmet.
+function hairGeometry() {
+  const g = new THREE.SphereGeometry(1.03, 64, 48, 0, Math.PI * 2, 0, Math.PI * 0.56)
+  const p = g.attributes.position
+  const v = new THREE.Vector3()
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i)
+    const sx = 0.78, sy = 0.98, sz = 0.95
+    const curl = 1 + 0.009 * (Math.sin(v.x * 34 + v.y * 15) + Math.sin(v.y * 26 - v.z * 19) + Math.sin(v.z * 30 + v.x * 11))
+    p.setXYZ(i, v.x * sx * curl, v.y * sy * curl + 0.01, v.z * sz * curl)
+  }
+  g.computeVertexNormals()
+  return g
+}
+
+// A thin mustache, sitting between the nose and the upper lip.
+function mustacheGeometry() {
+  const g = new THREE.SphereGeometry(1, 28, 10, 0, Math.PI, 0, Math.PI * 0.4)
+  g.scale(0.185, 0.034, 0.05)
+  g.translate(0, -0.455, 1.03)
+  g.computeVertexNormals()
+  return g
 }
 
 // A rounded box bent around the vertical axis, so it wraps the face like a visor. Built from a finely
@@ -160,20 +186,24 @@ function Scene({ onBeat, overlay, narrow }) {
   const pointer = useRef({ x: 0, y: 0 })
 
   const parts = useMemo(() => {
-    const skin = new THREE.MeshPhysicalMaterial({ color: '#2b2b30', roughness: 0.45, clearcoat: 0.35, clearcoatRoughness: 0.5 })
+    const skin = new THREE.MeshPhysicalMaterial({ color: '#c99068', roughness: 0.55, clearcoat: 0.18, clearcoatRoughness: 0.5 })
+    const hair = new THREE.MeshPhysicalMaterial({ color: '#19130f', roughness: 0.85, clearcoat: 0.06 })
     const alu = new THREE.MeshPhysicalMaterial({ color: '#e6e6ea', metalness: 0.15, roughness: 0.28, clearcoat: 0.6, envMapIntensity: 1.4 })
     const glass = new THREE.MeshPhysicalMaterial({ color: '#0d0d11', metalness: 0.3, roughness: 0.06, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 3 })
     const sheen = addOnto(new THREE.MeshBasicMaterial({ map: sheenTexture(), toneMapped: false, opacity: 0.5 }))
     const fabric = new THREE.MeshStandardMaterial({ color: '#18181b', roughness: 1 })
     const strip = addOnto(new THREE.MeshBasicMaterial({ map: gradientTexture(), toneMapped: false, opacity: 0.4 }))
-    return { skin, alu, glass, fabric, strip, sheen }
+    return { skin, alu, glass, fabric, strip, sheen, hair }
   }, [])
 
   const geo = useMemo(() => {
     const band = new THREE.TorusGeometry(1, 0.06, 18, 120, Math.PI) // around the back only
     const ear = new THREE.SphereGeometry(1, 32, 24)
+    const hairCap = hairGeometry()
+    const mustache = mustacheGeometry()
     return {
       head: headGeometry(),
+      hairCap, mustache,
       neck: new THREE.CylinderGeometry(0.4, 0.5, 1.3, 64, 1, true),
       frame: bentBox(1.52, 0.5, 0.2, 0.09, 0.72),
       glass: bentBox(1.38, 0.38, 0.06, 0.03, 0.72, 0.1),
@@ -326,6 +356,8 @@ function Scene({ onBeat, overlay, narrow }) {
       <directionalLight position={[0, -3, 2]} intensity={0.6} color="#FF4F7B" />
       <group ref={head} position={[narrow ? 0.2 : -0.5, 0, 0]} rotation={[0, 0.62, 0]}>
         <mesh geometry={geo.head} material={parts.skin} />
+        <mesh geometry={geo.hairCap} material={parts.hair} />
+        <mesh geometry={geo.mustache} material={parts.hair} />
         <mesh geometry={geo.neck} material={parts.skin} position={[0, -1.12, -0.12]} rotation={[0.16, 0, 0]} />
         {[-1, 1].map((s) => (
           <mesh key={s} geometry={geo.ear} material={parts.skin} position={[s * 0.79, -0.06, -0.06]} scale={[0.07, 0.2, 0.13]} />
