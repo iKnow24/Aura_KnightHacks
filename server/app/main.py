@@ -132,7 +132,7 @@ async def run_partial(node_id: str, seg: Segmenter, zone: str, audio: np.ndarray
     finally:
         partial_busy.discard(node_id)
     if text and seg.done == done:  # skip it if the sentence already finished while Whisper ran
-        await hub.broadcast(["hud"], {"type": "caption_partial", "zone": zone, "text": text, "ts": time.time()})
+        await hub.broadcast(["hud", "dashboard"], {"type": "caption_partial", "zone": zone, "text": text, "ts": time.time()})
 
 
 async def run_speech(zone: str, audio: np.ndarray):
