@@ -4,13 +4,13 @@
 Lumen brain on the AMD box  --writes-->  ~/lumen_events/2026-10-10_19.jsonl (one file per hour)
       |  the box's proxy blocks databricks.com, so your Mac carries the files:
       v
-scripts/databricks_sync.py on your Mac  --every 30 s, only new lines-->  /Volumes/lumen/home/raw_events/
+scripts/databricks_sync.py on your Mac  --every 5 s, only new lines-->  /Volumes/lumen/home/raw_events/
       v  starts the pipeline job
 Bronze -> Silver (test-button alerts dropped) -> Gold  -->  dashboard + Genie
 ```
 
 Live alerts still come from the brain in under a second. Databricks is a couple of minutes behind
-(30 s sync + pipeline start-up). That's fine: it's the history, not the alarm.
+when each upload has to start the pipeline job. "Close to real time" below gets it to seconds.
 
 ## What real data can and can't say tonight
 
@@ -68,6 +68,27 @@ This is a real home using Lumen, household = 'home'. The wearer is hard of heari
 
 Questions that work on a few hours of real data: *"What alerts happened in the last hour?"*,
 *"Which alert took longest to notice?"*, *"Did she miss anything today?"*
+
+## Close to real time
+
+Where the time goes: waiting for the next sync round (now 5 s), then starting the pipeline job and
+running Bronze → Silver → Gold (the slow part, a minute or two), then Genie's query (5–20 s).
+
+**A. Keep the pipeline running.** Open the pipeline → **Settings** → **Pipeline mode: Continuous** →
+Save → **Start**. New files flow through in seconds and there is no job to start, so run the sync with
+`python3 scripts/databricks_sync.py --continuous`. It keeps compute on, so start it shortly before the
+demo and stop it after. If Free Edition doesn't offer Continuous, skip to B.
+
+**B. Read the newest alerts straight from the files.** In the SQL editor, run `live_now.sql`. It makes
+the view `lumen.home.live_alerts_now`, which reads the uploaded files directly: an alert is there about
+5 seconds after it happens, pipeline or not. Add that view to the Genie space and add this line to
+its Instructions:
+
+```
+For the last hour or "just now", use live_alerts_now (status: seen, waiting, missed). For anything older, use the gold tables.
+```
+
+Roughly: about 2 minutes behind today, 15–40 s with A, 5–25 s with B.
 
 ## The 60-second demo
 
