@@ -48,6 +48,14 @@ export function useCameraWall({ nodes, previews, now, connected, cams, camError,
   const [open, setOpen] = useState(false)
   const latest = useRef(slots)
   latest.current = slots
+  const wearerId = sources.find((s) => s.zone === 'wearer')?.id
+  const held = useRef(null)
+  useEffect(() => {
+    if (!wearerId) { held.current = null; return }
+    if (held.current === wearerId || latest.current.center === wearerId) { held.current = wearerId; return }
+    held.current = wearerId
+    choose('center', wearerId)
+  }, [wearerId])
   useEffect(() => {
     const onKey = (e) => {
       if (e.target.closest?.('input, textarea, select') || e.metaKey || e.ctrlKey || e.altKey) return

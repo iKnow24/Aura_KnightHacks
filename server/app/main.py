@@ -398,12 +398,13 @@ async def ack(body: Ack):
 
 
 @app.post("/api/speech")
-def heard(body: Heard):
-    """Captions made in the browser (Instant mode) get saved too, so Ask Lumen can answer from them."""
+async def heard(body: Heard):
+    """Captions made in the browser (Instant mode). Saved, and sent to the dashboard, which is not on that phone."""
     if body.text.strip():
         entry = memory.add_speech(body.zone, body.text)
         if body.speaker is not None:
             entry.update(speaker=body.speaker, to_you=body.to_you)
+        await hub.broadcast(["dashboard", "hud"], {**entry, "type": "caption", "id": caption_id(entry)})
     return {"ok": True}
 
 
@@ -614,10 +615,12 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
             elif msg.get("text"):
                 data = json.loads(msg["text"])
                 if data.get("type") == "camera_preview":
-                    # Explicit demo-only opt-in. Never pass full frames to memory or the event log.
+                    # Room cameras stay off unless the demo flag is set. The headset is the screen
+                    # the dashboard is supposed to show, so its picture is forwarded either way.
+                    # Never pass full frames to memory or the event log.
                     jpeg = data.get("jpeg")
-                    if (os.environ.get("LUMEN_DEMO_PREVIEW") == "1"
-                            and isinstance(jpeg, str) and jpeg.startswith("data:image/jpeg;base64,")
+                    preview_ok = zone == WEARER or os.environ.get("LUMEN_DEMO_PREVIEW") == "1"
+                    if (preview_ok and isinstance(jpeg, str) and jpeg.startswith("data:image/jpeg;base64,")
                             and len(jpeg) <= 400_000 and time.monotonic() - last_preview >= 0.9):
                         last_preview = time.monotonic()
                         await hub.broadcast(["dashboard"], {"type": "camera_preview", "node_id": node_id,

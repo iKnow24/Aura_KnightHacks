@@ -445,14 +445,15 @@ export default function Captions() {
       .catch(() => {})
     const timer = setInterval(() => {
       const v = videoRef.current
-      if (!v?.videoWidth) return
       const w = 640
-      const h = Math.max(1, Math.round((w * v.videoHeight) / v.videoWidth))
+      const h = v?.videoWidth ? Math.max(1, Math.round((w * v.videoHeight) / v.videoWidth)) : 360
       const c = document.createElement('canvas')
       c.width = w
       c.height = h
       const g = c.getContext('2d')
-      g.drawImage(v, 0, 0, w, h)
+      g.fillStyle = '#000'
+      g.fillRect(0, 0, w, h)
+      if (v?.videoWidth) g.drawImage(v, 0, 0, w, h)
       const line = mirrorText.current
       if (line) {
         const bar = Math.round(Math.min(120, h * 0.18))
