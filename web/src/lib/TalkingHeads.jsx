@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { detectFaces, loadFaces } from './faces'
+import { detectFaces, loadFaces, toScreen } from './faces'
 import { FaceTracker } from './faceTracker'
 import { pickSpeaker } from './speakerMatch'
 import SpatialCaptions from './SpatialCaptions'
@@ -21,7 +21,10 @@ export default function TalkingHeads({ videoRef }) {
   const tracksRef = useRef([])
   const [ids, setIds] = useState('')
   const [lines, setLines] = useState({}) // track id -> {text, ts, live}
-  const names = useRef({}) // track id -> voice name ("Sharan", "Person 4")
+  const names = useRef({}) // track id -> voice name ("Sharan", "Person 4") or a pinned name
+  const pinned = useRef({}) // track id -> true when the presenter typed that name
+  const [pick, setPick] = useState(null) // {id} while the presenter is naming a tapped face
+  const [draft, setDraft] = useState('')
   const [, tick] = useState(0)
 
   useEffect(() => {
@@ -61,12 +64,47 @@ export default function TalkingHeads({ videoRef }) {
       // This face already has a different known voice: the line came from someone off camera.
       const had = names.current[face.id]
       if (final && msg.voice_known && had && had !== msg.voice && !had.startsWith('Person ')) return
-      if (final && msg.voice && (msg.voice_known || !had)) names.current[face.id] = msg.voice
+      if (final && msg.voice && !pinned.current[face.id] && (msg.voice_known || !had)) names.current[face.id] = msg.voice
       setLines((l) => ({ ...l, [face.id]: { text: msg.text, ts: Date.now() / 1000, live: !final } }))
     }
     window.addEventListener('lumen:caption', onCaption)
     return () => { clearInterval(t); window.removeEventListener('lumen:caption', onCaption) }
   }, [])
+
+  // Presenter pin: tap a face on the tile, type its name. It's a human's word, so it's marked "pinned"
+  // and voice labels don't overwrite it. Tap the same face again to clear it.
+  const onTap = (e) => {
+    const v = videoRef.current
+    const root = v?.parentElement
+    if (!v || !root) return
+    const rect = root.getBoundingClientRect()
+    const px = e.clientX - rect.left, py = e.clientY - rect.top
+    let hit = null
+    for (const t of tracksRef.current) {
+      const c = toScreen(v, root, t.x, t.y, 'contain')
+      const r = Math.max(36, t.size * v.videoHeight * Math.min(root.clientWidth / v.videoWidth, root.clientHeight / v.videoHeight) * 0.6)
+      const d = Math.hypot(c.left - px, c.top - py)
+      if (d <= r && (!hit || d < hit.d)) hit = { id: t.id, d }
+    }
+    if (!hit) return
+    if (pinned.current[hit.id]) {
+      delete pinned.current[hit.id]
+      delete names.current[hit.id]
+      tick((n) => n + 1)
+      return
+    }
+    setDraft(names.current[hit.id] ?? '')
+    setPick({ id: hit.id })
+  }
+  const savePin = (e) => {
+    e.preventDefault()
+    const name = draft.trim().slice(0, 30)
+    if (!pick || !name) return
+    names.current[pick.id] = name
+    pinned.current[pick.id] = true
+    setPick(null)
+    tick((n) => n + 1)
+  }
 
   const now = Date.now() / 1000
   const visible = ids.split(',').filter(Boolean).map(Number)
@@ -76,7 +114,21 @@ export default function TalkingHeads({ videoRef }) {
     if (!line && !name) return []
     const track = tracksRef.current.find((t) => t.id === id)
     // A known face with nothing new to say keeps a quiet name tag; a fresh line shows over it.
-    return [{ trackId: id, key: id, text: line?.text ?? '', live: line?.live, name, color: track?.color ?? '#fff' }]
+    const shown = name && pinned.current[id] ? `${name} · pinned` : name
+    return [{ trackId: id, key: id, text: line?.text ?? '', live: line?.live, name: shown, color: track?.color ?? '#fff' }]
   })
-  return <SpatialCaptions videoRef={videoRef} tracksRef={tracksRef} bubbles={bubbles} neutral={null} fit="contain" />
+  return (
+    <>
+      <div onClick={onTap} className="absolute inset-0 z-[14] cursor-pointer" aria-hidden="true" />
+      <SpatialCaptions videoRef={videoRef} tracksRef={tracksRef} bubbles={bubbles} neutral={null} fit="contain" />
+      {pick && (
+        <form onSubmit={savePin} className="glass-dark absolute bottom-3 left-1/2 z-[30] flex -translate-x-1/2 items-center gap-2 rounded-2xl p-2 pl-3">
+          <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Who is this?"
+            aria-label="Name for this face" className="w-40 bg-transparent text-sm text-white outline-none placeholder:text-zinc-400" />
+          <button type="submit" disabled={!draft.trim()} className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-black disabled:opacity-40">Pin</button>
+          <button type="button" onClick={() => setPick(null)} className="px-2 text-xs text-zinc-300">Cancel</button>
+        </form>
+      )}
+    </>
+  )
 }
