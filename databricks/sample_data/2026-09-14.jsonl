@@ -1,0 +1,51 @@
+{"type": "alert", "id": "1789369440.000", "kind": "knock", "zone": "hallway", "severity": "warning", "source": "ast", "confidence": 0.89, "ts": 1789369440.0, "household": "maria"}
+{"type": "ack", "id": "1789369440.000", "by": "wearer", "ts": 1789369448.8747547, "household": "maria"}
+{"type": "mode", "mode": "watch", "ts": 1789383600.0, "household": "maria"}
+{"type": "alert", "id": "1789385187.000", "kind": "alarm_clock", "zone": "bedroom", "severity": "warning", "source": "ast", "confidence": 0.89, "ts": 1789385187.0, "household": "maria"}
+{"type": "ack", "id": "1789385187.000", "by": "wearer", "ts": 1789385191.9844105, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "I'm going to soccer practice, bye!", "ts": 1789390783.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1789390783.0, "speaker": 4, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Mom, I'm heading out, back around six.", "ts": 1789392665.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1789392665.0, "speaker": 1, "to_you": false, "household": "maria"}
+{"type": "alert", "id": "1789394907.000", "kind": "kettle", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.98, "ts": 1789394907.0, "household": "maria"}
+{"type": "ack", "id": "1789394907.000", "by": "wearer", "ts": 1789394922.7014387, "household": "maria"}
+{"type": "alert", "id": "1789395811.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.85, "ts": 1789395811.0, "household": "maria"}
+{"type": "ack", "id": "1789395811.000", "by": "wearer", "ts": 1789395816.1581848, "household": "maria"}
+{"type": "alert", "id": "1789401143.000", "kind": "doorbell", "zone": "hallway", "severity": "warning", "source": "ast", "confidence": 0.77, "ts": 1789401143.0, "household": "maria"}
+{"type": "ack", "id": "1789401143.000", "by": "wearer", "ts": 1789401152.5084713, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Can you grab milk if you go out?", "ts": 1789401244.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1789401244.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "sighting", "item": "wallet", "zone": "kitchen", "confidence": 0.39, "ts": 1789401300.0, "household": "maria"}
+{"type": "alert", "id": "1789403118.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.99, "ts": 1789403118.0, "household": "maria"}
+{"type": "ack", "id": "1789403118.000", "by": "wearer", "ts": 1789403123.5664182, "household": "maria"}
+{"type": "sighting", "item": "keys", "zone": "kitchen", "confidence": 0.34, "ts": 1789405920.0, "household": "maria"}
+{"type": "sighting", "item": "glasses", "zone": "living", "confidence": 0.33, "ts": 1789409760.0, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Grandma, can I use the laptop?", "ts": 1789410668.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1789410668.0, "speaker": 4, "to_you": true, "household": "maria"}
+{"type": "alert", "id": "1789412495.000", "kind": "timer", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.76, "ts": 1789412495.0, "household": "maria"}
+{"type": "ack", "id": "1789412495.000", "by": "wearer", "ts": 1789412510.136332, "household": "maria"}
+{"type": "alert", "id": "1789412783.000", "kind": "phone_ring", "zone": "living", "severity": "warning", "source": "ast", "confidence": 0.8, "ts": 1789412783.0, "household": "maria"}
+{"type": "ack", "id": "1789412783.000", "by": "wearer", "ts": 1789412789.1834977, "household": "maria"}
+{"type": "alert", "id": "1789413833.000", "kind": "phone_ring", "zone": "living", "severity": "warning", "source": "ast", "confidence": 0.95, "ts": 1789413833.0, "household": "maria"}
+{"type": "ack", "id": "1789413833.000", "by": "wearer", "ts": 1789413837.7502115, "household": "maria"}
+{"type": "alert", "id": "1789416975.000", "kind": "timer", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.78, "ts": 1789416975.0, "household": "maria"}
+{"type": "ack", "id": "1789416975.000", "by": "wearer", "ts": 1789416987.4693277, "household": "maria"}
+{"type": "sighting", "item": "glasses", "zone": "bedroom", "confidence": 0.36, "ts": 1789417020.0, "household": "maria"}
+{"type": "alert", "id": "1789419286.000", "kind": "doorbell", "zone": "hallway", "severity": "warning", "source": "ast", "confidence": 0.8, "ts": 1789419286.0, "household": "maria"}
+{"type": "ack", "id": "1789419286.000", "by": "wearer", "ts": 1789419291.258338, "household": "maria"}
+{"type": "sighting", "item": "glasses", "zone": "living", "confidence": 0.47, "ts": 1789419360.0, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "The plumber is coming Tuesday at ten.", "ts": 1789421343.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1789421343.0, "speaker": 1, "to_you": false, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Mom, I'm heading out, back around six.", "ts": 1789424087.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1789424087.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "The plumber is coming Tuesday at ten.", "ts": 1789428090.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1789428090.0, "speaker": 1, "to_you": false, "household": "maria"}
+{"type": "alert", "id": "1789431108.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.85, "ts": 1789431108.0, "household": "maria"}
+{"type": "speech", "zone": "wearer", "text": "Your blood test results came back normal.", "ts": 1789431889.0, "household": "maria"}
+{"type": "caption_meta", "ts": 1789431889.0, "speaker": 2, "to_you": true, "household": "maria"}
+{"type": "sighting", "item": "keys", "zone": "hallway", "confidence": 0.6, "ts": 1789434180.0, "household": "maria"}
+{"type": "sighting", "item": "wallet", "zone": "hallway", "confidence": 0.54, "ts": 1789436040.0, "household": "maria"}
+{"type": "sighting", "item": "keys", "zone": "kitchen", "confidence": 0.52, "ts": 1789436220.0, "household": "maria"}
+{"type": "mode", "mode": "night", "ts": 1789439400.0, "household": "maria"}
+{"type": "alert", "id": "1789441560.000", "kind": "dog_bark", "zone": "outside", "severity": "warning", "source": "ast", "confidence": 0.87, "ts": 1789441560.0, "household": "maria"}
+{"type": "ack", "id": "1789441560.000", "by": "wearer", "ts": 1789441569.0028067, "household": "maria"}
