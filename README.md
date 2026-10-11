@@ -209,5 +209,5 @@ cd web && npm run build
 ## Team 
 
 
-Built in one weekend at KnightHacks IX by Khalid, Jonel, and Sharan ([@iKnow24](https://github.com/iKnow24)) and team.
+Built in one weekend at KnightHacks IX by Khalid([@kha07]), Jonel([@joverboost]), and Sharan ([@iKnow24](https://github.com/iKnow24)) and team.
 MIT licensed.
