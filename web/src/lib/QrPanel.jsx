@@ -15,8 +15,10 @@ const DEVICES = [
 export default function QrPanel() {
   const [codes, setCodes] = useState([])
   useEffect(() => {
+    // BASE_URL keeps the sub-folder when hosted on GitHub Pages (/Aura_KnightHacks/).
+    const base = location.origin + import.meta.env.BASE_URL.replace(/\/$/, '')
     Promise.all(DEVICES.map(([label, path]) =>
-      QRCode.toDataURL(location.origin + import.meta.env.BASE_URL.replace(/\/$/, '') + path, { margin: 1, width: 240 }).then((src) => ({ label, path, src }))
+      QRCode.toDataURL(base + path, { margin: 1, width: 240 }).then((src) => ({ label, url: base + path, src }))
     )).then(setCodes)
   }, [])
 
@@ -27,7 +29,7 @@ export default function QrPanel() {
       )}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {codes.map((c) => (
-          <a key={c.path} href={c.path} target="_blank" rel="noreferrer" className="text-center text-sm">
+          <a key={c.url} href={c.url} target="_blank" rel="noreferrer" className="text-center text-sm">
             <img src={c.src} alt={`QR code for ${c.label}`} className="mx-auto rounded-xl bg-white p-1" />
             <div className="mt-1">{c.label}</div>
           </a>
