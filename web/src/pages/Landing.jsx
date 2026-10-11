@@ -6,6 +6,7 @@ import LiveMap from '../components/landing/LiveMap'
 import MemoryStack from '../components/landing/MemoryStack'
 import Timeline, { ECLIPSE } from '../components/ui/Timeline'
 import Logo, { Wordmark } from '../lib/Logo'
+import { LiquidButton } from '@/components/ui/liquid-glass-button'
 
 // The 3D head is its own chunk (three.js), loaded after the page paints. Without WebGL, or if anything
 // in it throws, the hero shows the logo instead. It still shows with reduced motion on, because it is the
@@ -94,9 +95,9 @@ export default function Landing() {
     <main className="overflow-x-clip bg-ink text-white selection:bg-white/20">
       <nav className={`fixed inset-x-0 top-0 z-40 flex items-center justify-between px-5 py-4 transition-[background-color,border-color] duration-500 sm:px-10 ${scrolled ? 'border-b border-white/5 bg-ink/70 backdrop-blur-xl' : 'border-b border-transparent'}`}>
         <Wordmark size={13} />
-        <a href="#start" onClick={enter} className="rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-black hover:bg-zinc-200">
+        <LiquidButton type="button" size="lg" onClick={enter} className="rounded-full px-5 text-[13px] font-semibold text-white">
           Enter the demo
-        </a>
+        </LiquidButton>
       </nav>
 
       {/* Hero */}
@@ -121,9 +122,9 @@ export default function Landing() {
         </motion.p>
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 1, ease }}
           className="mt-10 flex flex-wrap items-center justify-center gap-3">
-          <a href="#start" onClick={enter} className="flex h-12 items-center gap-2 rounded-full bg-white px-7 font-semibold text-black hover:bg-zinc-200">
+          <LiquidButton type="button" size="xl" onClick={enter} className="rounded-full px-8 text-base font-semibold text-white">
             Enter the live demo <ArrowRight size={17} />
-          </a>
+          </LiquidButton>
           <a href="#how" className="flex h-12 items-center rounded-full border border-white/15 px-7 font-medium text-zinc-200 hover:border-white/40">
             How it works
           </a>
@@ -201,9 +202,9 @@ export default function Landing() {
         <motion.h2 {...rise(0.05)} className="mt-8 text-[clamp(2.5rem,7vw,5.5rem)] font-semibold leading-[0.95] tracking-[-0.04em]">See it live.</motion.h2>
         <motion.p {...rise(0.1)} className="mt-5 max-w-md text-lg text-zinc-400">The phones in this room are listening right now.</motion.p>
         <motion.div {...rise(0.15)} className="mt-10 flex flex-col items-center gap-5">
-          <a href="#start" onClick={enter} className="flex h-14 items-center gap-2 rounded-full bg-white px-9 text-lg font-semibold text-black hover:bg-zinc-200">
+          <LiquidButton type="button" size="xxl" onClick={enter} className="rounded-full px-10 text-lg font-semibold text-white">
             Enter the demo <ArrowRight size={19} />
-          </a>
+          </LiquidButton>
           <Link to="/devices" className="text-sm text-zinc-500 underline-offset-4 hover:text-white hover:underline">Setting up a phone instead?</Link>
         </motion.div>
         <p className="absolute bottom-6 text-xs text-zinc-600">

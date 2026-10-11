@@ -23,6 +23,21 @@
   --color-amber-300: #e4e4e8;
   --color-amber-400: #f4f4f5;
   --color-amber-600: #d4d4d8;
+
+  /* Shared button colors. The page is already dark, so primary is white on ink. */
+  --color-primary: #f4f4f5;
+  --color-primary-foreground: #0b0b0c;
+  --color-background: #0b0b0c;
+  --color-foreground: #f4f4f5;
+  --color-secondary: rgb(255 255 255 / 0.08);
+  --color-secondary-foreground: #f4f4f5;
+  --color-muted: rgb(255 255 255 / 0.06);
+  --color-accent: rgb(255 255 255 / 0.1);
+  --color-accent-foreground: #f4f4f5;
+  --color-destructive: #ef4444;
+  --color-input: rgb(255 255 255 / 0.15);
+  --color-ring: #f4f4f5;
+  --color-border: rgb(255 255 255 / 0.12);
 }
 
 :root {
