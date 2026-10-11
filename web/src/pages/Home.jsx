@@ -17,7 +17,7 @@ export default function Home() {
     <main className="mx-auto max-w-xl px-6 pb-16 pt-[max(2rem,env(safe-area-inset-top))]">
       <div className="flex items-center justify-between">
         <Wordmark size={13} />
-        <Link to="/" className="flex items-center gap-1.5 text-sm text-zinc-500 transition hover:text-white"><ArrowLeft size={15} /> Sign in</Link>
+        <Link to="/start" className="flex items-center gap-1.5 text-sm text-zinc-500 transition hover:text-white"><ArrowLeft size={15} /> Sign in</Link>
       </div>
       <h1 className="mt-16 text-3xl font-semibold tracking-tight">What is this phone for?</h1>
       <p className="mt-2 text-zinc-500">Every device is a web page. Open one per phone.</p>

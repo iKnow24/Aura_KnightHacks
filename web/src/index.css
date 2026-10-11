@@ -83,3 +83,6 @@ button:not(:disabled):active, a:active { transform: scale(0.97); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+
+/* Landing page: a streak of light running along the pipeline line. */
+@keyframes journey-run { from { left: -8vw; } to { left: 100%; } }

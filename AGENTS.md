@@ -57,7 +57,7 @@ server/                 FastAPI brain (Python), port 8000
   tests/                pytest
 web/                    React app (Vite, Tailwind, Framer Motion, three.js), port 5173
   src/main.jsx          routes (see page map)
-  src/pages/            Login, Home, Dashboard, Captions, Node, Strobe, Rear, Mic
+  src/pages/            Landing, Login, Home, Dashboard, Captions, Node, Strobe, Rear, Mic
   src/lib/              useBrain (WebSocket), useLiveCaptions, AlertToast, Logo, WalkScene (3D walker),
                         RoomSplat + HomeScan (Gaussian splat room scan), History, pose, mic
   public/splats/        room scan file + room.json (see README there)
@@ -76,7 +76,8 @@ setup.sh / run.sh       one-time box setup / start everything
 
 ## Page map
 
-- `/` sign-in (the name is used for name calling). `/devices` picks what this phone is.
+- `/` landing page (what Lumen is, the live and memory pipelines; components in src/components/, uses gsap). "Enter the demo" goes to
+  `/start`, the sign-in (the name is used for name calling). `/devices` picks what this phone is.
 - `/captions`: **the one wearer page.** Full camera with **spatial captions**: each line floats above the head
   of the face whose mouth moved while it was said; unsure lines go to a neutral spot at the bottom (no side panel
   any more; see `docs/spatial-captions.md`). Movie look = classic subtitles. The 3D walking view is landscape
