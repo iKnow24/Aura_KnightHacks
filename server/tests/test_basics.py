@@ -152,3 +152,18 @@ def test_presenter_direction_is_logged_and_labelled():
     r = client.post("/api/presenter_dir", json={"corner": 2})
     assert r.json() == {"ok": True}
     assert client.post("/api/presenter_dir", json={"corner": 9}).json().get("error")
+
+
+def test_ask_falls_back_to_another_key(monkeypatch):
+    """Gemini busy (503) -> Ask Lumen tries Groq next, if that key is set too."""
+    from app import agent
+
+    for env in ("GROQ_API_KEY", "ANTHROPIC_API_KEY", "XAI_API_KEY", "GEMINI_API_KEY", "HF_TOKEN"):
+        monkeypatch.delenv(env, raising=False)
+    monkeypatch.setenv("LUMEN_LLM", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "g")
+    monkeypatch.setenv("GROQ_API_KEY", "q")
+    assert agent.pick_provider()[0] == "gemini"
+    assert [p[0] for p in agent.backup_providers("gemini")] == ["groq"]
+    monkeypatch.setenv("LUMEN_LLM", "off")
+    assert agent.backup_providers("gemini") == []
