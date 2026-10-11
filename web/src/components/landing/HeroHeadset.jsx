@@ -8,7 +8,9 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { Line2 } from 'three/examples/jsm/lines/Line2.js'
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js'
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { idlePose, makeRig, poseRig, resetRig } from '../../lib/avatarRig'
 import { ECLIPSE } from '../ui/Timeline'
 
 // Landing hero: a head in a headset. Sound travels in from the left as a waveform, enters the headset
@@ -177,6 +179,44 @@ function addOnto(m) {
 }
 const PARTICLES = 60
 
+// The real face: the Blender (MPFB) person from the dashboard, already wearing the white headset.
+// It is a 4 MB file, so the code-built head shows until it arrives, then swaps out.
+const AVATAR = `${import.meta.env.BASE_URL}models/avatar.glb`
+const SCALE = 6.2 // meters -> scene units, so the head is about the size of the placeholder
+
+function loadAvatar() {
+  return new GLTFLoader().loadAsync(AVATAR).then((gltf) => {
+    const scene = gltf.scene
+    scene.traverse((o) => {
+      if (!o.isMesh) return
+      o.frustumCulled = false
+      for (const m of [o.material].flat()) {
+        if (!m) continue
+        if (/hair|afro|eyebrow|eyelash/i.test(m.name)) Object.assign(m, { alphaTest: 0.45, transparent: false, depthWrite: true, side: THREE.DoubleSide })
+        else if (!/high-poly|cornea/i.test(m.name)) m.transparent = false
+        if (/high-poly/i.test(m.name)) o.visible = false // eye-wetness shell, would show as a grey film
+      }
+    })
+    // Arms down and relaxed (the file is in a T-pose), then measure where the headset ended up.
+    scene.scale.setScalar(SCALE)
+    const rig = makeRig(scene)
+    for (let i = 0; i < 6; i++) { resetRig(rig); poseRig(rig, scene, idlePose(0), 5) }
+    scene.updateMatrixWorld(true)
+    const box = new THREE.Box3()
+    scene.traverse((o) => { if (o.isMesh && /^headset_Cube$/.test(o.name)) box.expandByObject(o) })
+    if (box.isEmpty()) scene.traverse((o) => { if (o.isMesh && /headset/i.test(o.name)) box.expandByObject(o) })
+    const c = box.getCenter(new THREE.Vector3())
+    // Put the headset where the placeholder's visor sits, so the waves and the caption line up.
+    scene.position.set(-c.x, 0.12 - c.y, 0.98 - box.max.z + 0.1)
+    const off = scene.position
+    const anchors = {
+      temple: new THREE.Vector3(box.min.x + off.x - 0.02, c.y + off.y, c.z + off.z - (box.max.z - box.min.z) * 0.15),
+      lens: new THREE.Vector3(c.x + off.x, c.y + off.y, box.max.z + off.z + 0.03),
+    }
+    return { scene, rig, anchors }
+  })
+}
+
 function Scene({ onBeat, overlay, narrow }) {
   const { gl, scene, camera, size } = useThree()
   const head = useRef()
@@ -184,6 +224,15 @@ function Scene({ onBeat, overlay, narrow }) {
   const last = useRef('')
   const glow = useRef(0)
   const pointer = useRef({ x: 0, y: 0 })
+  const [avatar, setAvatar] = useState(null)
+  const anchors = useRef({ temple: new THREE.Vector3(-0.74, 0.12, 0.5), lens: new THREE.Vector3(0.15, 0.1, 1.05) })
+
+  useEffect(() => {
+    let live = true
+    loadAvatar().then((a) => { if (!live) return; anchors.current = a.anchors; setAvatar(a) })
+      .catch((e) => console.warn('Hero avatar failed to load; keeping the built-in head', e))
+    return () => { live = false }
+  }, [])
 
   const parts = useMemo(() => {
     const skin = new THREE.MeshPhysicalMaterial({ color: '#c99068', roughness: 0.55, clearcoat: 0.18, clearcoatRoughness: 0.5 })
@@ -270,6 +319,7 @@ function Scene({ onBeat, overlay, narrow }) {
 
   useFrame((_, dt) => {
     const t = (clock.current += Math.min(dt, 0.25))
+    if (avatar) { resetRig(avatar.rig); poseRig(avatar.rig, avatar.scene, idlePose(t), Math.min(dt, 0.1)) }
     const lt = t % LOOP
     const h = head.current
     if (!h) return
@@ -282,7 +332,7 @@ function Scene({ onBeat, overlay, narrow }) {
     h.updateMatrixWorld()
 
     // Sound: each line runs from off-screen left to the pod on the headset's near temple.
-    h.localToWorld(tmp.p1.set(-0.74, 0.12, 0.5))
+    h.localToWorld(tmp.p1.copy(anchors.current.temple))
     const bell = isBell(t - TRAVEL * 0.5)
     for (const w of waves) {
       tmp.p0.set(-7.5, -0.5 + w.dy * 3, -2 + w.dz * 4)
@@ -314,8 +364,8 @@ function Scene({ onBeat, overlay, narrow }) {
     parts.strip.opacity = 0.25 + glow.current * 0.75
 
     // Caption anchor: in front of the lens, out where the wearer is looking.
-    h.localToWorld(tmp.lens.set(0.15, 0.1, 1.05))
-    h.localToWorld(tmp.anchor.set(0.4, 0.2, 1.75))
+    h.localToWorld(tmp.lens.copy(anchors.current.lens))
+    h.localToWorld(tmp.anchor.copy(anchors.current.lens).add(tmp.v.set(0.25, 0.1, 0.7)))
     const pos = sparks.pts.geometry.attributes.position.array
     const col = sparks.pts.geometry.attributes.color.array
     sparks.seeds.forEach(([seed, ph, sp], i) => {
@@ -350,11 +400,13 @@ function Scene({ onBeat, overlay, narrow }) {
   return (
     <>
       <ambientLight intensity={0.08} />
-      <directionalLight position={[3, 4, 5]} intensity={1.1} />
+      <directionalLight position={[3, 4, 5]} intensity={1.7} />
       <directionalLight position={[-5, 1.5, -3]} intensity={5} color="#FF8A3D" />
       <directionalLight position={[5, 2.5, -4]} intensity={5} color="#8B6CFF" />
       <directionalLight position={[0, -3, 2]} intensity={0.6} color="#FF4F7B" />
       <group ref={head} position={[narrow ? 0.2 : -0.5, 0, 0]} rotation={[0, 0.62, 0]}>
+        {avatar && <primitive object={avatar.scene} />}
+        {!avatar && <>
         <mesh geometry={geo.head} material={parts.skin} />
         <mesh geometry={geo.hairCap} material={parts.hair} />
         <mesh geometry={geo.mustache} material={parts.hair} />
@@ -372,6 +424,7 @@ function Scene({ onBeat, overlay, narrow }) {
           <mesh key={s} geometry={geo.pod} material={parts.alu} position={[s * 0.7, 0.12, 0.5]} rotation={[0, s * -0.55, 0]} />
         ))}
         <mesh geometry={geo.band} material={parts.fabric} position={[0, 0.14, -0.02]} rotation={[-Math.PI / 2 + 0.18, 0, 0]} scale={[0.84, 1.0, 1]} />
+        </>}
       </group>
       {waves.map((w, i) => <primitive key={i} object={w.line} />)}
       <primitive object={sparks.pts} />
