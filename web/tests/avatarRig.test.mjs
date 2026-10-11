@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import * as THREE from 'three'
-import { makeRig, poseRig } from '../src/lib/avatarRig.js'
+import { idlePose, makeRig, poseRig, withIdle } from '../src/lib/avatarRig.js'
 
 // A tiny Mixamo-named skeleton in T-pose: the left arm points along +x (the figure's left when it faces +z).
 function skeleton() {
@@ -50,4 +50,14 @@ test('a person the camera loses fades back to the idle pose', () => {
   for (let i = 0; i < 80; i++) { arm.quaternion.identity(); poseRig(rig, root, null, 0.1) }
   assert.ok(rig.every((r) => r.weight < 0.01))
   assert.ok(arm.quaternion.angleTo(new THREE.Quaternion()) < 0.01)
+})
+
+test('with no webcam the figure stands relaxed, and points the webcam can\'t see fall back to that pose', () => {
+  const idle = idlePose(0)
+  assert.ok(idle[15][1] > idle[11][1], 'hands hang below the shoulders (MediaPipe y grows downward)')
+  assert.ok(idle.every((p, i) => ![11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28, 7, 8].includes(i) || p[3] === 1))
+  const seen = Array.from({ length: 33 }, (_, i) => (i === 15 ? [0.3, -0.9, 0, 0.99] : [0, 0, 0, 0.1]))
+  const mixed = withIdle(seen, 0)
+  assert.deepEqual(mixed[15], [0.3, -0.9, 0, 0.99], 'a raised hand the camera sees is kept')
+  assert.deepEqual(mixed[27], idlePose(0)[27], 'an ankle hidden under the desk uses the idle pose')
 })
