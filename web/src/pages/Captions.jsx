@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import AlertStack, { useAlerts } from '../lib/AlertToast'
+import { clockKnown, serverToPerf } from '../lib/clock'
 import { detectFaces, loadFaces } from '../lib/faces'
 import { FaceTracker } from '../lib/faceTracker'
 import { lastTwoLines, nameIn } from '../lib/captionText'
@@ -173,12 +174,19 @@ function useFaceTracks(videoRef, active, speechActive) {
     return () => { dead = true; clearInterval(timer) }
   }, [active, videoRef])
   // A finished line: match it to the speech just heard, then start timing the next one.
-  const claim = () => {
+  // saidAt = when the brain says the words were said (its clock, mapped to ours). Without it we
+  // fall back to when this phone's own mic went loud.
+  const claim = (saidAt) => {
     const now = performance.now()
-    const start = (speechStart.current ?? now - 4000) - 300
+    let start = (speechStart.current ?? now - 4000) - 300
+    let end = now
+    if (saidAt && saidAt.end - saidAt.start >= 250 && now - saidAt.end < 15000) {
+      start = saidAt.start
+      end = Math.min(now, saidAt.end)
+    }
     speechStart.current = speaking.current() ? now : null
     setLiveSpeaker(null)
-    return pickSpeaker(tracker.current.tracks, start, now)
+    return pickSpeaker(tracker.current.tracks, start, end)
   }
   return { tracksRef, ids, liveSpeaker, claim }
 }
@@ -271,6 +279,7 @@ export default function Captions() {
 
   const { state, connected } = useBrain('hud', push, (msg) => {
     if (msg.type === 'caption') captions.addRemote(msg)
+    if (msg.type === 'caption_voice') captions.addVoice(msg)
     if (msg.type === 'caption_partial' && !ZONES[msg.zone]) captions.addPartial(msg) // room nodes only get finished lines
     if (msg.type === 'scene' && msg.side === 'rear') setRearScene({ ...msg, at: Date.now() })
     if (msg.type === 'ack') drop(msg.id)
@@ -331,14 +340,14 @@ export default function Captions() {
     onFinal: (line) => {
       if (!line.zone && command(line.text)) return true
       if (line.zone && ZONES[line.zone]) { // a room node: shown, but not part of the lecture
-        // Instant mode: the brain never hears this phone's mic, but the room phone heard the same sentence and
-        // knows the voice. Put that name on the face whose lips moved for it.
-        const mine = line.voiceKnown && linesRef.current.findLast((l) => !l.zone && l.speaker && line.ts - l.ts < 8 && sameWords(l.text, line.text))
-        if (mine && names[mine.speaker.id] !== line.voice) { setNames((n) => ({ ...n, [mine.speaker.id]: line.voice })); flash(`👋 That's ${line.voice}`) }
+        // In Instant mode the brain never hears this phone's mic, but the room phone heard the same
+        // sentence and knows the voice. onVoice below puts that name on the face whose lips moved.
         return false
       }
       if (!line.zone && camera) {
-        const who = faces.claim()
+        const saidAt = line.startTs && line.endTs && clockKnown()
+          ? { start: serverToPerf(line.startTs), end: serverToPerf(line.endTs) } : null
+        const who = faces.claim(saidAt)
         if (who) {
           line.speaker = who
           // A name they said ("my name is Dana"), else the name the brain knows their voice by.
@@ -354,6 +363,19 @@ export default function Captions() {
         push({ id: `local-${Date.now()}`, kind: 'name_called', zone: 'wearer', severity: 'warning', ts: Date.now() / 1000 })
       }
       return false
+    },
+    // Whose voice it was lands a moment after the words. Put the name on the face that line went to,
+    // or, for a room phone's line in Instant mode, on the face that said the same words here.
+    onVoice: (msg) => {
+      if (!msg.voice_known) return
+      const line = linesRef.current.findLast((l) => l.id === msg.id || Math.abs(l.ts - msg.ts) < 0.001)
+      if (!line) return
+      const face = line.zone
+        ? linesRef.current.findLast((l) => !l.zone && l.speaker && line.ts - l.ts < 8 && sameWords(l.text, line.text))?.speaker
+        : line.speaker
+      if (!face || names[face.id] === msg.voice) return
+      setNames((n) => ({ ...n, [face.id]: msg.voice }))
+      flash(`👋 ${line.zone ? "That's" : 'Met'} ${msg.voice}`)
     },
   })
 

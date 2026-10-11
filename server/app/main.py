@@ -131,7 +131,7 @@ async def _maybe_direction():
         await hub.broadcast(["dashboard"], {"type": "direction", **found, "ts": time.time()})
 
 
-PARTIAL_EVERY_S = 1.0  # while someone talks, a rough caption this often (0 turns partials off)
+PARTIAL_EVERY_S = float(os.environ.get("PARTIAL_EVERY_S", "0.7"))  # rough caption this often while someone talks (0 = off)
 partial_at: dict[str, float] = {}
 partial_busy: set[str] = set()  # one partial per phone at a time, so a slow CPU never backs up
 
@@ -142,7 +142,7 @@ def feed_speech(node_id: str, zone: str, chunk: np.ndarray):
     seg = segmenters.setdefault(node_id, Segmenter())
     utterance = seg.feed(chunk)
     if utterance is not None:
-        asyncio.create_task(run_speech(zone, utterance))
+        asyncio.create_task(run_speech(zone, utterance, seg.span))
     elif PARTIAL_EVERY_S and node_id not in partial_busy and time.time() - partial_at.get(node_id, 0) >= PARTIAL_EVERY_S:
         audio = seg.so_far()
         if audio is not None:
@@ -154,24 +154,29 @@ def feed_speech(node_id: str, zone: str, chunk: np.ndarray):
 async def run_partial(node_id: str, seg: Segmenter, zone: str, audio: np.ndarray):
     """Words so far, shown greyed out on the caption screens until the finished line replaces them."""
     done = seg.done
+    start = seg.start
     try:
         text = await asyncio.to_thread(transcriber.transcribe, audio)
     finally:
         partial_busy.discard(node_id)
     if text and seg.done == done:  # skip it if the sentence already finished while Whisper ran
-        await hub.broadcast(["hud", "dashboard"], {"type": "caption_partial", "zone": zone, "text": text, "ts": time.time()})
+        # start_ts/end_ts are when the words were *said*, so a caption screen can match them to the
+        # mouth that was moving right then instead of guessing from how long Whisper took.
+        await hub.broadcast(["hud", "dashboard"], {"type": "caption_partial", "zone": zone, "text": text,
+                                                   "ts": time.time(), "start_ts": start, "end_ts": time.time()})
 
 
-async def run_speech(zone: str, audio: np.ndarray):
+async def run_speech(zone: str, audio: np.ndarray, span: tuple[float, float] | None = None):
     text = await asyncio.to_thread(transcriber.transcribe, audio)
     if not text:
         return
     keep, replaced = crosstalk.check(zone, text, float(np.sqrt(np.mean(audio ** 2))))
     if not keep:
         return  # a louder phone already captioned this sentence
-    voice = await asyncio.to_thread(voices.label, audio, text)
-    entry = memory.add_speech(zone, text, voice=voice["voice"] if voice else None)
-    msg = {**entry, "type": "caption", "id": caption_id(entry), **(voice or {})}
+    entry = memory.add_speech(zone, text)
+    msg = {**entry, "type": "caption", "id": caption_id(entry)}
+    if span:
+        msg["start_ts"], msg["end_ts"] = span
     if replaced:
         old = next((e for e in reversed(memory.entries) if e.get("type") == "speech"
                     and e["zone"] == replaced["zone"] and e["text"] == replaced["text"]), None)
@@ -180,8 +185,20 @@ async def run_speech(zone: str, audio: np.ndarray):
             memory.save()
             msg["replaces"] = caption_id(old)
     await hub.broadcast(["dashboard", "hud"], msg)
+    # The words go out first; who said it follows a moment later as a small patch on the same line.
+    # (Naming the voice is another model pass, and a caption shouldn't wait for it.)
+    asyncio.create_task(name_voice(msg["id"], entry, audio, text))
     if enabled("name_call") and mentions_name(text, profile["name"]):
         await emit_detected("name_called", zone, "warning", source="whisper")
+
+
+async def name_voice(line_id: str, entry: dict, audio: np.ndarray, text: str):
+    """Voiceprint match for a line already on screen: {"type": "caption_voice", "id": ..., "voice": ...}."""
+    voice = await asyncio.to_thread(voices.label, audio, text)
+    if not voice:
+        return
+    memory.set_voice(entry["ts"], voice["voice"])
+    await hub.broadcast(["dashboard", "hud"], {"type": "caption_voice", "id": line_id, "ts": entry["ts"], **voice})
 
 
 def pose_now(node_id: str) -> tuple[str | None, bool]:

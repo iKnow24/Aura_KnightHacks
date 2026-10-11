@@ -3,7 +3,8 @@
 Two brains, same tools:
 - With an LLM key set (Groq, Claude, xAI, Gemini or Hugging Face; see PROVIDERS), the model gets three tools
   (last_seen, transcript, alerts) and decides which to call, so free-form questions work
-  ("did anyone say anything about milk?").
+  ("did anyone say anything about milk?"). When DATABRICKS_HOST, DATABRICKS_TOKEN and GENIE_SPACE_ID
+  are set, it also gets ask_genie for week-long history. Leave those unset on the AMD box.
 - Without a key, or if the API call fails, a keyword router answers the core questions.
   The demo never depends on the network to answer "where are my keys".
 
@@ -16,6 +17,7 @@ import os
 import re
 import time
 
+from . import genie
 from .memory import Memory
 
 log = logging.getLogger(__name__)
@@ -168,7 +170,7 @@ PROVIDERS = {
     "claude": ("https://api.anthropic.com/v1/", "ANTHROPIC_API_KEY", "claude-haiku-5-5"),
     "xai": ("https://api.x.ai/v1", "XAI_API_KEY", "grok-4.7"),
     # Google Gemini through its OpenAI-compatible endpoint (key from aistudio.google.com).
-    "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai/", "GEMINI_API_KEY", "gemini-2.5-flash"),
+    "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai/", "GEMINI_API_KEY", "gemini-3.8-flash"),
     # Hugging Face Inference Providers: one HF token, many open models. Last, so it never
     # takes over from Groq when both keys are set; pick it with LUMEN_LLM=hf.
     "hf": ("https://router.huggingface.co/v1", "HF_TOKEN", "openai/gpt-oss-20b"),
@@ -201,6 +203,16 @@ TOOLS = [
     fn("alerts", "Safety alerts (smoke alarm, doorbell, fall, name called...) in the last N hours.",
        {"hours": {"type": "number"}}),
 ]
+ASK_GENIE = fn(
+    "ask_genie",
+    "Caregiver history over days or weeks: is she slower, how many alerts she missed, who talked, "
+    "which sound she misses. Not for what was just said or where an item is.",
+    {"question": {"type": "string", "description": "The history question, in plain words."}},
+    ["question"])
+GENIE_NOTE = (" For questions about this week, last week, who talked, or whether she is slower or missing "
+              "more alerts, call ask_genie and use only what it returns. If ask_genie says the history is "
+              "unavailable, say that and do not invent counts, times, or names. For what was just said, or "
+              "where an item is, use the other tools.")
 
 SYSTEM = ("You are Lumen, the memory of a home. You help a deaf or hard-of-hearing person, often an older adult, "
           "keep up with what was said around them. Answer in one to three short sentences, warm and plain, like a "
@@ -209,10 +221,21 @@ SYSTEM = ("You are Lumen, the memory of a home. You help a deaf or hard-of-heari
           "return nothing, say you haven't seen or heard it. Say times as relative ('12 minutes ago'). "
           "Zone 'living' is the living room; zone 'wearer' means said in the same room as the user, and "
           "said_to_you=true means the speaker was facing them. voice is who said it, when known (a name, or "
-          "'Person 4' for someone whose name we don't know).")
+          "'Person 4' for someone whose name we don't know). "
+          "If there is no history yet, say there isn't enough history yet; never say everything is fine without "
+          "data. Never diagnose a condition or guess "
+          "why someone is behaving differently; if a week is flagged or they ask about health, suggest a check-in "
+          "call. Never mention SQL, tables, queries or Databricks. Live captions are on their phone; for anything "
+          "unrelated to this home (weather, news) say you only help with what happened at home.")
+
+
+def llm_tools() -> list[dict]:
+    return TOOLS + [ASK_GENIE] if genie.configured() else list(TOOLS)
 
 
 def run_tool(name: str, args: dict, memory: Memory, events: list[dict]) -> dict:
+    if name == "ask_genie":
+        return genie.ask(args.get("question") or "")
     if name == "last_seen":
         r = tool_last_seen(memory, args.get("item", ""))
         r["entries"] = [r.pop("entry")] if "entry" in r else []
@@ -231,21 +254,25 @@ def answer_llm(question: str, memory: Memory, events: list[dict]) -> dict | None
         from openai import OpenAI
     except ImportError:
         return None
-    client = OpenAI(base_url=base_url, api_key=key, timeout=15)
-    messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": question}]
+    client = OpenAI(base_url=base_url, api_key=key, timeout=30)
+    prompt = SYSTEM + (GENIE_NOTE if genie.configured() else "")
+    messages = [{"role": "system", "content": prompt}, {"role": "user", "content": question}]
     evidence: list[dict] = []
     try:
         for _ in range(4):
-            msg = client.chat.completions.create(model=model, max_tokens=400, tools=TOOLS,
+            msg = client.chat.completions.create(model=model, max_tokens=400, tools=llm_tools(),
                                                  messages=messages).choices[0].message
             if not msg.tool_calls:
                 return {"answer": (msg.content or "").strip(), "evidence": evidence, "brain": name}
+            # Gemini tags each tool call with a thought signature (extra_content) and rejects the
+            # next request if it isn't sent back, so keep it when present.
             messages.append({"role": "assistant", "content": msg.content or "", "tool_calls": [
-                {"id": c.id, "type": "function", "function": {"name": c.function.name, "arguments": c.function.arguments}}
+                {"id": c.id, "type": "function", "function": {"name": c.function.name, "arguments": c.function.arguments},
+                 **({"extra_content": c.extra_content} if getattr(c, "extra_content", None) else {})}
                 for c in msg.tool_calls]})
             for c in msg.tool_calls:
                 r = run_tool(c.function.name, json.loads(c.function.arguments or "{}"), memory, events)
-                evidence += r.pop("entries")
+                evidence += r.pop("entries", [])
                 # The model only gets the facts, never the photos.
                 messages.append({"role": "tool", "tool_call_id": c.id, "content": json.dumps(r)})
     except Exception as e:

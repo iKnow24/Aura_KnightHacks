@@ -17,7 +17,7 @@ export const instantSupported = !!SR
 const KEY = 'lumen_transcript'
 const loadSaved = () => { try { return JSON.parse(localStorage.getItem(KEY)) || [] } catch { return [] } }
 
-export function useLiveCaptions({ engine, active, onFinal, externalMic = false }) {
+export function useLiveCaptions({ engine, active, onFinal, onVoice, externalMic = false }) {
   const [lines, setLines] = useState(loadSaved)
   const [interim, setInterim] = useState('')
   const [listening, setListening] = useState(false)
@@ -25,6 +25,8 @@ export function useLiveCaptions({ engine, active, onFinal, externalMic = false }
   const [level, setLevel] = useState(0)
   const finalRef = useRef(onFinal)
   finalRef.current = onFinal
+  const voiceRef = useRef(onVoice)
+  voiceRef.current = onVoice
 
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(lines.slice(-1000))) } catch { /* full or private */ } }, [lines])
 
@@ -96,9 +98,20 @@ export function useLiveCaptions({ engine, active, onFinal, externalMic = false }
     if (msg.zone === 'wearer' && engine !== 'private') return
     setInterim('')
     // voice: who said it by voiceprint ("Sharan", or "Person 4" when we don't know their name).
+    // start_ts/end_ts: when the words were said, on the brain's clock (clock.js lines it up with ours).
     addLine(msg.text, { id: msg.id ?? `${msg.ts}-${msg.zone}`, zone: msg.zone === 'wearer' ? null : msg.zone, ts: msg.ts, replaces: msg.replaces,
+      startTs: msg.start_ts, endTs: msg.end_ts,
       ...(msg.voice && { voice: msg.voice, voiceKnown: !!msg.voice_known }) })
   }, [engine, addLine])
+
+  // Naming the voice takes another model pass, so it arrives just after the words
+  // ({"type": "caption_voice"}). Patch the line that's already on screen.
+  const addVoice = useCallback((msg) => {
+    if (!msg.voice) return
+    setLines((l) => l.map((x) => ((x.id === msg.id || Math.abs(x.ts - msg.ts) < 0.001)
+      ? { ...x, voice: msg.voice, voiceKnown: !!msg.voice_known } : x)))
+    voiceRef.current?.(msg)
+  }, [])
 
   // While someone is still talking the brain sends the words so far about once a second
   // (caption_partial). They show greyed out until the finished line arrives.
@@ -107,5 +120,5 @@ export function useLiveCaptions({ engine, active, onFinal, externalMic = false }
     setInterim(msg.text)
   }, [engine])
 
-  return { lines, interim, listening, error, level, setLevel, addRemote, addPartial, clear: () => setLines([]), addLine }
+  return { lines, interim, listening, error, level, setLevel, addRemote, addPartial, addVoice, clear: () => setLines([]), addLine }
 }

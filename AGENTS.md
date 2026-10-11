@@ -107,6 +107,8 @@ Env vars: `MODE`, `LUMEN_NAME`, `LUMEN_LLM` = `groq` (free default, keep it) | `
 `GROQ_API_KEY` / `ANTHROPIC_API_KEY` / `XAI_API_KEY` / `GEMINI_API_KEY` / `HF_TOKEN` (Hugging Face Inference Providers;
 `LUMEN_LLM_MODEL` picks any HF chat model id); `WHISPER_PROVIDER=groq`; `VOICE_ID=0` turns voice labels off, `VOICE_MATCH` / `VOICE_NEW` tune them; `EVENT_LOG_DIR`, `LUMEN_HOUSEHOLD`,
 `LUMEN_SYNC_KEY`; `DATABRICKS_HOST`, `DATABRICKS_TOKEN`, `DATABRICKS_WAREHOUSE_ID` for the History tab.
+`GENIE_SPACE_ID` plus the same host and token let Ask Lumen call Genie (`ask_genie`). Leave those unset
+on the AMD box; its proxy blocks databricks.com. See `databricks/README.md`.
 
 ## Databricks (real data path)
 
