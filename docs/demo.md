@@ -94,3 +94,17 @@ Every item here is something code can't fix. Find out early.
   needs the GPU (it runs on CPU too, just slower).
 - Tunnel down: phone hotspot plus the laptop's local address won't give phones camera access
   (no https). Fall back to the pre-recorded demo video. **Record it Saturday night.**
+
+## Run the site from GitHub, with your real brain
+
+The GitHub Pages site (https://iknow24.github.io/Aura_KnightHacks/) is files only, so by default it runs a
+fake brain inside the page and nothing syncs between devices. To make it a real screen on your house, give
+it the address of the brain, once, on any page:
+
+    https://iknow24.github.io/Aura_KnightHacks/dashboard?brain=https://YOUR-TUNNEL.trycloudflare.com
+
+The page remembers it in that browser (`?brain=off` forgets it), and the "Add a phone" QR codes carry it
+along, so every phone you scan ends up on the same brain. The address has to be **https** (Pages is https,
+and browsers block a plain http brain from an https page): use the cloudflared tunnel that points at the
+brain on port 8000, not `http://localhost:8000` (that works only when the page itself is on localhost).
+Code is `web/src/lib/brain.js`. A free cloudflared tunnel gets a new address every time it restarts.

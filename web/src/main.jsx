@@ -1,4 +1,5 @@
 import './demo/backend.js' // first, so the fake brain is in place before any screen connects (VITE_DEMO only)
+import { connectBrain } from './lib/brain' // ?brain=<address>: talk to a brain on another machine
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, HashRouter, Navigate, Routes, Route } from 'react-router-dom'
@@ -21,6 +22,8 @@ const RequireUser = ({ children }) => (getUser() ? children : <Navigate to="/sta
 // Hosts that can't send every path to index.html (an embedded preview) build with VITE_ROUTER=hash.
 const Router = import.meta.env.VITE_ROUTER === 'hash' ? HashRouter : BrowserRouter
 const routerProps = import.meta.env.VITE_ROUTER === 'hash' ? {} : { basename: import.meta.env.BASE_URL }
+
+connectBrain()
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <Router {...routerProps}>

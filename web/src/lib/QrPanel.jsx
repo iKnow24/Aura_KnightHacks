@@ -1,4 +1,5 @@
 import QRCode from 'qrcode'
+import { brainOrigin, withBrain } from './brain'
 import { useEffect, useState } from 'react'
 
 // Phones for the pitch. The address is whatever this dashboard was opened from,
@@ -17,9 +18,11 @@ export default function QrPanel() {
   useEffect(() => {
     // BASE_URL keeps the sub-folder when hosted on GitHub Pages (/Aura_KnightHacks/).
     const base = location.origin + import.meta.env.BASE_URL.replace(/\/$/, '')
-    Promise.all(DEVICES.map(([label, path, note]) =>
-      QRCode.toDataURL(base + path, { margin: 1, width: 240 }).then((src) => ({ label, note, url: base + path, src }))
-    )).then(setCodes)
+    // withBrain keeps a ?brain= address on the link, so a phone scanning this points at the same brain.
+    Promise.all(DEVICES.map(([label, path, note]) => {
+      const url = withBrain(base + path)
+      return QRCode.toDataURL(url, { margin: 1, width: 240 }).then((src) => ({ label, note, url, src }))
+    })).then(setCodes)
   }, [])
 
   const local = location.hostname === 'localhost' || location.hostname === '127.0.0.1'

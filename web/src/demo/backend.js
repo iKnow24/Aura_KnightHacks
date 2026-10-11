@@ -2,6 +2,7 @@
 // It replaces fetch('/api/...') and WebSocket('/ws/...') so every screen works with no server.
 // Real detection (sound models, Whisper, OWLv2) still needs the brain on AMD or a laptop.
 // Turned on by building with VITE_DEMO=1. In a normal build the whole file is dropped as dead code.
+import { brainOrigin } from '../lib/brain'
 import HISTORY from './history.json'
 
 const now = () => Date.now() / 1000
@@ -130,7 +131,8 @@ const routes = {
   'POST /api/speech/tag': () => ({ ok: true }),
 }
 
-if (import.meta.env.VITE_DEMO) {
+// ?brain=<address> means there's a real brain to talk to, so the fake one stays out of the way.
+if (import.meta.env.VITE_DEMO && !brainOrigin()) {
   const realFetch = window.fetch.bind(window)
   window.fetch = async (input, init = {}) => {
     const raw = typeof input === 'string' ? input : input.url
