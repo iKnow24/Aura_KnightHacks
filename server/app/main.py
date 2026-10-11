@@ -23,7 +23,7 @@ from .agent import answer
 from .llm import local as local_llm
 from .recap import recap
 from .speakers import CrossTalk
-from . import eventlog
+from . import eventlog, hazard
 from .direction import locate
 from .history import history
 from .hub import Hub
@@ -404,6 +404,25 @@ async def look(body: Look):
         return await look_at("dashboard-camera", body.zone, body.jpeg) or {}
     finally:
         items_busy.discard("dashboard-camera")
+
+
+@app.post("/api/hazard")
+async def hazard_note(body: Look):
+    """Opt-in "watch out" note for one dashboard camera still, written by Gemini. Advice only: it never fires
+    an alert. The photo is answered and dropped; only the note text goes in the event log."""
+    if not body.jpeg.startswith("data:image/jpeg;base64,") or len(body.jpeg) > 400_000:
+        raise HTTPException(400, "send a small JPEG data URL")
+    if "hazard" in items_busy:
+        return {"enabled": True, "notes": [], "wait": True}
+    items_busy.add("hazard")
+    try:
+        result = await asyncio.to_thread(hazard.look, body.jpeg)
+    finally:
+        items_busy.discard("hazard")
+    if result.get("notes"):
+        eventlog.record({"type": "hazard_note", "zone": body.zone, "notes": result["notes"],
+                         "model": result.get("model"), "advisory": True})
+    return result
 
 
 @app.post("/api/scene-boxes")

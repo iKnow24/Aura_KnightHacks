@@ -15,6 +15,7 @@ paths, current state. This file is the short version; keep the two in sync.
   memory; the brain keeps only a small crop of each item it finds and never stores full frames.
 - No face recognition. Names only come from someone saying "my name is ...".
 - The Ask Lumen agent (server/app/agent.py) only reads the memory log and the alert timeline. It never fires alerts.
+- Hazard notes (server/app/hazard.py) are Gemini advice shown on the dashboard camera, opt-in by a button because the still goes to Google. They never fire an alert and the photo is dropped.
 - Never commit tokens or keys (Jupyter, Databricks, API keys).
 - The AMD box is the PyTorch ROCm image as root: never use sudo, never reinstall torch.
 - Never push to main. Draft PR while working, mark Ready when done; the auto-merge robot merges when CI is green.

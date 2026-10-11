@@ -90,3 +90,53 @@ def test_partial_audio_only_once_someone_is_talking():
     for _ in range(4):
         seg.feed(np.zeros(SAMPLE_RATE // 4, dtype=np.float32))
     assert seg.done == 1 and seg.so_far() is None
+
+
+def test_hazard_notes_are_parsed_safely_and_never_fire_alerts(monkeypatch):
+    from app import hazard
+
+    assert hazard.parse('```json\n{"notes": [{"label": "cup at table edge", "where": "left", "why": "could fall"}]}\n```') == [
+        {"label": "cup at table edge", "where": "left", "why": "could fall"}]
+    assert hazard.parse("no hazards here") == []
+    assert hazard.parse('{"notes": "oops"}') == []
+    assert len(hazard.parse('{"notes": [{"label": "a"}, {"label": "b"}, {"label": "c"}]}')) == 2
+    # Without a Gemini key it says so instead of calling anything.
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setenv("LUMEN_LLM", "off")
+    assert hazard.look("data:image/jpeg;base64,AAAA") == {"enabled": False, "notes": []}
+
+
+def test_hazard_endpoint_without_a_key_is_off_and_rejects_big_photos(monkeypatch):
+    monkeypatch.setenv("LUMEN_LLM", "off")
+    client = TestClient(app)
+    ok = client.post("/api/hazard", json={"jpeg": "data:image/jpeg;base64,AAAA"})
+    assert ok.status_code == 200 and ok.json() == {"enabled": False, "notes": []}
+    assert client.post("/api/hazard", json={"jpeg": "not a photo"}).status_code == 400
+
+
+def test_hazard_note_sends_the_photo_to_gemini_and_returns_the_notes(monkeypatch):
+    import sys
+    import types
+
+    from app import hazard
+
+    seen = {}
+
+    class FakeClient:
+        def __init__(self, **kw):
+            seen["base_url"] = kw["base_url"]
+            self.chat = types.SimpleNamespace(completions=types.SimpleNamespace(create=self.create))
+
+        def create(self, **kw):
+            seen["content"] = kw["messages"][0]["content"]
+            text = '{"notes": [{"label": "cup at table edge", "where": "left of the table", "why": "could fall"}]}'
+            return types.SimpleNamespace(choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=text))])
+
+    monkeypatch.setitem(sys.modules, "openai", types.SimpleNamespace(OpenAI=FakeClient))
+    monkeypatch.setenv("LUMEN_LLM", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(hazard, "_last_call", 0.0)
+    out = hazard.look("data:image/jpeg;base64,AAAA")
+    assert out["notes"][0]["label"] == "cup at table edge" and "generativelanguage" in seen["base_url"]
+    assert seen["content"][1] == {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,AAAA"}}
+    assert hazard.look("data:image/jpeg;base64,AAAA")["wait"] is True  # asked again too soon
