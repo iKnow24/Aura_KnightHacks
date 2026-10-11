@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { clockKnown, serverToPerf } from './clock'
 import { detectFaces, loadFaces } from './faces'
+import { nameIn } from './captionText'
 import { FaceTracker } from './faceTracker'
 import { pickSpeaker } from './speakerMatch'
 import SpatialCaptions from './SpatialCaptions'
@@ -25,6 +26,7 @@ export default function TalkingHeads({ videoRef }) {
   const [lines, setLines] = useState({}) // track id -> {text, ts, live}
   const [loose, setLoose] = useState(null) // a line with no face yet: shown once, not stuck at the page bottom
   const names = useRef({}) // track id -> voice name ("Sharan", "Person 4")
+  const people = useRef(0) // how many faces have been given a "Person N" label
   const lineTrack = useRef({}) // caption id -> track id, so a late voice name finds the right face
   const [, tick] = useState(0)
 
@@ -96,6 +98,13 @@ export default function TalkingHeads({ videoRef }) {
       const had = names.current[face.id]
       if (final && msg.voice_known && had && had !== msg.voice && !had.startsWith('Person ')) return
       if (final && msg.voice && (msg.voice_known || !had)) names.current[face.id] = msg.voice
+      if (final) {
+        // No voice ID on this brain (it needs torch): a spoken "my name is Dana" names the face that said it,
+        // and anyone else who talks is Person 1, 2... in the order they first spoke. A face keeps its label.
+        const said = nameIn(msg.text)
+        if (said) { names.current[face.id] = said; tick((n) => n + 1) }
+        else if (!names.current[face.id]) { names.current[face.id] = `Person ${++people.current}`; tick((n) => n + 1) }
+      }
       setLines((l) => ({ ...l, [face.id]: { text: msg.text, ts: Date.now() / 1000, live: !final } }))
     }
     window.addEventListener('lumen:caption', onCaption)
