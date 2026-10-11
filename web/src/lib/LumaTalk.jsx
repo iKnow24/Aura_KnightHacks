@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Mic, Send, Sparkles, X } from 'lucide-react'
-import { useRef, useState } from 'react'
-import { say } from './speak'
+import { Mic, Send, Sparkles, Volume2, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { prime, say, voiceSupported, warmup } from './speak'
 import { api } from './useBrain'
 
 // "Ask Luma" on the wearer's screen: tap, then talk or type. The answer comes from the house log
@@ -17,9 +17,15 @@ export default function LumaTalk({ liftBy = 0 }) {
   const [answer, setAnswer] = useState(null)
   const recRef = useRef()
 
+  // A laptop can load Luma's voice. A phone skips the download and keeps the captions light.
+  useEffect(() => {
+    if (window.matchMedia('(min-width: 900px)').matches) warmup()
+  }, [])
+
   const ask = async (text) => {
     const question = text.trim()
     if (!question || busy) return
+    prime()
     setQ('')
     setBusy(true)
     setAnswer({ question, text: '…' })
@@ -77,7 +83,14 @@ export default function LumaTalk({ liftBy = 0 }) {
             className="glass-dark absolute inset-x-3 top-[max(3.5rem,calc(env(safe-area-inset-top)+3rem))] z-30 mx-auto max-w-md rounded-2xl p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="text-xs uppercase tracking-widest text-zinc-400">Luma · {answer.question}</div>
-              <X size={14} className="shrink-0 text-zinc-500" />
+              <span className="flex shrink-0 items-center gap-2">
+                {voiceSupported() && answer.text && answer.text !== '…' && (
+                  <button type="button" aria-label="Hear this answer" title="Hear this answer"
+                    onClick={(e) => { e.stopPropagation(); say(answer.text, { force: true }) }}
+                    className="text-zinc-400"><Volume2 size={14} /></button>
+                )}
+                <X size={14} className="text-zinc-500" />
+              </span>
             </div>
             <p className="mt-2 text-lg leading-snug">{answer.text}</p>
           </motion.div>
