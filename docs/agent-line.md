@@ -90,9 +90,9 @@ Acknowledging: any screen calls `POST /api/ack {"id": alert_id, "by": "wearer"}`
 Rear guard phone sends `{"type": "approach", "label": "person" | "car" | ..., "score", "area"}` on its node socket.
 A room camera sends `{"type": "spill", "score", "area"}` when a new puddle sits still on the counter (Home and Watch modes).
 Lecture recap: `POST /api/recap {"segments": [{"text", "ts"}], "title"}` returns
-`{"title", "summary", "points", "map": {"center", "branches": [{"label", "ts", "details"}]}, "quiz": [{"q", "choices", "answer"}], "people", "brain": "groq" | "claude" | "xai" | "local" | "rules"}`.
-Ask Lumen: `POST /api/ask {"question": "..."}` returns `{"answer", "evidence": [log entries], "brain": "groq" | "claude" | "xai" | "rules"}`.
-Pick the AI with `LUMEN_LLM=groq|claude|xai|off` and the matching key (`GROQ_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`). No key means keyword answers.
+`{"title", "summary", "points", "map": {"center", "branches": [{"label", "ts", "details"}]}, "quiz": [{"q", "choices", "answer"}], "people", "brain": "groq" | "claude" | "xai" | "gemini" | "hf" | "local" | "rules"}`.
+Ask Lumen: `POST /api/ask {"question": "..."}` returns `{"answer", "evidence": [log entries], "brain": "groq" | "claude" | "xai" | "gemini" | "hf" | "rules"}`.
+Pick the AI with `LUMEN_LLM=groq|claude|xai|gemini|hf|off` and the matching key (`GROQ_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `GEMINI_API_KEY`, `HF_TOKEN`). No key means keyword answers.
 Set `WHISPER_PROVIDER=groq` to transcribe on Groq instead of the AMD GPU.
 
 ## Git, plainly
