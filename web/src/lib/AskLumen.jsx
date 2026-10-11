@@ -21,7 +21,19 @@ export default function AskLumen({ className = '' }) {
   const [listening, setListening] = useState(false)
   const [thread, setThread] = useState(load)
   const [voice, setVoiceOn] = useState(voiceOn)
+  const [speaking, setSpeaking] = useState(false)
   const list = useRef()
+  const spoke = useRef()
+
+  const hear = (text) => {
+    setVoice(true)
+    setVoiceOn(true)
+    const ok = text ? say(text, { force: true }) : greet()
+    if (!ok) return
+    setSpeaking(true)
+    clearTimeout(spoke.current)
+    spoke.current = setTimeout(() => setSpeaking(false), 2200)
+  }
 
   useEffect(() => {
     if (list.current) list.current.scrollTop = list.current.scrollHeight
@@ -44,7 +56,11 @@ export default function AskLumen({ className = '' }) {
     } catch {
       reply = { answer: "Can't reach the brain right now.", evidence: [] }
     }
-    say(reply.answer)
+    if (say(reply.answer)) {
+      setSpeaking(true)
+      clearTimeout(spoke.current)
+      spoke.current = setTimeout(() => setSpeaking(false), 2200)
+    }
     setThread((t) => [...t, { from: 'lumen', text: reply.answer, evidence: reply.evidence, brain: reply.brain, ts: Date.now() / 1000 }])
     setBusy(false)
   }
@@ -66,16 +82,16 @@ export default function AskLumen({ className = '' }) {
         <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
           {voiceSupported() && (
             <>
-              <button type="button" onClick={() => { setVoice(true); setVoiceOn(true); greet() }}
+              <button type="button" onClick={() => hear()}
                 title="Play Luma's voice now"
                 className="flex items-center gap-1 text-xs text-zinc-300 hover:text-white">
-                <Volume2 size={14} /> Hear Luma
+                <Volume2 size={14} /> {speaking ? 'Speaking…' : 'Hear Luma'}
               </button>
               <button type="button" onClick={() => {
                 const next = !voice
                 setVoice(next)
                 setVoiceOn(next)
-                if (next) greet()
+                if (next) hear()
               }} title="Luma reads answers and hazard notes aloud"
                 className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300">
                 {voice ? <Volume2 size={14} /> : <VolumeX size={14} />} Voice {voice ? 'on' : 'off'}
@@ -95,7 +111,7 @@ export default function AskLumen({ className = '' }) {
               <div className="min-w-0 flex-1 leading-snug">{m.text}</div>
               {m.from === 'lumen' && voiceSupported() && (
                 <button type="button" aria-label="Hear this answer" title="Hear this answer"
-                  onClick={() => { setVoice(true); setVoiceOn(true); say(m.text, { force: true }) }}
+                  onClick={() => hear(m.text)}
                   className="shrink-0 text-zinc-500 hover:text-white"><Volume2 size={14} /></button>
               )}
             </div>
