@@ -7,8 +7,9 @@ import MemoryStack from '../components/landing/MemoryStack'
 import Timeline, { ECLIPSE } from '../components/ui/Timeline'
 import Logo, { Wordmark } from '../lib/Logo'
 
-// The 3D head is its own chunk (three.js), loaded after the page paints. Without WebGL, or with
-// reduced motion turned on, or if anything in it throws, the hero shows the logo instead.
+// The 3D head is its own chunk (three.js), loaded after the page paints. Without WebGL, or if anything
+// in it throws, the hero shows the logo instead. It still shows with reduced motion on, because it is the
+// first thing judges see and its motion is slow and small.
 const HeroHeadset = lazy(() => import('../components/landing/HeroHeadset'))
 const hasWebGL = () => {
   try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')) } catch { return false }
@@ -69,7 +70,7 @@ export default function Landing() {
   const [leaving, setLeaving] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const shot = useRef(null)
-  const [show3d] = useState(() => !still && hasWebGL())
+  const [show3d] = useState(() => hasWebGL())
   const heroLogo = (
     <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 1.2, ease }}
       className={show3d ? 'grid h-full place-items-center' : ''}>
