@@ -37,7 +37,7 @@ export default function Story() {
           {data.source === 'event_log' && ' These rows are this home’s own event log.'}
         </p>
       </header>
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+      <div className="space-y-4">
         <Calendar data={data} day={day} onDay={setDay} />
         <DayList day={day} moments={data.moments || []} />
       </div>
@@ -55,7 +55,7 @@ function Calendar({ data, day, onDay }) {
   return (
     <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgb(255_255_255/0.08),0_30px_80px_-40px_rgb(0_0_0/0.9)] backdrop-blur-2xl sm:p-6">
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-      <div className="space-y-7">
+      <div className="grid gap-8 lg:grid-cols-2">
         {months.map((month) => (
           <div key={month.key}>
             <h3 className="mb-4 text-[15px] font-medium tracking-tight text-white">{month.label}</h3>
@@ -68,10 +68,10 @@ function Calendar({ data, day, onDay }) {
                 const on = day === cell.day
                 return (
                   <button key={cell.day} type="button" onClick={() => onDay(cell.day)} aria-pressed={on}
-                    className={`group relative flex aspect-square flex-col justify-between rounded-2xl border p-2 text-left transition duration-300 sm:aspect-[5/4] sm:p-2.5 ${on
+                    className={`group relative flex h-14 flex-col justify-between rounded-xl border px-2 py-1.5 text-left transition duration-300 sm:h-16 ${on
                       ? 'border-white/70 bg-white text-black shadow-[0_10px_40px_-10px_rgb(255_255_255/0.45)]'
                       : 'border-white/[0.07] bg-white/[0.04] text-white hover:border-white/20 hover:bg-white/[0.08]'}`}>
-                    <span className="text-sm font-medium tabular-nums sm:text-base">{cell.date.getDate()}</span>
+                    <span className="text-sm font-medium tabular-nums">{cell.date.getDate()}</span>
                     <span className="block">
                       <span className={`hidden text-[10px] sm:block ${on ? 'text-zinc-600' : 'text-zinc-500'}`}>
                         {cell.alerts ? `${cell.alerts} alert${cell.alerts === 1 ? '' : 's'}` : cell.clinic ? 'Clinic' : ''}
@@ -118,9 +118,9 @@ function buildMonths(days, moments) {
 function DayList({ day, moments }) {
   const rows = moments.filter((m) => m.day === day)
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgb(255_255_255/0.08)] backdrop-blur-2xl lg:sticky lg:top-6">
+    <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgb(255_255_255/0.08)] backdrop-blur-2xl">
       <h3 className="text-[15px] font-medium tracking-tight">{day ? new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) : 'Pick a day'}</h3>
-      <ul className="mt-3 max-h-[28rem] space-y-2 overflow-y-auto">
+      <ul className="mt-3 grid max-h-[26rem] gap-2 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
         {rows.length === 0 && <li className="text-sm text-zinc-500">Nothing logged this day.</li>}
         {rows.map((m, i) => (
           <li key={`${m.time}-${m.kind}-${i}`} className="flex gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.04] p-3 text-sm">
