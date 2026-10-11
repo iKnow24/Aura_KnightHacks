@@ -6,8 +6,10 @@ drop: upload one day at a time and watch the pipeline pick up only the new file.
 
 The data is made up, and the decline in week 2 is planted on purpose: from day 8 on, Maria
 takes longer to notice alerts and misses more of them, worst at night. Say so in the demo.
+Pass --steady for days that should stay at her normal pace (history before that two-week window).
 
     python3 databricks/generate_household.py --days 14 --out databricks/sample_data
+    python3 databricks/generate_household.py --days 30 --end 2026-09-25 --steady
 """
 import argparse
 import json
@@ -67,8 +69,10 @@ LINES = [
 ITEMS = [("keys", ["hallway", "living", "kitchen"]), ("glasses", ["bedroom", "living"]), ("wallet", ["kitchen", "hallway"])]
 
 
-def decline(day_index: int) -> float:
-    """0 for the first week, then rising to 1 by the last day."""
+def decline(day_index: int, steady: bool = False) -> float:
+    """0 for the first week, then rising to 1 by the last day. --steady stays at 0 the whole time."""
+    if steady:
+        return 0.0
     return max(0.0, (day_index - 6) / 7)
 
 
@@ -276,8 +280,8 @@ def day_in_the_life(rng, day: date, at) -> list[dict]:
     return events
 
 
-def day_events(rng, day: date, index: int) -> list[dict]:
-    d = decline(index)
+def day_events(rng, day: date, index: int, household: str = HOUSEHOLD, steady: bool = False) -> list[dict]:
+    d = decline(index, steady)
     at = lambda h, m=0, s=0: datetime(day.year, day.month, day.day, h, m, s, tzinfo=TZ)
     events = [{"type": "mode", "mode": "watch", "ts": at(7).timestamp()},
               {"type": "mode", "mode": "night", "ts": at(22, 30).timestamp()}]
@@ -299,7 +303,7 @@ def day_events(rng, day: date, index: int) -> list[dict]:
     # The day-in-the-life below uses its own dice so a judge can read a real morning and evening.
     events += day_in_the_life(random.Random(index * 17 + 3), day, at)
     for e in events:
-        e["household"] = HOUSEHOLD
+        e["household"] = household
     return sorted(events, key=lambda e: e["ts"])
 
 
@@ -309,16 +313,24 @@ def main():
     p.add_argument("--end", default=None, help="last day, YYYY-MM-DD (default: yesterday)")
     p.add_argument("--out", default=str(Path(__file__).parent / "sample_data"))
     p.add_argument("--seed", type=int, default=7)
+    p.add_argument("--household", default=HOUSEHOLD, help="household id written on every line (default: maria)")
+    p.add_argument("--steady", action="store_true",
+                   help="no planted slowdown; use for days before the 2026-09-26 demo window")
     args = p.parse_args()
+    if args.household == "home":
+        raise SystemExit("refusing household 'home': that name is the real house, not generated data")
     rng = random.Random(args.seed)
     end = date.fromisoformat(args.end) if args.end else date.today() - timedelta(days=1)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     for i in range(args.days):
         day = end - timedelta(days=args.days - 1 - i)
-        events = day_events(rng, day, i)
-        (out / f"{day.isoformat()}.jsonl").write_text("".join(json.dumps(e) + "\n" for e in events))
-        print(day, len(events), "events")
+        events = day_events(rng, day, i, args.household, args.steady)
+        path = out / f"{day.isoformat()}.jsonl"
+        if path.exists():
+            raise SystemExit(f"refusing to overwrite {path.name}; pick an --end that does not overlap")
+        path.write_text("".join(json.dumps(e) + "\n" for e in events))
+        print(day, len(events), "events", args.household, "steady" if args.steady else "decline")
 
 
 if __name__ == "__main__":

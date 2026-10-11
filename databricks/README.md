@@ -39,7 +39,7 @@ EVENT_LOG_DIR=./event_log LUMEN_HOUSEHOLD=maria ./run.sh
 The brain writes one file per hour (`2026-10-10_14.jsonl`). Upload only finished hours: Auto Loader
 reads each file name once, so a file that keeps growing after upload would lose its new lines.
 
-`databricks/sample_data/` already holds 14 days ending 2026-10-09.
+`databricks/sample_data/` holds those 14 days (2026-09-26 to 2026-10-09) plus 30 earlier days at her normal pace (2026-08-27 to 2026-09-25, made with `--steady`). The "worth a call" numbers still come from the last two weeks only. Do not regenerate the original 14 days; the script refuses to overwrite a file that is already there.
 
 ## Quickest start: one SQL file
 

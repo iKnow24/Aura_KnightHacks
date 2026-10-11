@@ -22,7 +22,9 @@ def test_sample_history_matches_planted_decline(monkeypatch):
     history._cache.clear()
     out = TestClient(main.app).get("/api/history?household=maria").json()
     assert out["source"] == "sample"
-    assert len(out["days"]) == 14
+    # 30 steady days (2026-08-27..09-25) plus the original 14. The warning still uses only the last two weeks.
+    assert len(out["days"]) == 44
+    assert out["days"][0]["day"] == "2026-08-27"
     s = out["status"]
     assert s["latest_day"] == "2026-10-09"
     assert (s["missed_this_week"], s["missed_week_before"]) == (15, 5)
