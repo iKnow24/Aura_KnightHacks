@@ -43,7 +43,7 @@ EVENT_LOG_DIR=$HOME/lumen_events LUMEN_HOUSEHOLD=home LUMEN_SYNC_KEY=pick-a-pass
 **4. Your Mac**, in the repo folder (`git pull` first), in a new Terminal tab while the Jupyter bridge is running:
 
 ```bash
-databricks auth login --host https://dbc-b3f6f3f8-af14.cloud.databricks.com --profile lumen
+databricks auth login --host https://dbc-2559c3a9-bfb4.cloud.databricks.com --profile lumen
 export LUMEN_SYNC_KEY=pick-a-password
 python3 scripts/databricks_sync.py
 ```
