@@ -13,6 +13,7 @@ The short version:
 - Before saying you're done, run `cd server && python -m pytest -q` and `cd web && npm run build`.
 - The alert JSON in `docs/agent-line.md` is a contract; don't change it unless asked.
 - No LLM decides whether a safety alert fires. No face recognition. No live video leaves a phone.
+- Sound direction: headset is the center, back cam is behind, security phone is on the chest (`server/app/direction.py`). SAID and PSELDNets are the reference models. Do not stack those phone streams into their checkpoints. Direction never fires an alert.
 - Captions and alerts stay large, plain and high contrast. Black/gray/white design; the Eclipse logo is the only color.
 - Never use `sudo` or reinstall `torch` on the AMD box. Never commit tokens or API keys.
 - Keep changes small and explain them in plain words.

@@ -23,6 +23,7 @@ export default function TalkingHeads({ videoRef }) {
   const tracksRef = useRef([])
   const [ids, setIds] = useState('')
   const [lines, setLines] = useState({}) // track id -> {text, ts, live}
+  const [loose, setLoose] = useState(null) // a line with no face yet: shown once, not stuck at the page bottom
   const names = useRef({}) // track id -> voice name ("Sharan", "Person 4")
   const lineTrack = useRef({}) // caption id -> track id, so a late voice name finds the right face
   const [, tick] = useState(0)
@@ -81,10 +82,20 @@ export default function TalkingHeads({ videoRef }) {
       }
       if (!msg.text) return
       const final = msg.type === 'caption'
-      const face = who(msg, final)
-      if (!face) return
+      let face = who(msg, final)
+      const tracks = tracker.current.tracks.filter((x) => x.hits >= 3)
+      if (!face && tracks.length === 1) face = tracks[0]
+      if (!face) {
+        setLoose({ key: msg.id ?? msg.text, text: msg.text, name: msg.voice, live: !final, ts: Date.now() / 1000 })
+        return
+      }
+      setLoose(null)
       // Only the last 20 lines need remembering; a voice name arrives within a second of its line.
       if (final && msg.id) lineTrack.current = Object.fromEntries(Object.entries({ [msg.id]: face.id, ...lineTrack.current }).slice(0, 20))
+      // This face already has a different known voice: the line came from someone off camera.
+      const had = names.current[face.id]
+      if (final && msg.voice_known && had && had !== msg.voice && !had.startsWith('Person ')) return
+      if (final && msg.voice && (msg.voice_known || !had)) names.current[face.id] = msg.voice
       setLines((l) => ({ ...l, [face.id]: { text: msg.text, ts: Date.now() / 1000, live: !final } }))
     }
     window.addEventListener('lumen:caption', onCaption)
@@ -101,5 +112,6 @@ export default function TalkingHeads({ videoRef }) {
     // A known face with nothing new to say keeps a quiet name tag; a fresh line shows over it.
     return [{ trackId: id, key: id, text: line?.text ?? '', live: line?.live, name, color: track?.color ?? '#fff' }]
   })
-  return <SpatialCaptions videoRef={videoRef} tracksRef={tracksRef} bubbles={bubbles} neutral={null} fit="contain" />
+  const neutral = loose && now - loose.ts < HOLD_S ? loose : null
+  return <SpatialCaptions videoRef={videoRef} tracksRef={tracksRef} bubbles={bubbles} neutral={neutral} fit="contain" />
 }

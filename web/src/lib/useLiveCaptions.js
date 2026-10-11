@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { voiceForLine } from './captionText'
 import { streamMic } from './mic'
 
 // Two caption engines:
@@ -37,7 +38,11 @@ export function useLiveCaptions({ engine, active, onFinal, onVoice, externalMic 
     setLines((l) => [...l.filter((x) => x.id !== extra.replaces), line].slice(-1000))
     const post = (path, body) => fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => {})
     const who = { speaker: line.speaker?.id ?? null, to_you: !!line.speaker?.toYou }
-    if (extra.local) post('/api/speech', { text: line.text, ...who })
+    if (extra.local) {
+      const voice = voiceForLine(line.text)
+      if (voice) { line.voice = voice; line.voiceKnown = true }
+      post('/api/speech', { text: line.text, ...who })
+    }
     else if (line.speaker && !line.zone) post('/api/speech/tag', { ts: line.ts, ...who })
   }, [])
 
@@ -52,6 +57,7 @@ export function useLiveCaptions({ engine, active, onFinal, onVoice, externalMic 
       rec.interimResults = true
       rec.lang = 'en-US'
       rec.onstart = () => setListening(true)
+      let partialAt = 0
       rec.onresult = (e) => {
         let live = ''
         for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -60,6 +66,11 @@ export function useLiveCaptions({ engine, active, onFinal, onVoice, externalMic 
           else live += r[0].transcript
         }
         setInterim(live)
+        const now = Date.now()
+        if (live.trim() && now - partialAt > 350) {
+          partialAt = now
+          fetch('/api/speech/partial', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: live }) }).catch(() => {})
+        }
       }
       rec.onerror = (e) => {
         if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {

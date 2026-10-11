@@ -4,7 +4,7 @@ import AlertStack, { useAlerts } from '../lib/AlertToast'
 import { clockKnown, serverToPerf } from '../lib/clock'
 import { detectFaces, loadFaces } from '../lib/faces'
 import { FaceTracker } from '../lib/faceTracker'
-import { lastTwoLines } from '../lib/captionText'
+import { lastTwoLines, nameIn } from '../lib/captionText'
 import SpatialCaptions from '../lib/SpatialCaptions'
 import { pickSpeaker } from '../lib/speakerMatch'
 import { Camera, CameraOff, Clapperboard, Download, Ellipsis, Footprints, GraduationCap, House, Lock, Zap } from 'lucide-react'
@@ -35,18 +35,7 @@ const HIDE_BAR_MS = 4000
 const SPEECH_LEVEL = 0.02 // mic loudness that counts as speech (Private engine)
 const HOLD_S = 5 // a spatial caption stays up this long after its last word
 const FACE_MS = 66 // face tracking at about 15 frames a second
-// "Hi, I'm Adam" / "my name is Adam". A capital letter is required after the weak cues ("I'm going"
-// isn't a name); after "my name is" the recognizer's lowercase is trusted.
-const NAME_RE = /\b(?:[Mm]y name's|[Nn]ame's|I'm|I am|[Cc]all me|[Tt]his is)\s+([A-Z][a-z]{2,})/
-const MY_NAME_IS = /\bmy name is\s+([a-z]{3,})/i
-const NOT_NAMES = new Set(['Going', 'Not', 'Just', 'Sure', 'Sorry', 'Good', 'Fine', 'Okay', 'So', 'Here', 'Really', 'Glad',
-  'Done', 'Back', 'Trying', 'Looking', 'Talking', 'Very', 'The', 'From', 'Your', 'What', 'Lumen'])
-export function nameIn(text) {
-  const m = text.match(MY_NAME_IS)?.[1] ?? text.match(NAME_RE)?.[1]
-  if (!m) return null
-  const name = m[0].toUpperCase() + m.slice(1).toLowerCase()
-  return NOT_NAMES.has(name) ? null : name
-}
+export { nameIn }
 
 // Two transcripts of one sentence (Google on this phone, Whisper on the room phone): most words in common.
 function sameWords(a, b) {
@@ -398,9 +387,14 @@ export default function Captions() {
   useEffect(() => { window.lumenSay = (t) => captions.addLine(t, { local: true }) })
 
   useEffect(() => {
-    if (!started || realEngine !== 'private') return
-    fetch('/api/memory').then((r) => r.json()).then((m) => setWhisperOff(m.models?.whisper === 'off')).catch(() => {})
-  }, [started, realEngine])
+    if (!started || realEngine !== 'private' || mode === 'outside') return
+    fetch('/api/memory').then((r) => r.json()).then((m) => {
+      const off = m.models?.whisper === 'off'
+      setWhisperOff(off)
+      // This Mac has no Whisper. Instant is the caption path that already works here.
+      if (off && instantSupported) setEngine('instant')
+    }).catch(() => {})
+  }, [started, realEngine, mode])
 
   useEffect(() => { if (videoRef.current) videoRef.current.srcObject = camera }, [camera])
 
@@ -462,19 +456,20 @@ export default function Captions() {
     const sock = nodeSocket(id, 'wearer')
     let stopMic = () => {}
     let dead = false
-    attachMic((buf) => sock.send(buf), (level) => pushLevel.current(level))
+    attachMic((buf) => sock.send(buf), (level) => pushLevel.current(level), null, { echoCancel: true })
       .then((stop) => { if (dead) stop(); else stopMic = stop })
       .catch(() => {})
     const timer = setInterval(() => {
       const v = videoRef.current
-      if (!v?.videoWidth) return
       const w = 640
-      const h = Math.max(1, Math.round((w * v.videoHeight) / v.videoWidth))
+      const h = v?.videoWidth ? Math.max(1, Math.round((w * v.videoHeight) / v.videoWidth)) : 360
       const c = document.createElement('canvas')
       c.width = w
       c.height = h
       const g = c.getContext('2d')
-      g.drawImage(v, 0, 0, w, h)
+      g.fillStyle = '#000'
+      g.fillRect(0, 0, w, h)
+      if (v?.videoWidth) g.drawImage(v, 0, 0, w, h)
       const line = mirrorText.current
       if (line) {
         const bar = Math.round(Math.min(120, h * 0.18))

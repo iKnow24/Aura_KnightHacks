@@ -58,14 +58,17 @@ Every alert in the system is this JSON, and nothing else (see `server/app/hub.py
 
 Change the contract only with all three people agreeing, and change it in one commit.
 
-Two more message types go out on the same sockets. They are not alerts, so screens can ignore them:
+These message types go out on the same sockets. They are not alerts, so screens can ignore them:
 
 ```json
 {"type": "caption", "zone": "kitchen", "text": "Dinner's ready!", "ts": 1728540000.1,
  "start_ts": 1728539998.4, "end_ts": 1728540000.0}                                     // dashboard + hud
 {"type": "caption_voice", "id": "<caption id>", "ts": <caption ts>, "voice": "Sharan", "voice_known": true}
 {"type": "sighting", "item": "keys", "zone": "living", "ts": 1728540000.1}             // dashboard
+{"type": "direction", "zone": "behind", "level": 0.04, "ts": 1728540000.1}            // dashboard only
 ```
+
+`direction` is not an alert. It names which live mic heard the latest sound. The headset is the clock, the back cam is behind the person, and the security phone is on the chest. The guess comes from `server/app/direction.py` (weights trained on those positions). SAID and PSELDNets checkpoints are not loaded: they expect four mics on one puck. Screens can ignore this message. It is not stored.
 
 `start_ts`/`end_ts` are when the words were *said* (brain clock), not when the caption was sent. A caption
 screen lines that up with its own clock (`web/src/lib/clock.js`) and gives the line to the face whose mouth

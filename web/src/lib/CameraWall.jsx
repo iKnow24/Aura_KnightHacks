@@ -3,6 +3,7 @@ import { Maximize2, RefreshCw, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { nodeSocket } from './audio'
+import { loadDetector } from './surroundings'
 import { assign, closeCameras, fillSlots, listCameras, localSource, openCamera, phoneSource } from './cameras'
 import { attachMic } from './mic'
 import TalkingHeads from './TalkingHeads'
@@ -48,6 +49,14 @@ export function useCameraWall({ nodes, previews, now, connected, cams, camError,
   const [open, setOpen] = useState(false)
   const latest = useRef(slots)
   latest.current = slots
+  const wearerId = sources.find((s) => s.zone === 'wearer')?.id
+  const held = useRef(null)
+  useEffect(() => {
+    if (!wearerId) { held.current = null; return }
+    if (held.current === wearerId || latest.current.center === wearerId) { held.current = wearerId; return }
+    held.current = wearerId
+    choose('center', wearerId)
+  }, [wearerId])
   useEffect(() => {
     const onKey = (e) => {
       if (e.target.closest?.('input, textarea, select') || e.metaKey || e.ctrlKey || e.altKey) return
@@ -206,12 +215,11 @@ function phoneLabel(zone) {
 function Feed({ source, preview, look = false }) {
   return source.deviceId
     ? <LaptopFeed deviceId={source.deviceId} label={source.label} look={look} />
-    : <PhoneFeed preview={preview} label={source.label} hear={look && source.zone === 'wearer'} />
+    : <PhoneFeed preview={preview} label={source.label} />
 }
 
 // A room phone. With its opt-in preview on, its camera; otherwise it is the room's ears, so show it listening.
-function PhoneFeed({ preview, label, hear }) {
-  useHeadsetAudio(hear)
+function PhoneFeed({ preview, label }) {
   if (preview) return <img src={preview.jpeg} alt={`${label} camera`} className="absolute inset-0 h-full w-full object-contain" />
   if (label === '1 Headset') {
     return (
@@ -235,31 +243,6 @@ function PhoneFeed({ preview, label, hear }) {
   )
 }
 
-// Plays the headset mic while that camera is the main view. Chunks are 16 kHz mono float32.
-function useHeadsetAudio(on) {
-  useEffect(() => {
-    if (!on) return
-    const ctx = new AudioContext({ sampleRate: 16000 })
-    ctx.resume().catch(() => {})
-    let next = 0
-    const play = (raw) => {
-      const samples = new Float32Array(raw)
-      if (!samples.length) return
-      const buffer = ctx.createBuffer(1, samples.length, 16000)
-      buffer.getChannelData(0).set(samples)
-      const src = ctx.createBufferSource()
-      src.buffer = buffer
-      src.connect(ctx.destination)
-      if (next < ctx.currentTime || next > ctx.currentTime + 0.4) next = ctx.currentTime + 0.05
-      src.start(next)
-      next += buffer.duration
-    }
-    const onChunk = (e) => { ctx.resume().catch(() => {}); play(e.detail) }
-    window.addEventListener('lumen:headset-audio', onChunk)
-    return () => { window.removeEventListener('lumen:headset-audio', onChunk); ctx.close() }
-  }, [on])
-}
-
 // The Mac webcam sends a still about once a second and its mic is analyzed like a room node.
 // The video itself stays on this laptop.
 function useMacMic(on) {
@@ -268,7 +251,7 @@ function useMacMic(on) {
     const sock = nodeSocket('mac-webcam', 'living')
     let stopMic = () => {}
     let dead = false
-    attachMic((buf) => sock.send(buf)).then((stop) => { if (dead) stop(); else stopMic = stop }).catch(() => {})
+    attachMic((buf) => sock.send(buf), null, null, { echoCancel: true }).then((stop) => { if (dead) stop(); else stopMic = stop }).catch(() => {})
     return () => { dead = true; stopMic(); sock.close() }
   }, [on])
 }
@@ -300,6 +283,32 @@ function LaptopFeed({ deviceId, label, look }) {
 // (POST /api/look). The brain drops the photo and keeps the scene JSON. If the vision model is
 // off, keep trying so it starts as soon as the model is there.
 const LOOK_MS = 1000
+// EfficientDet names -> the words the brain already watches for.
+const BOX_LABELS = {
+  cup: 'cup', bottle: 'bottle', 'wine glass': 'cup', 'cell phone': 'phone', remote: 'remote',
+  person: 'person', knife: 'knife', laptop: 'laptop',
+}
+
+async function boxesOnCamera(video) {
+  const detector = await loadDetector()
+  const { detections } = detector.detectForVideo(video, performance.now())
+  const w = video.videoWidth
+  const h = video.videoHeight
+  if (!w || !h) return []
+  const objects = []
+  for (const d of detections || []) {
+    const cat = d.categories?.[0]
+    const label = BOX_LABELS[cat?.categoryName]
+    const b = d.boundingBox
+    if (!label || !b) continue
+    objects.push({
+      label, score: cat.score,
+      box: [b.originX / w, b.originY / h, (b.originX + b.width) / w, (b.originY + b.height) / h],
+    })
+  }
+  return objects
+}
+
 function useSeen(video, on) {
   const [seen, setSeen] = useState(null)
   useEffect(() => {
@@ -316,7 +325,13 @@ function useSeen(video, on) {
         c.getContext('2d').drawImage(v, 0, 0, c.width, c.height)
         const r = await fetch('/api/look', { method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ jpeg: c.toDataURL('image/jpeg', 0.6) }) })
-        if (r.status === 503 || r.status === 404) return  // model isn't up yet; keep trying
+        if (r.status === 503 || r.status === 404) {
+          // The big vision model is on the AMD box. This Mac measures the boxes itself.
+          const local = await fetch('/api/scene-boxes', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ objects: await boxesOnCamera(v) }) })
+          if (local.ok && live) setSeen({ ...(await local.json()), aspect: c.width / c.height })
+          return
+        }
         if (r.ok && live) setSeen({ ...(await r.json()), aspect: c.width / c.height })
       } catch { /* brain offline: try again next tick */ } finally { busy = false }
     }, LOOK_MS)
@@ -335,7 +350,7 @@ function BrainReadout({ seen }) {
       </span>
       {seen
         ? <>
-            <span className="min-w-0 flex-1 truncate text-sm font-medium text-white">{seen.summary || 'nothing new'}</span>
+            <span className="min-w-0 flex-1 truncate text-sm font-medium text-white">{seen.change || seen.summary || 'nothing new'}</span>
             <span className="tabular shrink-0 text-zinc-400">{seen.model} · {Math.round(seen.inference_ms)} ms{seen.device ? ` · ${seen.device}` : ''}</span>
           </>
         : <span className="text-zinc-500">waiting for the first frame from the AMD brain</span>}

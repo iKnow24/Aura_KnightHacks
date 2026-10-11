@@ -18,12 +18,13 @@ from .detectors.fall import FallDetector
 from .detectors import scene
 from .detectors.items import ItemFinder, decode, items_from_hits
 from .detectors.speech import Segmenter, Transcriber, mentions_name
-from .detectors.voices import Voices
+from .detectors.voices import Voices, name_in
 from .agent import answer
 from .llm import local as local_llm
 from .recap import recap
 from .speakers import CrossTalk
 from . import eventlog
+from .direction import locate
 from .history import history
 from .hub import Hub
 from .memory import Memory, seed_demo
@@ -65,6 +66,9 @@ memory = Memory(None if os.environ.get("LUMEN_TESTING") == "1"
 profile = {"name": os.environ.get("LUMEN_NAME", "")}  # set at login; used for name calling
 transcriber = Transcriber()
 voices = Voices()  # who's talking, by voiceprint (named ones saved to VOICE_FILE)
+# Instant captions have text before a voiceprint exists. After "my name is Sharan" on a mic,
+# later lines from that same mic keep the name until someone else introduces themselves.
+named_mics: dict[str, str] = {}
 segmenters: dict[str, Segmenter] = {}
 item_finder = ItemFinder()
 items_busy: set[str] = set()
@@ -76,6 +80,7 @@ vision_ms: deque = deque(maxlen=500)
 last_pose: dict[str, tuple[float, list | None]] = {}
 last_phone_scene: dict[str, float] = {}
 last_headset_look: dict[str, float] = {}
+last_direction = 0.0
 
 
 async def emit_detected(kind: str, zone: str, severity: str, source: str, confidence: float = 1.0):
@@ -106,6 +111,24 @@ def caption_id(entry: dict) -> str:
 
 
 WEARER = "wearer"  # zone name the headset uses for its own mic
+
+
+async def _maybe_direction():
+    """About twice a second, line up every live mic and tell the dashboard which side heard it."""
+    global last_direction
+    if time.monotonic() - last_direction < 0.45:
+        return
+    last_direction = time.monotonic()
+    tails = {}
+    for nid, audio in audio_buffers.items():
+        zone = hub.nodes.get(nid, {}).get("zone")
+        if zone and len(audio) >= 4000:
+            tails[zone] = audio
+    if len(tails) < 2:
+        return
+    found = locate(tails)
+    if found:
+        await hub.broadcast(["dashboard"], {"type": "direction", **found, "ts": time.time()})
 
 
 PARTIAL_EVERY_S = float(os.environ.get("PARTIAL_EVERY_S", "0.7"))  # rough caption this often while someone talks (0 = off)
@@ -217,6 +240,18 @@ async def run_items(node_id: str, zone: str, jpeg: str):
 
 
 async def publish_vision(event: dict):
+    previous = latest_vision.get(event["node_id"])
+    changed = scene.change_sentence(event["zone"], previous, event)
+    counts = scene.watched_counts(event)
+    if counts:
+        memory.note_scene(event["zone"], counts, event.get("summary", ""))
+    if changed:
+        text, lost, still = changed
+        event["change"] = text
+        memory.note_change(event["zone"], text, lost, still)
+        if any(label in scene.DRINKS for label in lost):
+            event["risk"] = {"score": max(event.get("risk", {}).get("score", 0), 74), "level": "warning",
+                             "why": "a drink left the scene"}
     latest_vision[event["node_id"]] = event
     if "inference_ms" in event:
         vision_ms.append(event["inference_ms"])
@@ -240,7 +275,13 @@ async def handle_approach(zone: str, data: dict):
 async def handle_spill(zone: str, data: dict):
     # The kitchen phone decided a new puddle is sitting on the counter. Same rule as a
     # rear-camera approach: the phone measures, the brain only sends the alert.
+    # The scene JSON says which drink was there a moment ago, so Ask Lumen can name it.
     if enabled("spill"):
+        seen = next((e for e in reversed(list(latest_vision.values())) if e.get("zone") == zone), None)
+        drinks = [label for label in ("cup", "bottle") if (seen or {}).get("counts", {}).get(label)]
+        what = drinks[0] if drinks else "drink"
+        memory.note_change(zone, f"A {what} spilled in the {zone}. The scene JSON had shown it there just before.",
+                           lost=drinks or [what], seen=[])
         await emit_detected("spill", zone, "warning", source="spill_vision", confidence=float(data.get("score", 0.8)))
 
 
@@ -296,6 +337,11 @@ class Segment(BaseModel):
 class Look(BaseModel):
     jpeg: str
     zone: str = "living"
+
+
+class SceneBoxes(BaseModel):
+    zone: str = "living"
+    objects: list[dict] = []
 
 
 class RecapRequest(BaseModel):
@@ -360,6 +406,14 @@ async def look(body: Look):
         items_busy.discard("dashboard-camera")
 
 
+@app.post("/api/scene-boxes")
+async def scene_boxes(body: SceneBoxes):
+    """The laptop camera measured its own boxes because the big vision model is off on this machine."""
+    event = scene.from_boxes("laptop-camera", body.zone, time.time(), body.objects)
+    await publish_vision(event)
+    return event
+
+
 @app.get("/api/state")
 def state():
     return hub.state()
@@ -377,13 +431,40 @@ async def ack(body: Ack):
     return event or {"error": "unknown alert"}
 
 
+def voice_on_mic(zone: str, text: str) -> str | None:
+    """The name they just said, or the name this mic already introduced."""
+    said = name_in(text)
+    if said:
+        named_mics[zone] = said
+        return said
+    return named_mics.get(zone)
+
+
 @app.post("/api/speech")
-def heard(body: Heard):
-    """Captions made in the browser (Instant mode) get saved too, so Ask Lumen can answer from them."""
-    if body.text.strip():
-        entry = memory.add_speech(body.zone, body.text)
+async def heard(body: Heard):
+    """Captions made in the browser (Instant mode). Saved, and sent to the dashboard, which is not on that phone."""
+    text = body.text.strip()
+    if text:
+        voice = voice_on_mic(body.zone, text)
+        entry = memory.add_speech(body.zone, text, voice=voice)
         if body.speaker is not None:
             entry.update(speaker=body.speaker, to_you=body.to_you)
+        if voice:
+            entry["voice_known"] = voice == name_in(text) or voice in voices.book.people
+        await hub.broadcast(["dashboard", "hud"], {**entry, "type": "caption", "id": caption_id(entry)})
+    return {"ok": True}
+
+
+@app.post("/api/speech/partial")
+async def heard_partial(body: Heard):
+    """Words still being said, so the dashboard is not a sentence behind the mouth."""
+    text = body.text.strip()
+    if text:
+        voice = named_mics.get(body.zone)
+        msg = {"type": "caption_partial", "zone": body.zone, "text": text, "ts": time.time()}
+        if voice:
+            msg["voice"] = voice
+        await hub.broadcast(["dashboard", "hud"], msg)
     return {"ok": True}
 
 
@@ -573,14 +654,13 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
                 await hub.broadcast(["dashboard"], {"type": "state", **hub.state()})
             if msg.get("bytes"):
                 chunk = np.frombuffer(msg["bytes"], dtype=np.float32)
-                # Headset demo: the dashboard plays this mic with the picture. Not saved.
-                if (zone == WEARER and os.environ.get("LUMEN_DEMO_PREVIEW") == "1"
-                        and 0 < chunk.size <= 16000):
-                    await hub.broadcast_bytes(["dashboard"], bytes(msg["bytes"]))
+                # Do not play this mic on the dashboard. Speakers into a nearby mic come back
+                # a moment later, like a phone call. The brain still analyzes the audio below.
                 # The headset mic is analyzed here, on this machine: the beep detector (no model,
                 # no API), the local sound model, and local Whisper. Nothing in this block calls out.
                 buf = np.concatenate([audio_buffers.get(node_id, np.zeros(0, np.float32)), chunk])[-AUDIO_WINDOW:]
                 audio_buffers[node_id] = buf
+                await _maybe_direction()
                 if len(buf) == AUDIO_WINDOW and enabled("alarm_dsp") and alarm_dsp.is_alarm(buf):
                     await emit_detected("smoke_alarm", zone, "critical", source="alarm_dsp")
                     audio_buffers[node_id] = np.zeros(0, np.float32)  # don't re-fire on the same beeps
@@ -593,10 +673,12 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
             elif msg.get("text"):
                 data = json.loads(msg["text"])
                 if data.get("type") == "camera_preview":
-                    # Explicit demo-only opt-in. Never pass full frames to memory or the event log.
+                    # Room cameras stay off unless the demo flag is set. The headset is the screen
+                    # the dashboard is supposed to show, so its picture is forwarded either way.
+                    # Never pass full frames to memory or the event log.
                     jpeg = data.get("jpeg")
-                    if (os.environ.get("LUMEN_DEMO_PREVIEW") == "1"
-                            and isinstance(jpeg, str) and jpeg.startswith("data:image/jpeg;base64,")
+                    preview_ok = zone == WEARER or os.environ.get("LUMEN_DEMO_PREVIEW") == "1"
+                    if (preview_ok and isinstance(jpeg, str) and jpeg.startswith("data:image/jpeg;base64,")
                             and len(jpeg) <= 400_000 and time.monotonic() - last_preview >= 0.9):
                         last_preview = time.monotonic()
                         await hub.broadcast(["dashboard"], {"type": "camera_preview", "node_id": node_id,

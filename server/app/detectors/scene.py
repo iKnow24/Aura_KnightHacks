@@ -89,9 +89,11 @@ def build(node_id: str, zone: str, ts: float, hits: list[dict], labels: dict[str
     for o in objects:
         counts[o["label"]] = counts.get(o["label"], 0) + 1
     people = max(counts.get("person", 0), 1 if pose_person else 0)
-    return {"type": "vision", "node_id": node_id, "zone": zone, "ts": ts, "source": "owlv2",
-            "people": people, "posture": pose_posture, "objects": objects, "counts": counts,
-            "summary": summary(counts, people, pose_posture), "model": MODEL_ID.split("/")[-1], **timing}
+    event = {"type": "vision", "node_id": node_id, "zone": zone, "ts": ts, "source": "owlv2",
+             "people": people, "posture": pose_posture, "objects": objects, "counts": counts,
+             "summary": summary(counts, people, pose_posture), "model": MODEL_ID.split("/")[-1], **timing}
+    event["risk"] = rate(event)
+    return event
 
 
 def from_phone(node_id: str, zone: str, ts: float, objects: list) -> dict:
@@ -103,9 +105,101 @@ def from_phone(node_id: str, zone: str, ts: float, objects: list) -> dict:
     for o in objs:
         counts[o["label"]] = counts.get(o["label"], 0) + 1
     people = counts.get("person", 0)
-    return {"type": "vision", "node_id": node_id, "zone": zone, "ts": ts, "source": "phone",
-            "people": people, "posture": None, "objects": objs, "counts": counts,
-            "summary": summary(counts, people, None), "model": "efficientdet-lite0 (on phone)"}
+    event = {"type": "vision", "node_id": node_id, "zone": zone, "ts": ts, "source": "phone",
+             "people": people, "posture": None, "objects": objs, "counts": counts,
+             "summary": summary(counts, people, None), "model": "efficientdet-lite0 (on phone)"}
+    event["risk"] = rate(event)
+    return event
+
+
+def from_boxes(node_id: str, zone: str, ts: float, objects: list) -> dict:
+    """Boxes measured on this computer (the laptop camera) when the big vision model is off.
+    Same JSON shape. The photo never arrives."""
+    objs = []
+    for raw in objects[:20]:
+        if not isinstance(raw, dict) or not raw.get("label"):
+            continue
+        item = {"label": str(raw["label"])[:40], "score": round(float(raw.get("score") or 0), 2)}
+        box = raw.get("box")
+        if isinstance(box, list) and len(box) == 4:
+            item["box"] = [round(float(n), 3) for n in box]
+        objs.append(item)
+    counts: dict[str, int] = {}
+    for obj in objs:
+        counts[obj["label"]] = counts.get(obj["label"], 0) + 1
+    people = counts.get("person", 0)
+    event = {"type": "vision", "node_id": node_id, "zone": zone, "ts": ts, "source": "phone",
+             "people": people, "posture": None, "objects": objs, "counts": counts,
+             "summary": summary(counts, people, None), "model": "efficientdet-lite0 (on this Mac)"}
+    event["risk"] = rate(event)
+    return event
+
+
+# Things a person asks about, or that a spill would move. People walking through are not a "difference".
+WATCHED = ("cup", "bottle", "pill bottle", "keys", "glasses", "wallet", "phone", "remote")
+
+
+def watched_counts(event: dict | None) -> dict[str, int]:
+    counts = (event or {}).get("counts") or {}
+    return {label: int(counts.get(label, 0)) for label in WATCHED if counts.get(label)}
+
+
+def _centers(event: dict | None, label: str) -> list[tuple[float, float]]:
+    out = []
+    for obj in (event or {}).get("objects") or []:
+        box = obj.get("box") if isinstance(obj, dict) else None
+        if obj.get("label") == label and isinstance(box, list) and len(box) == 4:
+            out.append(((box[0] + box[2]) / 2, (box[1] + box[3]) / 2))
+    return out
+
+
+# People and laptops are not "lost" just because a frame missed them. A real shift still gets a line.
+MOVE = WATCHED + ("person", "laptop", "knife")
+
+
+def moved_labels(before: dict | None, after: dict) -> list[str]:
+    """Something important that is still in frame, but its box moved across the picture."""
+    moved = []
+    for label in MOVE:
+        prev, now = _centers(before, label), _centers(after, label)
+        need = 0.18 if label == "person" else 0.12
+        if len(prev) == 1 and len(now) == 1 and math.dist(prev[0], now[0]) >= need:
+            moved.append(label)
+    return moved
+
+
+def change_sentence(zone: str, before: dict | None, after: dict) -> tuple[str, list[str], list[str]] | None:
+    """Spot the difference between two scene JSON lines. Returns (sentence, lost labels, still there)."""
+    prev, now = watched_counts(before), watched_counts(after)
+    lost = [label for label in WATCHED if prev.get(label, 0) > now.get(label, 0)]
+    gained = [label for label in WATCHED if now.get(label, 0) > prev.get(label, 0)]
+    moved = moved_labels(before, after)
+    if not lost and not gained and not moved:
+        return None
+    bits = [f"the {label} is gone" for label in lost] + [f"a {label} showed up" for label in gained]
+    bits += [f"the {label} moved" for label in moved]
+    still = [label for label, n in now.items() if n]
+    return f"In the {zone}, " + ", ".join(bits) + ".", lost, still
+
+
+# Fixed scores. A higher number wins. Nothing here decides an alert; the detectors still do that.
+RISK_SCORES = {"fire": 95, "smoke": 88, "knife": 72}
+DRINKS = ("cup", "bottle")
+
+
+def rate(event: dict) -> dict:
+    """A 0–100 risk rating from one scene JSON line. Lying down and fire outrank a cup on the table."""
+    score, why = 0, []
+    counts = event.get("counts") or {}
+    for label, points in RISK_SCORES.items():
+        if counts.get(label) and points > score:
+            score, why = points, [label]
+    if event.get("posture") == "lying" and 80 > score:
+        score, why = 80, ["someone lying down"]
+    elif event.get("posture") == "lying" and "someone lying down" not in why:
+        why.append("someone lying down")
+    level = "critical" if score >= 80 else "warning" if score >= 55 else "low"
+    return {"score": score, "level": level, "why": ", ".join(why) if why else "nothing risky"}
 
 
 def summary(counts: dict[str, int], people: int, pose_posture: str | None) -> str:
@@ -116,8 +210,32 @@ def summary(counts: dict[str, int], people: int, pose_posture: str | None) -> st
     return ", ".join(parts) or "nothing recognised"
 
 
+def convert_images(folder, out_dir, finder) -> int:
+    """One JSON file per photo. The photos are not copied. Needs the vision model (the AMD box)."""
+    import json
+    import time
+    from pathlib import Path
+
+    from PIL import Image
+
+    src, dest = Path(folder), Path(out_dir)
+    dest.mkdir(parents=True, exist_ok=True)
+    photos = [p for p in sorted(src.iterdir()) if p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}]
+    if not photos:
+        raise SystemExit(f"No photos in {src}")
+    prompts, thresholds, labels = queries()
+    for photo in photos:
+        image = Image.open(photo).convert("RGB")
+        hits, timing = finder.detect(image, prompts, thresholds)
+        event = build(photo.stem, "room", time.time(), hits, labels, *image.size, timing, None, False)
+        (dest / f"{photo.stem}.json").write_text(json.dumps(event))
+        print(photo.name, event["risk"]["level"], event["risk"]["score"], event["summary"])
+    return len(photos)
+
+
 if __name__ == "__main__":
-    # Speed test + sample JSON on the AMD box: python -m app.detectors.scene [photo.jpg] [runs]
+    # One photo, timed:     python -m app.detectors.scene photo.jpg [runs]
+    # A whole folder:       python -m app.detectors.scene --json-dir photos json_out
     import json
     import statistics
     import sys
@@ -129,6 +247,12 @@ if __name__ == "__main__":
     finder = ItemFinder()
     if not finder.available():
         raise SystemExit("Model didn't load; see the warning above.")
+    if len(sys.argv) > 1 and sys.argv[1] == "--json-dir":
+        if len(sys.argv) < 4:
+            raise SystemExit("Usage: python -m app.detectors.scene --json-dir photos json_out")
+        n = convert_images(sys.argv[2], sys.argv[3], finder)
+        print(f"Wrote {n} JSON files")
+        raise SystemExit(0)
     image = Image.open(sys.argv[1]).convert("RGB") if len(sys.argv) > 1 else Image.new("RGB", (640, 480), "gray")
     runs = int(sys.argv[2]) if len(sys.argv) > 2 else 20
     prompts, thresholds, labels = queries()

@@ -62,8 +62,8 @@ function Beam({ bearing, color, text, lift = 0 }) {
   )
 }
 
-function CameraMark({ bearing }) {
-  const [x, z] = spot(bearing, 1.35)
+function CameraMark({ bearing, radius = 1.35 }) {
+  const [x, z] = spot(bearing, radius)
   return (
     <mesh position={[x, 0.18, z]}>
       <boxGeometry args={[0.1, 0.08, 0.14]} />
@@ -88,9 +88,17 @@ function PersonMark({ bearing, slot = 0 }) {
   )
 }
 
-export default function SoundField({ nodes, now, alerts, vision }) {
+// On the body, not out in the room: back cam behind the person, security phone on the chest.
+const ON_BODY = [
+  ['behind', 0.7, 'Back cam'],
+  ['drone', 0.42, 'Phone'],
+]
+
+export default function SoundField({ nodes, now, alerts, vision, direction }) {
   const cameras = Object.values(nodes || {}).filter((n) => now - n.last_seen < 10 && ZONES[n.zone]?.bearing != null)
   const heard = (alerts || []).filter((a) => ZONES[a.zone]?.bearing != null)
+  const side = direction && now - direction.ts < 1.8 && ZONES[direction.zone]?.bearing != null ? direction : null
+  const atCenter = side?.zone === 'wearer'
   const people = Object.values(vision || {}).filter((v) => now - v.ts < 15 && v.people > 0 && ZONES[v.zone]?.bearing != null)
   return (
     <Canvas dpr={[1, 1.5]} camera={{ position: [2.1, 2.6, 3.3], fov: 36 }} onCreated={({ camera }) => camera.lookAt(0, 0.65, 0)}>
@@ -103,10 +111,20 @@ export default function SoundField({ nodes, now, alerts, vision }) {
       </mesh>
       <mesh position={[0, 0.85, 0]}>
         <capsuleGeometry args={[0.09, 0.34, 4, 8]} />
-        <meshStandardMaterial color="#d4d4d8" roughness={0.6} />
+        <meshStandardMaterial color={atCenter ? '#f4f4f5' : '#d4d4d8'} roughness={0.6} />
       </mesh>
-      <Label text="You" position={[0, 1.45, 0]} />
-      {cameras.map((n) => <CameraMark key={n.zone} bearing={ZONES[n.zone].bearing} />)}
+      <Label text={atCenter ? 'Headset' : 'You'} position={[0, 1.45, 0]} />
+      {ON_BODY.map(([zone, radius, label]) => {
+        const [x, z] = spot(ZONES[zone].bearing, radius)
+        return (
+          <group key={zone}>
+            <CameraMark bearing={ZONES[zone].bearing} radius={radius} />
+            <Label text={label} position={[x, 0.55, z]} />
+          </group>
+        )
+      })}
+      {cameras.filter((n) => n.zone !== 'wearer' && n.zone !== 'behind' && n.zone !== 'drone').map((n) => <CameraMark key={n.zone} bearing={ZONES[n.zone].bearing} />)}
+      {side && !atCenter && <Beam bearing={ZONES[side.zone].bearing} color="#f4f4f5" text={side.zone === 'drone' ? 'Phone' : 'Back cam'} />}
       {people.map((v) => Array.from({ length: Math.min(v.people, 3) }, (_, i) => (
         <PersonMark key={`${v.node_id}-${i}`} bearing={ZONES[v.zone].bearing} slot={i - 1} />
       )))}

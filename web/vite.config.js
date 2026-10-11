@@ -1,3 +1,4 @@
+import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -9,6 +10,7 @@ const BRAIN = process.env.BRAIN_URL || 'http://localhost:8000'
 // BASE_PATH: set when the site is served from a sub-folder (GitHub Pages serves /Aura_KnightHacks/).
 export default defineConfig({
   base: process.env.BASE_PATH || '/',
+  resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   plugins: [react(), tailwindcss()],
   server: {
     allowedHosts: true,

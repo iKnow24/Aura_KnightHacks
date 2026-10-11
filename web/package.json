@@ -13,7 +13,10 @@
     "@fontsource-variable/manrope": "^5.3.0",
     "@mediapipe/tasks-vision": "0.10.21",
     "@mkkellogg/gaussian-splats-3d": "^0.4.7",
+    "@radix-ui/react-slot": "^1.4.0",
     "@react-three/fiber": "^8.17.10",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "framer-motion": "^11.11.0",
     "gsap": "^3.13.0",
     "lucide-react": "^0.460.0",
@@ -21,6 +24,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.27.0",
+    "tailwind-merge": "^3.7.0",
     "three": "^0.169.0"
   },
   "devDependencies": {

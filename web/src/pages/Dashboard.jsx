@@ -1,5 +1,5 @@
 import { Maximize2, X } from 'lucide-react'
-import { Component, lazy, Suspense, useEffect, useState } from 'react'
+import { Component, lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { api, useBrain } from '../lib/useBrain'
 import AlertIcon from '../lib/AlertIcon'
 import AskLumen from '../lib/AskLumen'
@@ -7,11 +7,11 @@ import { useCameraWall, useLaptopCameras } from '../lib/CameraWall'
 import History from '../lib/History'
 import Story from '../lib/Story'
 import Conversation, { useCaptions } from '../lib/Conversation'
-import QrPanel from '../lib/QrPanel'
 import { Wordmark } from '../lib/Logo'
 import { getUser, signOut } from '../lib/user'
 const Avatar3D = lazy(() => import('../lib/Avatar3D'))
 const SoundField = lazy(() => import('../lib/SoundField'))
+import QrPanel from '../lib/QrPanel'
 import { playDemoSound } from '../lib/demoSounds'
 import { alertText, SEVERITY_COLOR, zoneLabel } from '../lib/zones'
 
@@ -29,10 +29,10 @@ const FAKES = [
 
 export default function Dashboard() {
   const [ripples, setRipples] = useState([])
-  const [showQr, setShowQr] = useState(false)
   const [tab, setTab] = useState('live')
   const [previews, setPreviews] = useState({})
   const [vision, setVision] = useState({})
+  const [direction, setDirection] = useState(null)
   const user = getUser()
   const captions = useCaptions()
   const { state, connected } = useBrain('dashboard', (alert) => {
@@ -46,6 +46,7 @@ export default function Dashboard() {
       window.dispatchEvent(new CustomEvent('lumen:caption', { detail: msg }))
     }
     if (msg.type === 'vision') setVision((v) => ({ ...v, [msg.node_id]: msg }))
+    if (msg.type === 'direction') setDirection(msg)
     if (msg.type === 'camera_preview') setPreviews((previous) => {
       const fresh = Object.fromEntries(Object.entries(previous).filter(([, p]) => Date.now() / 1000 - p.ts < 5))
       return { ...fresh, [msg.node_id]: msg }
@@ -56,6 +57,19 @@ export default function Dashboard() {
     const timer = setInterval(() => setNow(Date.now() / 1000), 2000)
     return () => clearInterval(timer)
   }, [])
+  const heardRisk = useRef(0)
+  useEffect(() => {
+    const hot = Object.values(vision).filter((v) => v.risk && v.risk.level !== 'low')
+    const top = hot.sort((a, b) => b.risk.score - a.risk.score)[0]
+    if (!top || top.risk.score <= heardRisk.current) {
+      if (!top) heardRisk.current = 0
+      return
+    }
+    heardRisk.current = top.risk.score
+    const why = top.risk.why || ''
+    const kind = /fire|smoke/.test(why) ? 'smoke_alarm' : /lying/.test(why) ? 'fall' : /drink|cup|bottle/.test(why) ? 'spill' : 'car_horn'
+    playDemoSound(kind, user?.name)
+  }, [vision, user?.name])
   const laptop = useLaptopCameras()
   const wall = useCameraWall({ nodes: state.nodes, previews, now, connected, cams: laptop.cams, camError: laptop.error,
     onAskCameras: () => laptop.refresh(true), alert: ripples.at(-1) })
@@ -75,11 +89,8 @@ export default function Dashboard() {
           </button>
         ))}
       </div>
-      <button onClick={() => setShowQr((v) => !v)} className="glass ml-auto rounded-full px-4 py-1.5 text-sm font-medium hover:border-white/20">
-        {showQr ? 'Hide' : 'Add phones'}
-      </button>
       <select
-        className="glass rounded-full px-3 py-1.5 text-sm font-medium"
+        className="glass ml-auto rounded-full px-3 py-1.5 text-sm font-medium"
         value={state.mode}
         onChange={(e) => api('/api/mode', { mode: e.target.value })}
       >
@@ -93,7 +104,7 @@ export default function Dashboard() {
 
   if (tab === 'history') {
     return (
-      <main className="h-full overflow-y-auto overflow-x-hidden p-4">
+      <main className="dashboard h-full overflow-y-auto overflow-x-hidden p-4">
         {header}
         <History />
       </main>
@@ -103,12 +114,12 @@ export default function Dashboard() {
   // Control center: main camera in the middle, a camera on each side, the headset wearer in 3D
   // bottom left, and the 3D sound field bottom right.
   return (
-    <main className="h-full overflow-y-auto overflow-x-hidden p-4">
+    <main className="dashboard h-full overflow-y-auto overflow-x-hidden p-4">
       {header}
+      <QrPanel />
       {wall.full}
 
       <Stage title="Cameras" context="Every camera in the house, including the headset captions view. Tap a name to make it the main picture. Press 1 or 2 to swap a side camera in.">
-        {showQr && <QrPanel />}
         <div className="mb-2 flex flex-wrap items-center gap-2">
           {wall.switcher}
         </div>
@@ -117,12 +128,12 @@ export default function Dashboard() {
           <div className="min-h-0 lg:col-start-1 lg:row-start-1">{wall.left}</div>
           <div className="min-h-0 lg:col-start-3 lg:row-start-1">{wall.right}</div>
           <Stage title="Headset figure" context="The person in the headset, drawn in 3D from a laptop camera pointed at them. The other cameras stay on the wall above." className="min-h-0 lg:col-start-1 lg:row-start-2" fill>
-            <Suspense fallback={<div className="glass h-full min-h-[200px] rounded-xl" />}><Avatar3D cams={laptop.cams} /></Suspense>
+            <Suspense fallback={<div className="glass h-full min-h-[200px] rounded-xl" />}><Avatar3D cams={laptop.cams} direction={direction} /></Suspense>
           </Stage>
           <Stage title="Sound around them" context="Each live camera sits around the wearer. A sound shows up as a beam from the camera that heard it." className="min-h-0 lg:col-start-3 lg:row-start-2" fill>
             <div className="glass relative h-full min-h-[200px] overflow-hidden rounded-xl">
               <Suspense fallback={<div className="h-full min-h-[200px]" />}>
-                <SoundField nodes={state.nodes} now={now} alerts={ripples} vision={vision} />
+                <SoundField nodes={state.nodes} now={now} alerts={ripples} vision={vision} direction={direction} />
               </Suspense>
             </div>
           </Stage>
@@ -130,20 +141,21 @@ export default function Dashboard() {
       </Stage>
 
       {/* Scene JSON from each camera (server/app/detectors/scene.py): labels only, the photos are already gone. */}
-      {Object.values(vision).some((v) => now - v.ts < 15) && (
-        <section className="glass mt-4 rounded-xl p-4">
-          <h2 className="mb-2 font-semibold">What the cameras see</h2>
-          <ul className="space-y-1 text-sm">
-            {Object.values(vision).filter((v) => now - v.ts < 15).map((v) => (
-              <li key={v.node_id} className="flex flex-wrap gap-x-3">
-                <span className="w-24 shrink-0 text-zinc-400">{zoneLabel(v.zone)}</span>
-                <span className="min-w-0 flex-1">{v.summary}</span>
-                {v.inference_ms != null && <span className="text-zinc-500">{Math.round(v.inference_ms)} ms · {v.device}</span>}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <section className="glass mt-4 rounded-xl p-4">
+        <h2 className="mb-3 font-semibold">Risk from the scene JSON</h2>
+        {Object.values(vision).filter((v) => now - v.ts < 15).length === 0 && (
+          <p className="text-lg text-zinc-300">Waiting for a camera. Each photo becomes a JSON file with a risk number.</p>
+        )}
+        <ul className="space-y-3">
+          {Object.values(vision).filter((v) => now - v.ts < 15).map((v) => (
+            <li key={v.node_id} className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              <span className="text-4xl font-semibold tabular-nums">{v.risk?.score ?? 0}</span>
+              <span className="text-lg font-semibold uppercase">{v.risk?.level ?? 'low'}</span>
+              <span className="text-lg">{zoneLabel(v.zone)} · {v.change || v.risk?.why || v.summary}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
         <span className="shrink-0 self-center text-xs uppercase tracking-[0.2em] text-zinc-500">Demo alerts</span>

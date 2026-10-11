@@ -50,6 +50,7 @@ server/                 FastAPI brain (Python), port 8000
   app/modes.py          modes (watch, wearer, lecture, outside, night) are CONFIG here, not separate code
   app/detectors/        alarm_dsp (smoke alarm beeps), ast_sound (sound classifier), fall (pose rules),
                         speech (Whisper) + who said it (WavLM voiceprints, detectors/voices.py), items + scene JSON (one OWLv2 pass per still, detectors/scene.py)
+  app/direction.py      which body mic heard a sound. Headset is the clock. Does not fire alerts.
   app/agent.py, llm.py  "Ask Lumen" memory agent; LLM provider picked by env var
   app/memory.py         what was said / seen, for Ask Lumen
   app/eventlog.py       JSONL event log, one file per hour (feeds databricks/)
@@ -155,6 +156,18 @@ Setup steps: `databricks/REAL_DATA.md`.
 - Don't edit `README.md` unless asked.
 - If something is untested on real hardware, say so plainly.
 - Prefer a fallback that always works on stage (fake alerts, "Seed demo memory") over a fragile real path.
+
+## Sound direction (read this before touching where a sound came from)
+
+The live mics are on the person, not a lab array:
+
+- Headset (`zone=wearer`) is the center and the clock.
+- Back cam (`zone=behind`) is clipped behind them. It sends its mic as well as the rear camera.
+- Security camera (`zone=drone`) is the phone on the chest.
+
+`server/app/direction.py` lines those streams up and asks a small model which mic was closest. The weights in `server/app/direction_weights.json` were trained by `python -m app.direction_train` on calculated delays (distance / 343 m/s) for those three positions. Retrain with that command after you move a mic. The `direction` websocket message is not an alert.
+
+SAID (`huggingface.co/IN03X/SAID`) and PSELDNets (`huggingface.co/datasets/Jinbo-HU/PSELDNets`) are the reference models we want for this. Their published checkpoints expect four microphones on one small device, recorded at the same instant, a few centimeters apart. Do not stack the headset, back cam, and phone and feed that to those checkpoints. That invents a direction. Load those weights only after a real four-capsule array is on the rig.
 
 ## Current state and known gaps (Oct 10 evening)
 
