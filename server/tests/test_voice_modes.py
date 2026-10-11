@@ -57,3 +57,32 @@ def test_whisper_caption_message_type_and_speaker(monkeypatch):
         asyncio.run(main.run_speech("Dana", np.full(16000, 0.1, np.float32)))
         msg = hud.receive_json()
     assert msg["type"] == "caption" and msg["zone"] == "Dana" and msg["id"].endswith("Dana")
+
+
+def test_segmenter_times_the_words_not_the_silence():
+    """Captions carry when the words were said, so a caption screen can match them to a moving mouth."""
+    from app.detectors.speech import SAMPLE_RATE, Segmenter
+
+    seg = Segmenter()
+    loud = np.full(SAMPLE_RATE // 2, 0.3, np.float32)  # half a second of speech per chunk
+    quiet = np.zeros(SAMPLE_RATE // 2, np.float32)
+    t = 1000.0
+    for chunk in (loud, loud, quiet, quiet):
+        t += 0.5
+        out = seg.feed(chunk, ts=t)
+    assert out is not None and seg.span is not None
+    start, end = seg.span
+    assert start == 1000.0  # the first loud chunk had already been recorded when it arrived
+    assert end == 1001.0  # the trailing second of quiet isn't speech
+    assert seg.start is None  # ready to time the next sentence
+
+
+def test_caption_says_when_the_words_were_said(monkeypatch):
+    monkeypatch.setattr(main.transcriber, "transcribe", lambda audio: "dinner is ready")
+    client = TestClient(app)
+    with client.websocket_connect("/ws/dashboard") as dash:
+        dash.receive_json()
+        import asyncio
+        asyncio.run(main.run_speech("living", np.full(16000, 0.1, np.float32), (1000.0, 1002.5)))
+        msg = dash.receive_json()
+    assert (msg["start_ts"], msg["end_ts"]) == (1000.0, 1002.5)

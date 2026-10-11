@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { clockKnown, serverToPerf } from './clock'
 import { detectFaces, loadFaces } from './faces'
 import { FaceTracker } from './faceTracker'
 import { pickSpeaker } from './speakerMatch'
@@ -15,6 +16,7 @@ import SpatialCaptions from './SpatialCaptions'
 const FACE_MS = 66 // about 15 face checks a second
 const HOLD_S = 6 // a line stays over a head this long
 const LIVE_S = 1.5 // "talking right now" = mouth moving over the last 1.5 s
+const HISTORY_MS = 15000 // how far back faceTracker.js keeps mouth movement
 
 export default function TalkingHeads({ videoRef }) {
   const tracker = useRef(new FaceTracker())
@@ -22,6 +24,7 @@ export default function TalkingHeads({ videoRef }) {
   const [ids, setIds] = useState('')
   const [lines, setLines] = useState({}) // track id -> {text, ts, live}
   const names = useRef({}) // track id -> voice name ("Sharan", "Person 4")
+  const lineTrack = useRef({}) // caption id -> track id, so a late voice name finds the right face
   const [, tick] = useState(0)
 
   useEffect(() => {
@@ -44,24 +47,44 @@ export default function TalkingHeads({ videoRef }) {
     const t = setInterval(() => tick((n) => n + 1), 1000)
     // Whose mouth moved for this line? Whisper finishes a line a moment after the speaker stops,
     // so look back over roughly how long the words took to say.
-    const who = (text, final) => {
+    const who = (msg, final) => {
       const now = performance.now()
-      const words = text.split(/\s+/).length
-      const span = final ? Math.min(9000, 1200 + words * 380) : LIVE_S * 1000
+      let [start, end] = [null, null]
+      if (msg.start_ts && msg.end_ts && clockKnown()) {
+        // The brain timed the words themselves, so look at exactly that stretch of mouth movement.
+        start = serverToPerf(msg.start_ts)
+        end = Math.min(now, serverToPerf(msg.end_ts))
+      }
+      if (start == null || end - start < 250 || now - end > HISTORY_MS) {
+        // No usable timing (older brain, or the line is older than our face history): guess from
+        // how long the words take to say.
+        const words = msg.text.split(/\s+/).length
+        start = now - (final ? Math.min(9000, 1200 + words * 380) : LIVE_S * 1000)
+        end = now - (final ? 400 : 0)
+      }
       const tracks = tracker.current.tracks.filter((x) => x.hits >= 3)
       // One face in view: a little mouth movement is enough (nobody to confuse it with).
-      return pickSpeaker(tracks, now - span, now - (final ? 400 : 0), tracks.length === 1 ? { minTalk: 0.015 } : undefined)
+      return pickSpeaker(tracks, start, end, tracks.length === 1 ? { minTalk: 0.015 } : undefined)
     }
     const onCaption = (e) => {
       const msg = e.detail
-      if (!msg?.text) return
+      if (!msg) return
+      // The name of the voice lands a moment after the words (caption_voice): put it on the same face.
+      if (msg.type === 'caption_voice') {
+        const id = lineTrack.current[msg.id]
+        if (!id || !msg.voice) return
+        const had = names.current[id]
+        // This face already has a different known voice: the line came from someone off camera.
+        if (msg.voice_known && had && had !== msg.voice && !had.startsWith('Person ')) return
+        if (msg.voice_known || !had) { names.current[id] = msg.voice; tick((n) => n + 1) }
+        return
+      }
+      if (!msg.text) return
       const final = msg.type === 'caption'
-      const face = who(msg.text, final)
+      const face = who(msg, final)
       if (!face) return
-      // This face already has a different known voice: the line came from someone off camera.
-      const had = names.current[face.id]
-      if (final && msg.voice_known && had && had !== msg.voice && !had.startsWith('Person ')) return
-      if (final && msg.voice && (msg.voice_known || !had)) names.current[face.id] = msg.voice
+      // Only the last 20 lines need remembering; a voice name arrives within a second of its line.
+      if (final && msg.id) lineTrack.current = Object.fromEntries(Object.entries({ [msg.id]: face.id, ...lineTrack.current }).slice(0, 20))
       setLines((l) => ({ ...l, [face.id]: { text: msg.text, ts: Date.now() / 1000, live: !final } }))
     }
     window.addEventListener('lumen:caption', onCaption)

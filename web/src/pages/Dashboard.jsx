@@ -39,9 +39,12 @@ export default function Dashboard() {
     setRipples((r) => [...r, alert])
     setTimeout(() => setRipples((r) => r.filter((x) => x.id !== alert.id)), 12000)
   }, (msg) => {
-    if (msg.type === 'caption') captions.add(msg)
+    // caption_voice is the brain saying whose voice a line already on screen was; it merges by ts.
+    if (msg.type === 'caption' || msg.type === 'caption_voice') captions.add(msg)
     // The main camera tile puts lines over the speaker's head (TalkingHeads.jsx).
-    if (msg.type === 'caption' || msg.type === 'caption_partial') window.dispatchEvent(new CustomEvent('lumen:caption', { detail: msg }))
+    if (msg.type === 'caption' || msg.type === 'caption_partial' || msg.type === 'caption_voice') {
+      window.dispatchEvent(new CustomEvent('lumen:caption', { detail: msg }))
+    }
     if (msg.type === 'vision') setVision((v) => ({ ...v, [msg.node_id]: msg }))
     if (msg.type === 'camera_preview') setPreviews((previous) => {
       const fresh = Object.fromEntries(Object.entries(previous).filter(([, p]) => Date.now() / 1000 - p.ts < 5))

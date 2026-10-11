@@ -7,6 +7,7 @@ EVENT_LOG_DIR=/path/to/folder and the brain appends to <folder>/<YYYY-MM-DD>_<HH
   {"type": "ack", "id": "<alert id>", "by": "wearer", "ts": ...}
   {"type": "speech", "zone": "kitchen", "text": "...", "ts": ...}
   {"type": "caption_meta", "ts": <speech ts>, "speaker": 1, "to_you": true}
+  {"type": "caption_voice", "ts": <speech ts>, "voice": "Sharan"}
   {"type": "sighting", "item": "keys", "zone": "living", "confidence": 0.4, "ts": ...}
   {"type": "mode", "mode": "night", "ts": ...}
   {"type": "vision", "zone": "kitchen", "people": 1, "posture": "standing", "objects": [...], "inference_ms": 92.4, ...}

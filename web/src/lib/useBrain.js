@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { noteServerTime } from './clock'
 
 const wsUrl = (path) => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${path}`
 
@@ -27,6 +28,7 @@ export function useBrain(role, onAlert, onOther) {
           return
         }
         const msg = JSON.parse(e.data)
+        noteServerTime(msg.ts) // keeps our clock lined up with the brain's (clock.js)
         if (msg.type === 'state') setState(msg)
         if (msg.type === 'alert') {
           setState((s) => ({ ...s, events: [...s.events, msg].slice(-50) }))
