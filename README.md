@@ -206,7 +206,10 @@ cd web && npm run build
 | `docs/shipping.md`, `scripts/` | How PRs get tested and merged into main |
 | `AGENTS.md` | Rules for AI coding agents (Codex, Cursor) working in this repo; `CLAUDE.md` for Claude Code |
 
-## Team
+## Team 
+Khalid Al-husseini
+Jonel Diaz
+Shuran
 
 Built in one weekend at KnightHacks IX by Sharan ([@iKnow24](https://github.com/iKnow24)) and team.
 MIT licensed.
