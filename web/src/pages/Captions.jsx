@@ -376,9 +376,14 @@ export default function Captions() {
   useEffect(() => { window.lumenSay = (t) => captions.addLine(t, { local: true }) })
 
   useEffect(() => {
-    if (!started || realEngine !== 'private') return
-    fetch('/api/memory').then((r) => r.json()).then((m) => setWhisperOff(m.models?.whisper === 'off')).catch(() => {})
-  }, [started, realEngine])
+    if (!started || realEngine !== 'private' || mode === 'outside') return
+    fetch('/api/memory').then((r) => r.json()).then((m) => {
+      const off = m.models?.whisper === 'off'
+      setWhisperOff(off)
+      // This Mac has no Whisper. Instant is the caption path that already works here.
+      if (off && instantSupported) setEngine('instant')
+    }).catch(() => {})
+  }, [started, realEngine, mode])
 
   useEffect(() => { if (videoRef.current) videoRef.current.srcObject = camera }, [camera])
 
