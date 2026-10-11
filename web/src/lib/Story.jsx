@@ -66,9 +66,9 @@ function Calendar({ data, day, onDay }) {
           <div className="mt-1 grid grid-cols-7 gap-1">
             {month.cells.map((cell, i) => cell ? (
               <button key={cell.day} type="button" onClick={() => onDay(cell.day)} aria-pressed={day === cell.day}
-                className={`min-h-14 rounded-lg px-1 py-1.5 text-left ${day === cell.day ? 'bg-zinc-100 text-ink' : 'bg-white/5 hover:bg-white/10'}`}>
-                <div className="text-sm font-medium">{cell.date.getDate()}</div>
-                <div className={`text-[10px] ${day === cell.day ? 'text-zinc-600' : 'text-zinc-400'}`}>
+                className={`glass min-h-14 rounded-lg px-1 py-1.5 text-left ${day === cell.day ? 'ring-1 ring-white/70' : 'hover:bg-white/10'}`}>
+                <div className="text-sm font-medium text-white">{cell.date.getDate()}</div>
+                <div className="text-[10px] text-zinc-400">
                   {cell.alerts ? `${cell.alerts} alert${cell.alerts === 1 ? '' : 's'}` : cell.clinic ? 'Clinic' : ''}
                 </div>
               </button>

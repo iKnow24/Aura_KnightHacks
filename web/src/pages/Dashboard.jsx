@@ -100,7 +100,7 @@ export default function Dashboard() {
 
   if (tab === 'history') {
     return (
-      <main className="h-full overflow-y-auto overflow-x-hidden p-4">
+      <main className="dashboard h-full overflow-y-auto overflow-x-hidden p-4">
         {header}
         <History />
       </main>
@@ -110,7 +110,7 @@ export default function Dashboard() {
   // Control center: main camera in the middle, a camera on each side, the headset wearer in 3D
   // bottom left, and the 3D sound field bottom right.
   return (
-    <main className="h-full overflow-y-auto overflow-x-hidden p-4">
+    <main className="dashboard h-full overflow-y-auto overflow-x-hidden p-4">
       {header}
       {wall.full}
 
