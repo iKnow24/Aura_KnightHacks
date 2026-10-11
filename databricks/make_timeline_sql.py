@@ -2,7 +2,7 @@
 
 One readable table, home_timeline: when, who, what happened, where. No upload or pipeline needed.
 
-    python3 databricks/make_timeline_sql.py > databricks/fake_timeline.sql
+    python3 databricks/make_timeline_sql.py > databricks/dummy_data.sql
 """
 import json
 import random
@@ -17,7 +17,9 @@ ROOMS = ["kitchen", "living room", "hallway", "bedroom"]
 NAMES = {"smoke_alarm": "Smoke alarm went off", "doorbell": "Doorbell rang", "knock": "Knock at the door",
          "phone_ring": "Phone rang", "name_called": "Someone called Maria's name", "timer": "Oven timer beeped",
          "kettle": "Kettle whistled", "alarm_clock": "Alarm clock rang",
-         "dog_bark": "Dog barked outside", "car_alarm": "Car alarm outside", "glass_break": "Glass broke"}
+         "dog_bark": "Dog barked outside", "car_alarm": "Car alarm outside", "glass_break": "Glass broke",
+         "vehicle": "Car approaching", "reversing": "Vehicle reversing", "car_horn": "Car horn",
+         "bike_bell": "Bike coming up", "person_behind": "Person coming up behind"}
 ROOM = {"living": "living room"}
 
 
@@ -47,19 +49,31 @@ def rows(folder: Path):
             m = meta.get(e["ts"], {})
             who = PEOPLE.get(m.get("speaker"), "Unknown")
             to = "to Maria" if m.get("to_you") else "nearby"
-            yield (when, "speech", who, f'Said ({to}): "{e["text"]}"', rng.choice(ROOMS), "info", None, None, False)
+            where = e.get("place") or ROOM.get(e.get("zone"), e.get("zone"))
+            yield (when, "speech", who, f'Said ({to}): "{e["text"]}"', where, "info", None, None, False)
         elif t == "sighting":
-            yield (when, "item_seen", "Lumen camera", f"Spotted {e['item']}", ROOM.get(e["zone"], e["zone"]),
+            where = e.get("place") or ROOM.get(e.get("zone"), e.get("zone"))
+            yield (when, "item_seen", "Lumen camera", f"Spotted {e['item']}", where,
                    "info", e["confidence"], None, False)
         elif t == "mode":
             label = "Night mode on (bed strobe armed)" if e["mode"] == "night" else "Day mode on"
             yield (when, "mode", "Lumen", label, "whole house", "info", None, None, False)
+        elif t == "risk":
+            level = e.get("warning") or "none"
+            what = (f"{NAMES.get(e['kind'], e['kind'])}: danger {e['danger']:.2f}, "
+                    f"limit {e['risk_limit']:.2f}, {level}")
+            yield (when, "risk", "Lumen", what, e.get("place") or e.get("zone"), level if level != "none" else "info",
+                   e.get("danger"), None, False)
+        elif t == "reminder":
+            yield (when, "reminder", "Lumen", e.get("what"), e.get("place") or e.get("zone"), "info", None, None, False)
+        elif t == "interaction":
+            yield (when, "interaction", e.get("by") or "Maria", e.get("action"), e.get("place"), "info", None, None, False)
 
 
 def main():
     folder = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).parent / "sample_data"
     out = sorted(rows(folder))
-    print(f"""-- Lumen fake home timeline: {len(out)} events, 2 weeks of one household (Maria, 74, hard of hearing).
+    print(f"""-- Lumen dummy data: {len(out)} events, 2 weeks of one household (Maria, 74, hard of hearing).
 -- Made up for the demo. From day 8 on Maria is planted to react slower and miss more alerts.
 -- Paste into the Databricks SQL editor and run. Change lumen.home if your catalog/schema differ.
 

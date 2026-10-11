@@ -21,3 +21,4 @@ models/
 web/public/mediapipe/wasm/
 event_log/
 lumen_voices.json
+data/

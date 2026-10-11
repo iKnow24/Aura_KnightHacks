@@ -153,7 +153,7 @@ We'd rather you hear the limits from us.
 | 3D walking view, back-phone detection | ✅ | ⚠️ not yet on a real phone; distance is a rough estimate, about ±30% |
 | History tab | ✅ | ✅ on the sample data, offline; ⚠️ the live Databricks read is not yet tested |
 | Databricks pipeline, dashboard datasets, Genie setup | ✅ | ⚠️ not yet run on a Databricks workspace |
-| Household history | ⚠️ generated, not real | Two weeks of fake events with a planted slowdown |
+| Household history | ⚠️ generated, not real | Two weeks of dummy data with a planted slowdown |
 
 ## Run it
 

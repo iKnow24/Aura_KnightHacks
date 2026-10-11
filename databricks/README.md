@@ -43,9 +43,9 @@ reads each file name once, so a file that keeps growing after upload would lose 
 
 ## Quickest start: one SQL file
 
-`fake_timeline.sql` is the same two weeks as one readable table (`lumen.home.home_timeline`: when, who,
+`dummy_data.sql` is the same two weeks as one readable table (`lumen.home.home_timeline`: when, who,
 what, where). Paste it into the SQL editor and run it, no upload or pipeline needed. Rebuild it with
-`python3 databricks/make_timeline_sql.py > databricks/fake_timeline.sql`.
+`python3 databricks/make_timeline_sql.py > databricks/dummy_data.sql`.
 
 ## 2. Set up Free Edition (SQL editor)
 
