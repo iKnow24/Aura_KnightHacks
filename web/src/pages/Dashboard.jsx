@@ -11,6 +11,7 @@ import { Wordmark } from '../lib/Logo'
 import { getUser, signOut } from '../lib/user'
 const Avatar3D = lazy(() => import('../lib/Avatar3D'))
 const SoundField = lazy(() => import('../lib/SoundField'))
+import QrPanel from '../lib/QrPanel'
 import { playDemoSound } from '../lib/demoSounds'
 import { alertText, SEVERITY_COLOR, zoneLabel } from '../lib/zones'
 
@@ -112,6 +113,7 @@ export default function Dashboard() {
   return (
     <main className="dashboard h-full overflow-y-auto overflow-x-hidden p-4">
       {header}
+      <QrPanel />
       {wall.full}
 
       <Stage title="Cameras" context="Every camera in the house, including the headset captions view. Tap a name to make it the main picture. Press 1 or 2 to swap a side camera in.">
