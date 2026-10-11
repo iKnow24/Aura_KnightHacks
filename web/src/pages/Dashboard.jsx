@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [tab, setTab] = useState('live')
   const [previews, setPreviews] = useState({})
   const [vision, setVision] = useState({})
+  const [direction, setDirection] = useState(null)
   const user = getUser()
   const captions = useCaptions()
   const { state, connected } = useBrain('dashboard', (alert) => {
@@ -41,6 +42,7 @@ export default function Dashboard() {
     // The main camera tile puts lines over the speaker's head (TalkingHeads.jsx).
     if (msg.type === 'caption' || msg.type === 'caption_partial') window.dispatchEvent(new CustomEvent('lumen:caption', { detail: msg }))
     if (msg.type === 'vision') setVision((v) => ({ ...v, [msg.node_id]: msg }))
+    if (msg.type === 'direction') setDirection(msg)
     if (msg.type === 'camera_preview') setPreviews((previous) => {
       const fresh = Object.fromEntries(Object.entries(previous).filter(([, p]) => Date.now() / 1000 - p.ts < 5))
       return { ...fresh, [msg.node_id]: msg }
@@ -121,12 +123,12 @@ export default function Dashboard() {
           <div className="min-h-0 lg:col-start-1 lg:row-start-1">{wall.left}</div>
           <div className="min-h-0 lg:col-start-3 lg:row-start-1">{wall.right}</div>
           <Stage title="Headset figure" context="The person in the headset, drawn in 3D from a laptop camera pointed at them. The other cameras stay on the wall above." className="min-h-0 lg:col-start-1 lg:row-start-2" fill>
-            <Suspense fallback={<div className="glass h-full min-h-[200px] rounded-xl" />}><Avatar3D cams={laptop.cams} /></Suspense>
+            <Suspense fallback={<div className="glass h-full min-h-[200px] rounded-xl" />}><Avatar3D cams={laptop.cams} direction={direction} /></Suspense>
           </Stage>
           <Stage title="Sound around them" context="Each live camera sits around the wearer. A sound shows up as a beam from the camera that heard it." className="min-h-0 lg:col-start-3 lg:row-start-2" fill>
             <div className="glass relative h-full min-h-[200px] overflow-hidden rounded-xl">
               <Suspense fallback={<div className="h-full min-h-[200px]" />}>
-                <SoundField nodes={state.nodes} now={now} alerts={ripples} vision={vision} />
+                <SoundField nodes={state.nodes} now={now} alerts={ripples} vision={vision} direction={direction} />
               </Suspense>
             </div>
           </Stage>

@@ -9,6 +9,7 @@ import { openCamera } from './cameras'
 import { isWalking, makeRig, poseRig, resetRig, withIdle } from './avatarRig'
 import { dressAsWearer } from './outfit'
 import { detectPeople, loadPose } from './pose'
+import { ZONES, zoneLabel } from './zones'
 
 // Bottom-left of the control center: the person in the headset, as a 3D figure that copies their
 // pose. The laptop webcam faces them; MediaPipe finds 33 body points on this laptop and the figure's
@@ -194,7 +195,23 @@ function Figure({ poseRef, onReady, onGait }) {
   return fig ? <primitive object={fig.scene} /> : null
 }
 
-export default function Avatar3D({ cams }) {
+function Heard({ bearing }) {
+  if (bearing == null) return null
+  const a = (bearing * Math.PI) / 180
+  const from = new THREE.Vector3(Math.sin(a) * 1.35, 1.15, Math.cos(a) * 1.35)
+  const to = new THREE.Vector3(0, 1.05, 0)
+  const mid = from.clone().add(to).multiplyScalar(0.5)
+  const dir = to.clone().sub(from)
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize())
+  return (
+    <mesh position={mid} quaternion={q}>
+      <cylinderGeometry args={[0.012, 0.045, dir.length(), 6]} />
+      <meshBasicMaterial color="#f4f4f5" />
+    </mesh>
+  )
+}
+
+export default function Avatar3D({ cams, direction = null }) {
   const [deviceId, setDeviceId] = useState(() => { try { return localStorage.getItem('lumen.avatarCam') || '' } catch { return '' } })
   const [on, setOn] = useState(false)
   const [status, setStatus] = useState('Off')
@@ -204,6 +221,8 @@ export default function Avatar3D({ cams }) {
   const poseRef = useRef(null)
   const peopleRef = useRef([])
   const cam = cams.find((c) => c.id === deviceId) ?? cams[0]
+  const fresh = direction && Date.now() / 1000 - direction.ts < 1.8 && ZONES[direction.zone]
+  const bearing = fresh ? ZONES[direction.zone].bearing : null
 
   useEffect(() => {
     if (!on || !cam) return
@@ -247,6 +266,7 @@ export default function Avatar3D({ cams }) {
         <directionalLight position={[2, 4, 3]} intensity={1.6} />
         <Figure poseRef={poseRef} onReady={() => setFigureReady(true)} onGait={(walking) => setStatus(walking ? 'Walking' : 'Tracking')} />
         <Bystanders peopleRef={peopleRef} />
+        <Heard bearing={bearing} />
         <mesh rotation-x={-Math.PI / 2}><circleGeometry args={[0.9, 48]} /><meshBasicMaterial color="#18181b" /></mesh>
       </Canvas>
       {/* Small self-view so the person can see they're in frame. */}
@@ -265,6 +285,7 @@ export default function Avatar3D({ cams }) {
           {on ? 'Stop' : 'Start'}
         </button>
       </figcaption>
+      {fresh && <p className="pointer-events-none absolute left-0 right-0 top-12 text-center text-sm font-semibold">{zoneLabel(direction.zone)}</p>}
       <p className="pointer-events-none absolute bottom-7 left-0 right-0 text-center text-xs text-zinc-500">{hint}</p>
       <p className="absolute bottom-2 left-3 text-xs text-zinc-400" aria-live="polite">{cam ? status : 'No laptop camera found'}</p>
     </figure>

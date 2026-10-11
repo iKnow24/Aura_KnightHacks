@@ -11,8 +11,9 @@ export const ZONES = {
   // Not rooms: places relative to the wearer (Outside mode). map: false keeps them off the floor plan.
   behind: { label: 'Behind you', bearing: 180, map: false },
   wearer: { label: 'Near you', bearing: 0, map: false },
-  // Extra security camera, or the same phone on a drone. map: false keeps it off the floor plan.
-  drone: { label: 'Security camera', bearing: 0, map: false },
+  // The four pitch mics, one compass point each. map: false keeps them off the floor plan.
+  Mic: { label: '1 Mic', bearing: 90, map: false },
+  drone: { label: 'Security camera', bearing: 270, map: false },
 }
 
 export const zoneLabel = (zone) => ZONES[zone]?.label ?? zone

@@ -58,12 +58,15 @@ Every alert in the system is this JSON, and nothing else (see `server/app/hub.py
 
 Change the contract only with all three people agreeing, and change it in one commit.
 
-Two more message types go out on the same sockets. They are not alerts, so screens can ignore them:
+These message types go out on the same sockets. They are not alerts, so screens can ignore them:
 
 ```json
 {"type": "caption", "zone": "kitchen", "text": "Dinner's ready!", "ts": 1728540000.1}   // dashboard + hud
 {"type": "sighting", "item": "keys", "zone": "living", "ts": 1728540000.1}             // dashboard
+{"type": "direction", "zone": "behind", "level": 0.04, "ts": 1728540000.1}            // dashboard only
 ```
+
+`direction` is not an alert. It names which live mic heard the latest sound, after the streams are lined up. Screens can ignore it. It is not stored.
 
 The headset streams its own mic as node zone `"wearer"` (speech only, no alarm detectors). When a caption
 for it arrives, the headset works out who said it from lip movement and sends back

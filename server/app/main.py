@@ -24,6 +24,7 @@ from .llm import local as local_llm
 from .recap import recap
 from .speakers import CrossTalk
 from . import eventlog
+from .direction import locate
 from .history import history
 from .hub import Hub
 from .memory import Memory, seed_demo
@@ -76,6 +77,7 @@ vision_ms: deque = deque(maxlen=500)
 last_pose: dict[str, tuple[float, list | None]] = {}
 last_phone_scene: dict[str, float] = {}
 last_headset_look: dict[str, float] = {}
+last_direction = 0.0
 
 
 async def emit_detected(kind: str, zone: str, severity: str, source: str, confidence: float = 1.0):
@@ -106,6 +108,24 @@ def caption_id(entry: dict) -> str:
 
 
 WEARER = "wearer"  # zone name the headset uses for its own mic
+
+
+async def _maybe_direction():
+    """About twice a second, line up every live mic and tell the dashboard which side heard it."""
+    global last_direction
+    if time.monotonic() - last_direction < 0.45:
+        return
+    last_direction = time.monotonic()
+    tails = {}
+    for nid, audio in audio_buffers.items():
+        zone = hub.nodes.get(nid, {}).get("zone")
+        if zone and len(audio) >= 4000:
+            tails[zone] = audio
+    if len(tails) < 2:
+        return
+    found = locate(tails)
+    if found:
+        await hub.broadcast(["dashboard"], {"type": "direction", **found, "ts": time.time()})
 
 
 PARTIAL_EVERY_S = 1.0  # while someone talks, a rough caption this often (0 turns partials off)
@@ -581,6 +601,7 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
                 # no API), the local sound model, and local Whisper. Nothing in this block calls out.
                 buf = np.concatenate([audio_buffers.get(node_id, np.zeros(0, np.float32)), chunk])[-AUDIO_WINDOW:]
                 audio_buffers[node_id] = buf
+                await _maybe_direction()
                 if len(buf) == AUDIO_WINDOW and enabled("alarm_dsp") and alarm_dsp.is_alarm(buf):
                     await emit_detected("smoke_alarm", zone, "critical", source="alarm_dsp")
                     audio_buffers[node_id] = np.zeros(0, np.float32)  # don't re-fire on the same beeps
