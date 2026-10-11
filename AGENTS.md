@@ -153,6 +153,16 @@ Setup steps: `databricks/REAL_DATA.md`.
 - If something is untested on real hardware, say so plainly.
 - Prefer a fallback that always works on stage (fake alerts, "Seed demo memory") over a fragile real path.
 
+## Cursor Cloud specific instructions
+
+Cloud Agents are the laptop backup brain, not the AMD box.
+
+- Do not run `setup.sh`, and do not install `server/requirements-ml.txt`. Those expect the PyTorch ROCm image. Never reinstall torch.
+- `python` on PATH runs `~/.venv`. App packages come from `server/requirements.txt`. Tests also need `pytest` and `httpx`, which is what `scripts/check.sh` installs.
+- Boot already starts the brain on port 8000 and Vite on port 5173. Use those. `run.sh` also starts a Cloudflare tunnel, which this VM does not need unless a phone must open the app.
+- No API keys are required for the demo. Sign in at `/` with a first name, open `/dashboard`, and press a Demo alert (same as `POST /api/fake-alert`). Ask Lumen uses plain rules when no LLM key is set. History uses the sample week when Databricks env vars are unset.
+- Before you say product work is done: `cd server && python -m pytest -q` and `cd web && npm run build`.
+
 ## Current state and known gaps (Oct 10 evening)
 
 - Working: brain + models on the AMD GPU through the Jupyter bridge; phones reach it via Mac cloudflared.
