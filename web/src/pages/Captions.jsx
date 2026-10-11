@@ -8,6 +8,7 @@ import { lastTwoLines, nameIn } from '../lib/captionText'
 import SpatialCaptions from '../lib/SpatialCaptions'
 import { pickSpeaker } from '../lib/speakerMatch'
 import { Camera, CameraOff, Clapperboard, Download, Ellipsis, Footprints, GraduationCap, House, Lock, Zap } from 'lucide-react'
+import CornerMark from '../lib/CornerMark'
 import Logo from '../lib/Logo'
 import Recap from '../lib/Recap'
 import Surround from '../lib/Surround'
@@ -276,6 +277,8 @@ export default function Captions() {
   useEffect(() => { const t = setInterval(() => tick((n) => n + 1), 500); return () => clearInterval(t) }, [])
   useEffect(() => { try { localStorage.setItem('lumen_look', look) } catch { /* private mode */ } }, [look])
   const levelRef = useRef(0)
+  const [corner, setCorner] = useState(null) // presenter-set sound direction (CornerMark.jsx)
+  const cornerTimer = useRef()
 
   const { state, connected } = useBrain('hud', push, (msg) => {
     if (msg.type === 'caption') captions.addRemote(msg)
@@ -283,6 +286,11 @@ export default function Captions() {
     if (msg.type === 'caption_partial' && !ZONES[msg.zone]) captions.addPartial(msg) // room nodes only get finished lines
     if (msg.type === 'scene' && msg.side === 'rear') setRearScene({ ...msg, at: Date.now() })
     if (msg.type === 'ack') drop(msg.id)
+    if (msg.type === 'presenter_dir') {
+      setCorner(msg.corner)
+      clearTimeout(cornerTimer.current)
+      cornerTimer.current = setTimeout(() => setCorner(null), 4000)
+    }
   })
   const mode = state.modes[state.mode] ? state.mode : 'wearer'
   const rearCar = (() => {
@@ -508,6 +516,7 @@ export default function Captions() {
     <main className="relative h-full overflow-hidden bg-[radial-gradient(ellipse_at_top,#1c1917,#000_60%)]" onClick={toggleBar}>
       {camera && <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />}
       <AlertStack alerts={alerts} onAck={ack} />
+      <CornerMark corner={corner} />
       {rearCar && (
         <div className="absolute inset-x-0 bottom-28 z-20 mx-auto w-fit max-w-[90%] bg-black px-5 py-3 text-center text-2xl font-semibold tracking-wide text-white">
           {rearCar.kind === 'truck' ? 'TRUCK' : 'CAR'} BEHIND YOU · {rearCar.mph} MPH

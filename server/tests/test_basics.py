@@ -140,3 +140,15 @@ def test_hazard_note_sends_the_photo_to_gemini_and_returns_the_notes(monkeypatch
     assert out["notes"][0]["label"] == "cup at table edge" and "generativelanguage" in seen["base_url"]
     assert seen["content"][1] == {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,AAAA"}}
     assert hazard.look("data:image/jpeg;base64,AAAA")["wait"] is True  # asked again too soon
+
+
+def test_presenter_direction_is_logged_and_labelled():
+    client = TestClient(app)
+    with client.websocket_connect("/ws/hud") as hud:
+        hud.receive_json()
+        client.post("/api/presenter_dir", json={"corner": 2})
+        msg = hud.receive_json()
+    assert msg["type"] == "presenter_dir" and msg["corner"] == 2 and msg["presenter_set"] is True
+    r = client.post("/api/presenter_dir", json={"corner": 2})
+    assert r.json() == {"ok": True}
+    assert client.post("/api/presenter_dir", json={"corner": 9}).json().get("error")

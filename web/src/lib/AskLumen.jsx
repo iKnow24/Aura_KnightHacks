@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
-import { Mic, Send } from 'lucide-react'
+import { Mic, Send, Volume2, VolumeX } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { say, setVoice, voiceOn, voiceSupported } from './speak'
 import { ALERT_TEXT, ZONES } from './zones'
 
 const SUGGESTIONS = ['Where are my keys?', 'What was the last thing said?', 'What happened while I was asleep?']
@@ -19,6 +20,7 @@ export default function AskLumen({ className = '' }) {
   const [busy, setBusy] = useState(false)
   const [listening, setListening] = useState(false)
   const [thread, setThread] = useState(load)
+  const [voice, setVoiceOn] = useState(voiceOn)
   const list = useRef()
 
   useEffect(() => {
@@ -41,6 +43,7 @@ export default function AskLumen({ className = '' }) {
     } catch {
       reply = { answer: "Can't reach the brain right now.", evidence: [] }
     }
+    say(reply.answer)
     setThread((t) => [...t, { from: 'lumen', text: reply.answer, evidence: reply.evidence, brain: reply.brain, ts: Date.now() / 1000 }])
     setBusy(false)
   }
@@ -59,7 +62,15 @@ export default function AskLumen({ className = '' }) {
     <section className={`glass flex min-h-0 flex-col rounded-xl p-4 ${className}`}>
       <div className="flex items-center justify-between">
         <h2 className="font-semibold">Messages · Ask Lumen</h2>
-        {thread.length > 0 && <button onClick={() => setThread([])} className="text-xs text-zinc-500 hover:text-zinc-300">Clear</button>}
+        <div className="flex items-center gap-3">
+          {voiceSupported() && (
+            <button onClick={() => { setVoice(!voice); setVoiceOn(!voice) }} title="Luma reads answers and hazard notes aloud"
+              className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300">
+              {voice ? <Volume2 size={14} /> : <VolumeX size={14} />} Voice {voice ? 'on' : 'off'}
+            </button>
+          )}
+          {thread.length > 0 && <button onClick={() => setThread([])} className="text-xs text-zinc-500 hover:text-zinc-300">Clear</button>}
+        </div>
       </div>
 
       <ol ref={list} className="mt-3 min-h-24 flex-1 space-y-3 overflow-y-auto pr-1" aria-live="polite">

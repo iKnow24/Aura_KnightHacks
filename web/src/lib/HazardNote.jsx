@@ -1,5 +1,6 @@
 import { TriangleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { say } from './speak'
 
 // "Watch out" notes along the bottom of the dashboard camera, written by Luma (the model behind it is named in the brain, not on screen).
 //
@@ -47,7 +48,10 @@ export default function HazardNote({ videoRef }) {
         else if (r.error) setStatus(r.error)
         else if (!r.wait) {
           setStatus('')
-          if (r.notes?.length) setNote({ notes: r.notes, at: Date.now() })
+          if (r.notes?.length) {
+            setNote({ notes: r.notes, at: Date.now() })
+            say(`Watch out. ${r.notes.map((n) => [n.label, n.where].filter(Boolean).join(', ')).join('. ')}`)
+          }
           else setNote((n) => (n && Date.now() - n.at < HOLD_MS ? n : null))
         }
       } catch { if (!dead) setStatus('Brain not reachable') }

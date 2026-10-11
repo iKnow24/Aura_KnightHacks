@@ -11,6 +11,7 @@ import { Wordmark } from '../lib/Logo'
 import { getUser, signOut } from '../lib/user'
 const Avatar3D = lazy(() => import('../lib/Avatar3D'))
 const SoundField = lazy(() => import('../lib/SoundField'))
+import CornerMark, { usePresenterKeys } from '../lib/CornerMark'
 import QrPanel from '../lib/QrPanel'
 import { playDemoSound } from '../lib/demoSounds'
 import { alertText, SEVERITY_COLOR, zoneLabel } from '../lib/zones'
@@ -35,6 +36,9 @@ export default function Dashboard() {
   const [direction, setDirection] = useState(null)
   const user = getUser()
   const captions = useCaptions()
+  usePresenterKeys()
+  const [corner, setCorner] = useState(null)
+  const cornerTimer = useRef()
   const { state, connected } = useBrain('dashboard', (alert) => {
     setRipples((r) => [...r, alert])
     setTimeout(() => setRipples((r) => r.filter((x) => x.id !== alert.id)), 12000)
@@ -47,6 +51,11 @@ export default function Dashboard() {
     }
     if (msg.type === 'vision') setVision((v) => ({ ...v, [msg.node_id]: msg }))
     if (msg.type === 'direction') setDirection(msg)
+    if (msg.type === 'presenter_dir') {
+      setCorner(msg.corner)
+      clearTimeout(cornerTimer.current)
+      cornerTimer.current = setTimeout(() => setCorner(null), 4000)
+    }
     if (msg.type === 'camera_preview') setPreviews((previous) => {
       const fresh = Object.fromEntries(Object.entries(previous).filter(([, p]) => Date.now() / 1000 - p.ts < 5))
       return { ...fresh, [msg.node_id]: msg }
@@ -115,6 +124,7 @@ export default function Dashboard() {
   // bottom left, and the 3D sound field bottom right.
   return (
     <main className="dashboard h-full overflow-y-auto overflow-x-hidden p-4">
+      <CornerMark corner={corner} />
       {header}
       <QrPanel />
       {wall.full}
