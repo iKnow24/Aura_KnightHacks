@@ -43,4 +43,4 @@ any phone or laptop camera. The layout is remembered in that browser.
   is enough; legs follow only when the camera can see them.
 - **Your own figure**: in Blender, rig the character with Mixamo bone names (or start from a Mixamo download),
   then File > Export > glTF 2.0 (.glb) and save it as `web/public/models/avatar.glb`. An `idle` animation in the
-  file is used when nobody is tracked. Without the file, the walker figure is shown.
+  file is used when nobody is tracked. Without the file, the walker figure is shown, dressed like our headset wearer (`web/src/lib/outfit.js`: hair, headset, shirt over tee, lanyard, watch, jeans, sneakers).

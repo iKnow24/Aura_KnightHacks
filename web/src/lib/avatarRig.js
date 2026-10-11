@@ -72,6 +72,32 @@ export function poseRig(rig, scene, lm, dt) {
   }
 }
 
+// A person standing relaxed, in MediaPipe world points: arms down, slow breathing, a slight sway and
+// the head drifting a little. Drives figures that have no idle animation clip (the Blender avatar),
+// and fills in body parts the webcam can't see (legs under a desk) so they stand naturally.
+export function idlePose(t) {
+  const breath = Math.sin(t * 1.25) * 0.005, sway = Math.sin(t * 0.45) * 0.012, look = Math.sin(t * 0.3) * 0.015
+  const lm = Array.from({ length: 33 }, () => [0, 0, 0, 0])
+  const set = (i, x, y, z = 0) => { lm[i] = [x, y, z, 1] }
+  for (const s of [1, -1]) {
+    const L = s > 0
+    set(L ? 11 : 12, s * 0.18 + sway, -0.46 - breath)
+    set(L ? 13 : 14, s * 0.22 + sway * 0.6, -0.19 - breath * 0.5, -0.01)
+    set(L ? 15 : 16, s * 0.23 + sway * 0.3, 0.06, -0.05)
+    set(L ? 23 : 24, s * 0.1, 0)
+    set(L ? 25 : 26, s * 0.1, 0.43, -0.01)
+    set(L ? 27 : 28, s * 0.1, 0.85)
+    set(L ? 7 : 8, s * 0.07 + sway + look, -0.62 - breath, -0.035)
+  }
+  return lm
+}
+
+// Real webcam points where MediaPipe is sure of them, the relaxed pose everywhere else.
+export function withIdle(lm, t) {
+  const idle = idlePose(t)
+  return lm ? lm.map((p, i) => (p[3] > 0.5 ? p : idle[i])) : idle
+}
+
 // Models without an idle clip: start each frame from the rest pose.
 export function resetRig(rig) {
   for (const r of rig) r.bone.quaternion.copy(r.bind)

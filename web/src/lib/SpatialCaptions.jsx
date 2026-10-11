@@ -26,10 +26,12 @@ function Bubble({ c, setRef }) {
       className="pointer-events-none absolute left-0 top-0 z-[15] will-change-transform" style={{ visibility: 'hidden' }}>
       <div className="glass-dark max-w-[min(78vw,24em)] rounded-2xl px-3.5 py-2 text-center"
         style={{ boxShadow: `inset 0 -2px 0 ${c.color}` }}>
-        {c.name && <div className="mb-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-300">{c.name}{c.toYou ? ' · to you' : ''}</div>}
-        <p className="text-[clamp(16px,4.4vw,22px)] text-white" style={TEXT}>
-          {c.text}{c.live && <span className="ml-0.5 inline-block h-[0.9em] w-[2px] translate-y-[2px] animate-pulse bg-white" />}
-        </p>
+        {c.name && <div className={`${c.text ? 'mb-0.5' : ''} text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-300`}>{c.name}{c.toYou ? ' · to you' : ''}</div>}
+        {c.text && (
+          <p className="text-[clamp(16px,4.4vw,22px)] text-white" style={TEXT}>
+            {c.text}{c.live && <span className="ml-0.5 inline-block h-[0.9em] w-[2px] translate-y-[2px] animate-pulse bg-white" />}
+          </p>
+        )}
       </div>
     </motion.div>
   )
@@ -37,7 +39,8 @@ function Bubble({ c, setRef }) {
 
 // bubbles: [{trackId, key, text, live, name, color, toYou}]. neutral: {key, text, live, name} or null.
 // tracksRef.current: the face tracker's visible tracks (updated by the camera loop).
-export default function SpatialCaptions({ videoRef, tracksRef, bubbles, neutral, cue, raised }) {
+// fit: how the video is shown ('cover' on /captions, 'contain' on the dashboard camera tile).
+export default function SpatialCaptions({ videoRef, tracksRef, bubbles, neutral, cue, raised, fit = 'cover' }) {
   const els = useRef(new Map()) // trackId -> element
   const pos = useRef(new Map()) // trackId -> {x, y} on screen, eased
   const list = useRef(bubbles)
@@ -57,8 +60,8 @@ export default function SpatialCaptions({ videoRef, tracksRef, bubbles, neutral,
         const el = els.current.get(c.trackId)
         const t = tracksRef.current.find((x) => x.id === c.trackId)
         if (!el || !t) continue
-        const head = toScreen(v, root, t.x, t.y - t.size * HEAD_ABOVE_FOREHEAD)
-        const chin = toScreen(v, root, t.x, t.bottom)
+        const head = toScreen(v, root, t.x, t.y - t.size * HEAD_ABOVE_FOREHEAD, fit)
+        const chin = toScreen(v, root, t.x, t.bottom, fit)
         const w = el.offsetWidth, h = el.offsetHeight
         // Above the head; if that would leave the screen, under the chin instead. Never on the face.
         let y = head.top - GAP - h
@@ -83,7 +86,7 @@ export default function SpatialCaptions({ videoRef, tracksRef, bubbles, neutral,
     }
     raf = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(raf)
-  }, [videoRef, tracksRef])
+  }, [videoRef, tracksRef, fit])
 
   return (
     <>

@@ -5,7 +5,8 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { openCamera } from './cameras'
-import { makeRig, poseRig, resetRig } from './avatarRig'
+import { makeRig, poseRig, resetRig, withIdle } from './avatarRig'
+import { dressAsWearer } from './outfit'
 import { detectPoseWorld, loadPose } from './pose'
 
 // Bottom-left of the control center: the person in the headset, as a 3D figure that copies their
@@ -13,7 +14,8 @@ import { detectPoseWorld, loadPose } from './pose'
 // bones are turned to match. Video and body points stay in this browser tab.
 //
 // Figure: drop a Mixamo-rigged character exported from Blender (File > Export > glTF 2.0, .glb) at
-// web/public/models/avatar.glb. Without it, the walker figure from the captions view is used.
+// web/public/models/avatar.glb. Without it, the walker figure from the captions view is used, dressed
+// in code (outfit.js) like the team member who wears the headset in the demo.
 const MODELS = ['avatar.glb', 'walker.glb'].map((f) => `${import.meta.env.BASE_URL}models/${f}`)
 const POSE_FPS = 20
 
@@ -32,11 +34,17 @@ function Figure({ poseRef }) {
     loadFigure().then(({ gltf, custom }) => {
       if (!live) return
       const scene = cloneSkinned(gltf.scene)
-      if (!custom) scene.traverse((o) => {
+      if (!custom) dressAsWearer(scene) // the walker figure, dressed like the person in the demo headset
+      scene.traverse((o) => {
         if (!o.isMesh) return
-        o.material = new THREE.MeshStandardMaterial({ color: /Joints/.test(o.material.name) ? '#a1a1aa' : '#f4f4f5', roughness: 0.75 })
+        o.frustumCulled = false
+        // Blender exports: hair, brows and lashes as cut-outs, everything else solid, so layers never flicker.
+        for (const m of [o.material].flat()) {
+          if (!custom || !m) continue
+          if (/hair|afro|eyebrow|eyelash/i.test(m.name)) Object.assign(m, { alphaTest: 0.45, transparent: false, depthWrite: true })
+          else if (!/high-poly|cornea/i.test(m.name)) m.transparent = false
+        }
       })
-      scene.traverse((o) => { if (o.isMesh) o.frustumCulled = false })
       // Same height on screen whatever the model's units (Blender/Mixamo exports often carry a 0.01 scale).
       scene.updateMatrixWorld(true)
       const size = new THREE.Box3().setFromObject(scene).getSize(new THREE.Vector3())
@@ -44,17 +52,19 @@ function Figure({ poseRef }) {
       const mixer = new THREE.AnimationMixer(scene)
       const idle = gltf.animations.find((c) => /idle/i.test(c.name)) ?? gltf.animations[0]
       if (idle) mixer.clipAction(idle).play()
-      setFig({ scene, mixer, rig: makeRig(scene) })
+      setFig({ scene, mixer, rig: makeRig(scene), hasIdle: !!idle })
     }).catch((e) => console.warn('Avatar figure failed to load', e))
     return () => { live = false }
   }, [])
 
-  useFrame((_, dt) => {
+  useFrame(({ clock }, dt) => {
     if (!fig) return
     dt = Math.min(dt, 0.1)
     resetRig(fig.rig)
     fig.mixer.update(dt)
-    poseRig(fig.rig, fig.scene, poseRef.current, dt)
+    // No idle clip in the file (the Blender avatar): stand relaxed and breathe, with the webcam on top.
+    const lm = fig.hasIdle ? poseRef.current : withIdle(poseRef.current, clock.elapsedTime)
+    poseRig(fig.rig, fig.scene, lm, dt)
   })
   return fig ? <primitive object={fig.scene} /> : null
 }
