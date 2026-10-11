@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { Mic, Send, Volume2, VolumeX } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { greet, onVoiceStatus, prime, say, setVoice, voiceOn, voiceSupported, warmup } from './speak'
+import { greet, hush, onVoiceStatus, prime, say, setVoice, voiceOn, voiceSupported, warmup } from './speak'
 import { ALERT_TEXT, ZONES } from './zones'
 
 const SUGGESTIONS = ['Where are my keys?', 'What was the last thing said?', 'What happened while I was asleep?']
@@ -58,19 +58,27 @@ export default function AskLumen({ className = '' }) {
     } catch {
       reply = { answer: "Can't reach the brain right now.", evidence: [] }
     }
-    say(reply.answer)
+    if (voiceOn()) say(reply.answer, { force: true })
     setThread((t) => [...t, { from: 'lumen', text: reply.answer, evidence: reply.evidence, brain: reply.brain, ts: Date.now() / 1000 }])
     setBusy(false)
   }
 
   // Voice input for people who'd rather speak than type (Chrome and Safari).
+  // Unlock sound on this tap. The answer arrives later, after she has stopped listening.
   const listen = () => {
+    if (!Speech || busy) return
+    hush()
+    setVoice(true)
+    setVoiceOn(true)
+    prime()
+    warmup()
     const rec = new Speech()
     rec.lang = 'en-US'
-    rec.onresult = (e) => ask(e.results[0][0].transcript)
+    rec.onresult = (e) => ask(e.results[0][0].transcript || '')
+    rec.onerror = () => setListening(false)
     rec.onend = () => setListening(false)
     setListening(true)
-    rec.start()
+    try { rec.start() } catch { setListening(false) }
   }
 
   return (
@@ -144,12 +152,12 @@ export default function AskLumen({ className = '' }) {
       </div>
       <form onSubmit={(e) => { e.preventDefault(); ask(q) }} className="mt-2 flex gap-2">
         <input
-          value={q} onChange={(e) => setQ(e.target.value)} placeholder="Message Lumen…" aria-label="Message Lumen"
+          value={q} onChange={(e) => setQ(e.target.value)} placeholder={listening ? 'Listening…' : 'Ask out loud or type. Luma talks back.'} aria-label="Message Lumen"
           className="min-w-0 flex-1 rounded-lg bg-zinc-900 px-3 py-2 outline-none ring-amber-400 focus:ring-2"
         />
         {Speech && (
-          <button type="button" onClick={listen} title="Ask by voice" aria-label="Ask by voice"
-            className={`rounded-lg px-3 ${listening ? 'animate-pulse bg-red-500' : 'bg-zinc-800 hover:bg-zinc-700'}`}><Mic size={18} /></button>
+          <button type="button" onClick={listen} title={listening ? 'Listening' : 'Ask by voice'} aria-label={listening ? 'Listening' : 'Ask by voice'}
+            className={`rounded-lg px-3 ${listening ? 'animate-pulse bg-white text-black' : 'bg-zinc-800 hover:bg-zinc-700'}`}><Mic size={18} /></button>
         )}
         <button disabled={busy} aria-label="Send" className="rounded-lg bg-amber-400 px-3 font-semibold text-black disabled:opacity-50"><Send size={18} /></button>
       </form>

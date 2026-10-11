@@ -1,11 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Mic, Send, Sparkles, Volume2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { prime, say, voiceSupported, warmup } from './speak'
+import { hush, onVoiceStatus, prime, say, setVoice, voiceSupported, warmup } from './speak'
 import { api } from './useBrain'
 
-// "Ask Luma" on the wearer's screen: tap, then talk or type. The answer comes from the house log
-// (the same agent as Ask Lumen on the dashboard), shows as a card and is read aloud.
+// "Ask Luma" on the wearer's screen: one tap, then talk. The answer comes from the house log
+// (the same agent as Ask Lumen on the dashboard), shows as a card, and is said out loud.
 // Tap to talk, not always listening. It never fires an alert.
 const Speech = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)
 
@@ -14,19 +14,23 @@ export default function LumaTalk({ liftBy = 0 }) {
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
   const [heard, setHeard] = useState(false)
+  const [missed, setMissed] = useState(false)
   const [answer, setAnswer] = useState(null)
+  const [voiceStatus, setVoiceStatus] = useState({ status: 'idle', progress: 0 })
   const recRef = useRef()
 
-  // A laptop can load Luma's voice. A phone skips the download and keeps the captions light.
-  useEffect(() => {
-    if (window.matchMedia('(min-width: 900px)').matches) warmup()
-  }, [])
+  useEffect(() => onVoiceStatus(setVoiceStatus), [])
+  // The headset has to talk back, so start the voice download as soon as this page opens.
+  useEffect(() => { warmup() }, [])
 
   const ask = async (text) => {
     const question = text.trim()
     if (!question || busy) return
     prime()
+    warmup()
+    setVoice(true)
     setQ('')
+    setMissed(false)
     setBusy(true)
     setAnswer({ question, text: '…' })
     let reply
@@ -35,41 +39,83 @@ export default function LumaTalk({ liftBy = 0 }) {
     } catch {
       reply = { answer: "Can't reach the brain right now." }
     }
+    const spoken = reply.answer || 'No answer.'
     setBusy(false)
-    setAnswer({ question, text: reply.answer || 'No answer.' })
-    say(reply.answer)
+    setAnswer({ question, text: spoken })
+    say(spoken, { force: true })
   }
 
+  const stopListen = () => {
+    try { recRef.current?.stop() } catch { /* already stopped */ }
+    setHeard(false)
+  }
+
+  // The mic tap is the moment the browser allows sound. Unlock it here, before she answers.
   const listen = () => {
-    if (!Speech) return
+    if (!Speech || busy) return
+    hush()
+    prime()
+    warmup()
+    setVoice(true)
+    setMissed(false)
     const rec = new Speech()
     rec.lang = 'en-US'
-    rec.onresult = (e) => { setOpen(false); ask(e.results[0][0].transcript) }
+    rec.onresult = (e) => {
+      setHeard(false)
+      setOpen(false)
+      ask(e.results[0][0].transcript || '')
+    }
     rec.onend = () => setHeard(false)
-    rec.onerror = () => setHeard(false)
+    rec.onerror = () => {
+      setHeard(false)
+      setMissed(true)
+      setOpen(true)
+    }
     recRef.current = rec
+    setOpen(true)
     setHeard(true)
-    rec.start()
+    try { rec.start() } catch {
+      setHeard(false)
+      setMissed(true)
+    }
   }
+
+  const toggle = (e) => {
+    e.stopPropagation()
+    if (heard || open) {
+      stopListen()
+      setOpen(false)
+      return
+    }
+    if (Speech) listen()
+    else { prime(); warmup(); setOpen(true) }
+  }
+
+  const label = heard ? 'Listening'
+    : voiceStatus.status === 'speaking' ? 'Speaking'
+      : voiceStatus.status === 'loading' ? 'Getting voice'
+        : 'Ask Luma'
 
   return (
     <>
-      <button onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }} aria-label="Ask Luma"
+      <button onClick={toggle} aria-label={label}
         style={{ bottom: `calc(max(0.75rem, env(safe-area-inset-bottom)) + ${liftBy}px)` }}
-        className="glass-dark absolute right-3 z-30 flex h-12 w-12 items-center justify-center rounded-full text-white">
-        <Sparkles size={20} />
+        className={`glass-dark absolute right-3 z-30 flex h-12 items-center gap-2 rounded-full px-4 text-white ${heard ? 'ring-2 ring-white' : ''}`}>
+        {heard ? <Mic size={18} /> : <Sparkles size={18} />}
+        <span className="text-sm font-semibold">{label}</span>
       </button>
       <AnimatePresence>
         {open && (
           <motion.form key="ask" onClick={(e) => e.stopPropagation()}
-            onSubmit={(e) => { e.preventDefault(); setOpen(false); ask(q) }}
+            onSubmit={(e) => { e.preventDefault(); stopListen(); setOpen(false); ask(q) }}
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             style={{ bottom: `calc(max(0.75rem, env(safe-area-inset-bottom)) + ${liftBy + 60}px)` }}
             className="glass-dark absolute right-3 z-30 flex w-[min(86vw,22rem)] items-center gap-2 rounded-full p-1.5 pl-4">
-            <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ask Luma…"
+            <input autoFocus={!heard} value={q} onChange={(e) => setQ(e.target.value)}
+              placeholder={heard ? 'Listening…' : missed ? "Didn't catch that. Type it." : 'Ask Luma…'}
               className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-zinc-500" />
             {Speech && (
-              <button type="button" onClick={listen} aria-label="Talk to Luma"
+              <button type="button" onClick={heard ? stopListen : listen} aria-label={heard ? 'Stop listening' : 'Talk to Luma'}
                 className={`flex h-9 w-9 items-center justify-center rounded-full ${heard ? 'bg-white text-black' : 'bg-zinc-900'}`}><Mic size={16} /></button>
             )}
             <button className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900" aria-label="Send"><Send size={16} /></button>
@@ -86,13 +132,15 @@ export default function LumaTalk({ liftBy = 0 }) {
               <span className="flex shrink-0 items-center gap-2">
                 {voiceSupported() && answer.text && answer.text !== '…' && (
                   <button type="button" aria-label="Hear this answer" title="Hear this answer"
-                    onClick={(e) => { e.stopPropagation(); say(answer.text, { force: true }) }}
+                    onClick={(e) => { e.stopPropagation(); prime(); warmup(); say(answer.text, { force: true }) }}
                     className="text-zinc-400"><Volume2 size={14} /></button>
                 )}
                 <X size={14} className="text-zinc-500" />
               </span>
             </div>
             <p className="mt-2 text-lg leading-snug">{answer.text}</p>
+            {voiceStatus.status === 'loading' && <p className="mt-2 text-sm text-zinc-400">Getting Luma's voice{voiceStatus.progress ? ` ${voiceStatus.progress}%` : '…'} then she'll say this.</p>}
+            {voiceStatus.status === 'speaking' && <p className="mt-2 text-sm text-zinc-400">Speaking…</p>}
           </motion.div>
         )}
       </AnimatePresence>

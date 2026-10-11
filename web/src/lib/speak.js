@@ -141,6 +141,11 @@ function stopTalking() {
   if (status === 'speaking') setStatus(modelPromise ? 'ready' : 'idle')
 }
 
+// Stop the current line. Used when someone taps the mic so Luma is not talking over them.
+export function hush() {
+  stopTalking()
+}
+
 // The small quantized model sometimes spits out a single wild sample. Swap those
 // for the sample before them so the line does not click.
 function calm(samples) {
@@ -215,7 +220,7 @@ function loadModel() {
   return modelPromise
 }
 
-// Start the download before the first tap. The dashboard calls this. A phone does not.
+// Start the download before the first question. The dashboard and the headset both call this.
 export function warmup() {
   if (typeof window === 'undefined') return
   useKokoro = true
