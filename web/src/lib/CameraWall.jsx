@@ -6,6 +6,7 @@ import { nodeSocket } from './audio'
 import { loadDetector } from './surroundings'
 import { assign, closeCameras, fillSlots, listCameras, localSource, openCamera, phoneSource } from './cameras'
 import { attachMic } from './mic'
+import BodyOverlay from './BodyOverlay'
 import HazardNote from './HazardNote'
 import TalkingHeads from './TalkingHeads'
 import { alertText, SEVERITY_COLOR, zoneLabel } from './zones'
@@ -276,6 +277,7 @@ function LaptopFeed({ deviceId, label, look }) {
     <video ref={video} playsInline muted aria-label={`${label} camera`} className="absolute inset-0 h-full w-full object-contain" />
     {seen?.objects && <Highlights seen={seen} />}
     {look && seen !== 'off' && <BrainReadout seen={seen} />}
+    {look && <BodyOverlay videoRef={video} />}
     {look && <TalkingHeads videoRef={video} />}
     {look && <HazardNote videoRef={video} />}
   </>
