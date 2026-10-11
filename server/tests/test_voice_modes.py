@@ -101,3 +101,11 @@ def test_caption_says_when_the_words_were_said(monkeypatch):
         asyncio.run(main.run_speech("living", np.full(16000, 0.1, np.float32), (1000.0, 1002.5)))
         msg = dash.receive_json()
     assert (msg["start_ts"], msg["end_ts"]) == (1000.0, 1002.5)
+
+
+def test_home_mode_catches_both_a_fall_and_a_car_behind():
+    """The back phone's approach alert used to work only in Outside mode, where falls are off."""
+    from app.modes import MODES
+
+    for mode in ("wearer", "watch"):
+        assert {"fall", "rear_vision"} <= set(MODES[mode]["detectors"])
