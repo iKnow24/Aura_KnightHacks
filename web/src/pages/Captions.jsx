@@ -9,6 +9,7 @@ import SpatialCaptions from '../lib/SpatialCaptions'
 import { pickSpeaker } from '../lib/speakerMatch'
 import { Camera, CameraOff, Clapperboard, Download, Ellipsis, Footprints, GraduationCap, House, Lock, Zap } from 'lucide-react'
 import CornerMark from '../lib/CornerMark'
+import LumaTalk from '../lib/LumaTalk'
 import Logo from '../lib/Logo'
 import Recap from '../lib/Recap'
 import Surround from '../lib/Surround'
@@ -18,7 +19,7 @@ import { attachMic } from '../lib/mic'
 import { instantSupported, useLiveCaptions } from '../lib/useLiveCaptions'
 import { getUser } from '../lib/user'
 import { askMotion } from '../lib/walking'
-import { alertText, SEVERITY_COLOR, ZONES, zoneLabel } from '../lib/zones'
+import { alertText, micName, SEVERITY_COLOR, ZONES, zoneLabel } from '../lib/zones'
 
 // The wearer's phone, held up like a window: camera behind, and each line floats above the head of
 // the person who said it (spatial captions). Lines no face can be matched to sit in a neutral spot
@@ -279,6 +280,7 @@ export default function Captions() {
   const levelRef = useRef(0)
   const [corner, setCorner] = useState(null) // presenter-set sound direction (CornerMark.jsx)
   const cornerTimer = useRef()
+  const [heardBy, setHeardBy] = useState(null) // which device's mic heard the latest sound (server direction.py)
 
   const { state, connected } = useBrain('hud', push, (msg) => {
     if (msg.type === 'caption') captions.addRemote(msg)
@@ -286,6 +288,7 @@ export default function Captions() {
     if (msg.type === 'caption_partial' && !ZONES[msg.zone]) captions.addPartial(msg) // room nodes only get finished lines
     if (msg.type === 'scene' && msg.side === 'rear') setRearScene({ ...msg, at: Date.now() })
     if (msg.type === 'ack') drop(msg.id)
+    if (msg.type === 'direction' && msg.zone) setHeardBy({ zone: msg.zone, at: Date.now() })
     if (msg.type === 'presenter_dir') {
       setCorner(msg.corner)
       clearTimeout(cornerTimer.current)
@@ -517,6 +520,12 @@ export default function Captions() {
       {camera && <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />}
       <AlertStack alerts={alerts} onAck={ack} />
       <CornerMark corner={corner} />
+      {heardBy && Date.now() - heardBy.at < 2500 && (
+        <div className="pointer-events-none absolute inset-x-0 top-[max(0.75rem,env(safe-area-inset-top))] z-10 mx-auto w-fit glass-dark rounded-full px-3 py-1.5 text-sm">
+          Sound heard by <b>{micName(heardBy.zone)}</b>
+        </div>
+      )}
+      <LumaTalk liftBy={bar ? 76 : 0} />
       {rearCar && (
         <div className="absolute inset-x-0 bottom-28 z-20 mx-auto w-fit max-w-[90%] bg-black px-5 py-3 text-center text-2xl font-semibold tracking-wide text-white">
           {rearCar.kind === 'truck' ? 'TRUCK' : 'CAR'} BEHIND YOU · {rearCar.mph} MPH
