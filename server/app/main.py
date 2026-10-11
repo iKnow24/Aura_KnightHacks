@@ -200,6 +200,14 @@ async def run_items(node_id: str, zone: str, jpeg: str):
 
 
 async def publish_vision(event: dict):
+    previous = latest_vision.get(event["node_id"])
+    changed = scene.change_sentence(event["zone"], previous, event)
+    counts = scene.watched_counts(event)
+    if counts:
+        memory.note_scene(event["zone"], counts, event.get("summary", ""))
+    if changed:
+        text, lost, still = changed
+        memory.note_change(event["zone"], text, lost, still)
     latest_vision[event["node_id"]] = event
     if "inference_ms" in event:
         vision_ms.append(event["inference_ms"])
@@ -223,7 +231,13 @@ async def handle_approach(zone: str, data: dict):
 async def handle_spill(zone: str, data: dict):
     # The kitchen phone decided a new puddle is sitting on the counter. Same rule as a
     # rear-camera approach: the phone measures, the brain only sends the alert.
+    # The scene JSON says which drink was there a moment ago, so Ask Lumen can name it.
     if enabled("spill"):
+        seen = next((e for e in reversed(list(latest_vision.values())) if e.get("zone") == zone), None)
+        drinks = [label for label in ("cup", "bottle") if (seen or {}).get("counts", {}).get(label)]
+        what = drinks[0] if drinks else "drink"
+        memory.note_change(zone, f"A {what} spilled in the {zone}. The scene JSON had shown it there just before.",
+                           lost=drinks or [what], seen=[])
         await emit_detected("spill", zone, "warning", source="spill_vision", confidence=float(data.get("score", 0.8)))
 
 

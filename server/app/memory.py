@@ -120,6 +120,33 @@ class Memory:
     def items_seen(self) -> list[str]:
         return sorted({e["item"] for e in self.entries if e["type"] == "sighting"})
 
+    def note_scene(self, zone: str, counts: dict, summary: str, ts: float | None = None) -> dict:
+        """One scene JSON snapshot per room, refreshed in place. Ask Lumen reads this to find things."""
+        ts = ts or time.time()
+        for e in reversed(self.entries):
+            if e.get("type") == "scene" and e.get("zone") == zone:
+                e.update(ts=ts, counts=dict(counts), summary=summary)
+                return e
+        return self.add({"type": "scene", "zone": zone, "counts": dict(counts), "summary": summary, "ts": ts})
+
+    def note_change(self, zone: str, text: str, lost: list[str] | None = None, seen: list[str] | None = None,
+                    ts: float | None = None) -> dict:
+        """What changed between two scene JSON lines, including a spill."""
+        return self.add({"type": "change", "zone": zone, "text": text, "lost": list(lost or []),
+                         "seen": list(seen or []), "ts": ts or time.time()})
+
+    def latest_scene(self, zone: str | None = None) -> dict | None:
+        for e in reversed(self.entries):
+            if e.get("type") == "scene" and (zone is None or e.get("zone") == zone):
+                return e
+        return None
+
+    def latest_change(self) -> dict | None:
+        for e in reversed(self.entries):
+            if e.get("type") == "change":
+                return e
+        return None
+
     def clear(self):
         self.entries.clear()
         self.save()

@@ -108,6 +108,27 @@ def from_phone(node_id: str, zone: str, ts: float, objects: list) -> dict:
             "summary": summary(counts, people, None), "model": "efficientdet-lite0 (on phone)"}
 
 
+# Things a person asks about, or that a spill would move. People walking through are not a "difference".
+WATCHED = ("cup", "bottle", "pill bottle", "keys", "glasses", "wallet", "phone", "remote")
+
+
+def watched_counts(event: dict | None) -> dict[str, int]:
+    counts = (event or {}).get("counts") or {}
+    return {label: int(counts.get(label, 0)) for label in WATCHED if counts.get(label)}
+
+
+def change_sentence(zone: str, before: dict | None, after: dict) -> tuple[str, list[str], list[str]] | None:
+    """Spot the difference between two scene JSON lines. Returns (sentence, lost labels, still there)."""
+    prev, now = watched_counts(before), watched_counts(after)
+    lost = [label for label in WATCHED if prev.get(label, 0) > now.get(label, 0)]
+    gained = [label for label in WATCHED if now.get(label, 0) > prev.get(label, 0)]
+    if not lost and not gained:
+        return None
+    bits = [f"the {label} is gone" for label in lost] + [f"a {label} showed up" for label in gained]
+    still = [label for label, n in now.items() if n]
+    return f"In the {zone}, " + ", ".join(bits) + ".", lost, still
+
+
 def summary(counts: dict[str, int], people: int, pose_posture: str | None) -> str:
     parts = []
     if people:

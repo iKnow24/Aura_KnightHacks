@@ -7,7 +7,6 @@ import { useCameraWall, useLaptopCameras } from '../lib/CameraWall'
 import History from '../lib/History'
 import Story from '../lib/Story'
 import Conversation, { useCaptions } from '../lib/Conversation'
-import QrPanel from '../lib/QrPanel'
 import { Wordmark } from '../lib/Logo'
 import { getUser, signOut } from '../lib/user'
 const Avatar3D = lazy(() => import('../lib/Avatar3D'))
@@ -29,7 +28,6 @@ const FAKES = [
 
 export default function Dashboard() {
   const [ripples, setRipples] = useState([])
-  const [showQr, setShowQr] = useState(false)
   const [tab, setTab] = useState('live')
   const [previews, setPreviews] = useState({})
   const [vision, setVision] = useState({})
@@ -72,11 +70,8 @@ export default function Dashboard() {
           </button>
         ))}
       </div>
-      <button onClick={() => setShowQr((v) => !v)} className="glass ml-auto rounded-full px-4 py-1.5 text-sm font-medium hover:border-white/20">
-        {showQr ? 'Hide' : 'Add phones'}
-      </button>
       <select
-        className="glass rounded-full px-3 py-1.5 text-sm font-medium"
+        className="glass ml-auto rounded-full px-3 py-1.5 text-sm font-medium"
         value={state.mode}
         onChange={(e) => api('/api/mode', { mode: e.target.value })}
       >
@@ -105,7 +100,6 @@ export default function Dashboard() {
       {wall.full}
 
       <Stage title="Cameras" context="Every camera in the house, including the headset captions view. Tap a name to make it the main picture. Press 1 or 2 to swap a side camera in.">
-        {showQr && <QrPanel />}
         <div className="mb-2 flex flex-wrap items-center gap-2">
           {wall.switcher}
         </div>

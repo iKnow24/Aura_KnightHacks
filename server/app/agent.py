@@ -28,6 +28,8 @@ ITEM_WORDS = {
     "glasses": ["glasses", "spectacles", "specs"],
     "remote": ["remote", "tv remote", "clicker"],
     "headphones": ["headphones", "earbuds", "airpods"],
+    "cup": ["cup", "mug", "glass", "drink", "soda", "coffee"],
+    "bottle": ["bottle"],
 }
 
 ZONE_WORDS = {"kitchen": "kitchen", "living": "living", "lounge": "living", "bedroom": "bedroom",
@@ -104,7 +106,25 @@ def answer_rules(question: str, memory: Memory, events: list[dict]) -> dict:
     q = question.lower()
     item = find_item(q)
 
+    if re.search(r"\b(spill|spilled|fell|dropped|difference|changed)\b", q):
+        change = memory.latest_change()
+        if not change:
+            return {"answer": "I haven't seen a spill or a change in the scene JSON yet.", "evidence": []}
+        return {"answer": change["text"], "evidence": [change]}
+
     if item and re.search(r"\b(where|find|seen|left|lost)\b", q):
+        change = memory.latest_change()
+        if change and item in change.get("lost", []):
+            return {"answer": f"Your {item} was in the {room(change['zone'])}, and it is gone now. {change['text']}",
+                    "evidence": [change]}
+        scene_hit = None
+        for entry in reversed(memory.entries):
+            if entry.get("type") == "scene" and entry.get("counts", {}).get(item):
+                scene_hit = entry
+                break
+        if scene_hit:
+            return {"answer": f"Your {item} is in the {room(scene_hit['zone'])}. The latest scene JSON lists it there, {ago(scene_hit['ts'])}.",
+                    "evidence": [scene_hit]}
         r = tool_last_seen(memory, item)
         if not r["found"]:
             return {"answer": f"I haven't seen your {item} yet. Point a room's camera where you usually leave them.",
