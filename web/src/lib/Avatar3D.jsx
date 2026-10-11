@@ -6,6 +6,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { openCamera } from './cameras'
 import { makeRig, poseRig, resetRig } from './avatarRig'
+import { dressAsWearer } from './outfit'
 import { detectPoseWorld, loadPose } from './pose'
 
 // Bottom-left of the control center: the person in the headset, as a 3D figure that copies their
@@ -13,7 +14,8 @@ import { detectPoseWorld, loadPose } from './pose'
 // bones are turned to match. Video and body points stay in this browser tab.
 //
 // Figure: drop a Mixamo-rigged character exported from Blender (File > Export > glTF 2.0, .glb) at
-// web/public/models/avatar.glb. Without it, the walker figure from the captions view is used.
+// web/public/models/avatar.glb. Without it, the walker figure from the captions view is used, dressed
+// in code (outfit.js) like the team member who wears the headset in the demo.
 const MODELS = ['avatar.glb', 'walker.glb'].map((f) => `${import.meta.env.BASE_URL}models/${f}`)
 const POSE_FPS = 20
 
@@ -32,10 +34,7 @@ function Figure({ poseRef }) {
     loadFigure().then(({ gltf, custom }) => {
       if (!live) return
       const scene = cloneSkinned(gltf.scene)
-      if (!custom) scene.traverse((o) => {
-        if (!o.isMesh) return
-        o.material = new THREE.MeshStandardMaterial({ color: /Joints/.test(o.material.name) ? '#a1a1aa' : '#f4f4f5', roughness: 0.75 })
-      })
+      if (!custom) dressAsWearer(scene) // the walker figure, dressed like the person in the demo headset
       scene.traverse((o) => { if (o.isMesh) o.frustumCulled = false })
       // Same height on screen whatever the model's units (Blender/Mixamo exports often carry a 0.01 scale).
       scene.updateMatrixWorld(true)
