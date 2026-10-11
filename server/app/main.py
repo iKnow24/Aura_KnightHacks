@@ -208,6 +208,9 @@ async def publish_vision(event: dict):
     if changed:
         text, lost, still = changed
         memory.note_change(event["zone"], text, lost, still)
+        if any(label in scene.DRINKS for label in lost):
+            event["risk"] = {"score": max(event.get("risk", {}).get("score", 0), 74), "level": "warning",
+                             "why": "a drink left the scene"}
     latest_vision[event["node_id"]] = event
     if "inference_ms" in event:
         vision_ms.append(event["inference_ms"])

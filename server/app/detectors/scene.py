@@ -89,9 +89,11 @@ def build(node_id: str, zone: str, ts: float, hits: list[dict], labels: dict[str
     for o in objects:
         counts[o["label"]] = counts.get(o["label"], 0) + 1
     people = max(counts.get("person", 0), 1 if pose_person else 0)
-    return {"type": "vision", "node_id": node_id, "zone": zone, "ts": ts, "source": "owlv2",
-            "people": people, "posture": pose_posture, "objects": objects, "counts": counts,
-            "summary": summary(counts, people, pose_posture), "model": MODEL_ID.split("/")[-1], **timing}
+    event = {"type": "vision", "node_id": node_id, "zone": zone, "ts": ts, "source": "owlv2",
+             "people": people, "posture": pose_posture, "objects": objects, "counts": counts,
+             "summary": summary(counts, people, pose_posture), "model": MODEL_ID.split("/")[-1], **timing}
+    event["risk"] = rate(event)
+    return event
 
 
 def from_phone(node_id: str, zone: str, ts: float, objects: list) -> dict:
@@ -103,9 +105,11 @@ def from_phone(node_id: str, zone: str, ts: float, objects: list) -> dict:
     for o in objs:
         counts[o["label"]] = counts.get(o["label"], 0) + 1
     people = counts.get("person", 0)
-    return {"type": "vision", "node_id": node_id, "zone": zone, "ts": ts, "source": "phone",
-            "people": people, "posture": None, "objects": objs, "counts": counts,
-            "summary": summary(counts, people, None), "model": "efficientdet-lite0 (on phone)"}
+    event = {"type": "vision", "node_id": node_id, "zone": zone, "ts": ts, "source": "phone",
+             "people": people, "posture": None, "objects": objs, "counts": counts,
+             "summary": summary(counts, people, None), "model": "efficientdet-lite0 (on phone)"}
+    event["risk"] = rate(event)
+    return event
 
 
 # Things a person asks about, or that a spill would move. People walking through are not a "difference".
@@ -129,6 +133,26 @@ def change_sentence(zone: str, before: dict | None, after: dict) -> tuple[str, l
     return f"In the {zone}, " + ", ".join(bits) + ".", lost, still
 
 
+# Fixed scores. A higher number wins. Nothing here decides an alert; the detectors still do that.
+RISK_SCORES = {"fire": 95, "smoke": 88, "knife": 72}
+DRINKS = ("cup", "bottle")
+
+
+def rate(event: dict) -> dict:
+    """A 0–100 risk rating from one scene JSON line. Lying down and fire outrank a cup on the table."""
+    score, why = 0, []
+    counts = event.get("counts") or {}
+    for label, points in RISK_SCORES.items():
+        if counts.get(label) and points > score:
+            score, why = points, [label]
+    if event.get("posture") == "lying" and 80 > score:
+        score, why = 80, ["someone lying down"]
+    elif event.get("posture") == "lying" and "someone lying down" not in why:
+        why.append("someone lying down")
+    level = "critical" if score >= 80 else "warning" if score >= 55 else "low"
+    return {"score": score, "level": level, "why": ", ".join(why) if why else "nothing risky"}
+
+
 def summary(counts: dict[str, int], people: int, pose_posture: str | None) -> str:
     parts = []
     if people:
@@ -137,8 +161,32 @@ def summary(counts: dict[str, int], people: int, pose_posture: str | None) -> st
     return ", ".join(parts) or "nothing recognised"
 
 
+def convert_images(folder, out_dir, finder) -> int:
+    """One JSON file per photo. The photos are not copied. Needs the vision model (the AMD box)."""
+    import json
+    import time
+    from pathlib import Path
+
+    from PIL import Image
+
+    src, dest = Path(folder), Path(out_dir)
+    dest.mkdir(parents=True, exist_ok=True)
+    photos = [p for p in sorted(src.iterdir()) if p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}]
+    if not photos:
+        raise SystemExit(f"No photos in {src}")
+    prompts, thresholds, labels = queries()
+    for photo in photos:
+        image = Image.open(photo).convert("RGB")
+        hits, timing = finder.detect(image, prompts, thresholds)
+        event = build(photo.stem, "room", time.time(), hits, labels, *image.size, timing, None, False)
+        (dest / f"{photo.stem}.json").write_text(json.dumps(event))
+        print(photo.name, event["risk"]["level"], event["risk"]["score"], event["summary"])
+    return len(photos)
+
+
 if __name__ == "__main__":
-    # Speed test + sample JSON on the AMD box: python -m app.detectors.scene [photo.jpg] [runs]
+    # One photo, timed:     python -m app.detectors.scene photo.jpg [runs]
+    # A whole folder:       python -m app.detectors.scene --json-dir photos json_out
     import json
     import statistics
     import sys
@@ -150,6 +198,12 @@ if __name__ == "__main__":
     finder = ItemFinder()
     if not finder.available():
         raise SystemExit("Model didn't load; see the warning above.")
+    if len(sys.argv) > 1 and sys.argv[1] == "--json-dir":
+        if len(sys.argv) < 4:
+            raise SystemExit("Usage: python -m app.detectors.scene --json-dir photos json_out")
+        n = convert_images(sys.argv[2], sys.argv[3], finder)
+        print(f"Wrote {n} JSON files")
+        raise SystemExit(0)
     image = Image.open(sys.argv[1]).convert("RGB") if len(sys.argv) > 1 else Image.new("RGB", (640, 480), "gray")
     runs = int(sys.argv[2]) if len(sys.argv) > 2 else 20
     prompts, thresholds, labels = queries()
