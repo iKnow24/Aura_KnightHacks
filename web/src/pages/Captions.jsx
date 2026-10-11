@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import AlertStack, { useAlerts } from '../lib/AlertToast'
 import { detectFaces, loadFaces } from '../lib/faces'
 import { FaceTracker } from '../lib/faceTracker'
-import { lastTwoLines } from '../lib/captionText'
+import { lastTwoLines, nameIn } from '../lib/captionText'
 import SpatialCaptions from '../lib/SpatialCaptions'
 import { pickSpeaker } from '../lib/speakerMatch'
 import { Camera, CameraOff, Clapperboard, Download, Ellipsis, Footprints, GraduationCap, House, Lock, Zap } from 'lucide-react'
@@ -34,18 +34,7 @@ const HIDE_BAR_MS = 4000
 const SPEECH_LEVEL = 0.02 // mic loudness that counts as speech (Private engine)
 const HOLD_S = 5 // a spatial caption stays up this long after its last word
 const FACE_MS = 66 // face tracking at about 15 frames a second
-// "Hi, I'm Adam" / "my name is Adam". A capital letter is required after the weak cues ("I'm going"
-// isn't a name); after "my name is" the recognizer's lowercase is trusted.
-const NAME_RE = /\b(?:[Mm]y name's|[Nn]ame's|I'm|I am|[Cc]all me|[Tt]his is)\s+([A-Z][a-z]{2,})/
-const MY_NAME_IS = /\bmy name is\s+([a-z]{3,})/i
-const NOT_NAMES = new Set(['Going', 'Not', 'Just', 'Sure', 'Sorry', 'Good', 'Fine', 'Okay', 'So', 'Here', 'Really', 'Glad',
-  'Done', 'Back', 'Trying', 'Looking', 'Talking', 'Very', 'The', 'From', 'Your', 'What', 'Lumen'])
-export function nameIn(text) {
-  const m = text.match(MY_NAME_IS)?.[1] ?? text.match(NAME_RE)?.[1]
-  if (!m) return null
-  const name = m[0].toUpperCase() + m.slice(1).toLowerCase()
-  return NOT_NAMES.has(name) ? null : name
-}
+export { nameIn }
 
 // Two transcripts of one sentence (Google on this phone, Whisper on the room phone): most words in common.
 function sameWords(a, b) {
@@ -445,7 +434,7 @@ export default function Captions() {
     const sock = nodeSocket(id, 'wearer')
     let stopMic = () => {}
     let dead = false
-    attachMic((buf) => sock.send(buf), (level) => pushLevel.current(level))
+    attachMic((buf) => sock.send(buf), (level) => pushLevel.current(level), null, { echoCancel: true })
       .then((stop) => { if (dead) stop(); else stopMic = stop })
       .catch(() => {})
     const timer = setInterval(() => {

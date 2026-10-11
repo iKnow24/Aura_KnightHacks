@@ -148,7 +148,7 @@ export default function Dashboard() {
             <li key={v.node_id} className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
               <span className="text-4xl font-semibold tabular-nums">{v.risk?.score ?? 0}</span>
               <span className="text-lg font-semibold uppercase">{v.risk?.level ?? 'low'}</span>
-              <span className="text-lg">{zoneLabel(v.zone)} · {v.risk?.why || v.summary}</span>
+              <span className="text-lg">{zoneLabel(v.zone)} · {v.change || v.risk?.why || v.summary}</span>
             </li>
           ))}
         </ul>

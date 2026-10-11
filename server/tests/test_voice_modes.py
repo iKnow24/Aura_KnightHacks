@@ -48,6 +48,21 @@ def test_browser_captions_are_saved_to_memory():
     assert main.memory.entries[-1]["text"] == "The meeting moved to 3 pm"
 
 
+def test_my_name_is_sticks_to_later_lines_from_that_mic():
+    main.named_mics.clear()
+    client = TestClient(app)
+    with client.websocket_connect("/ws/dashboard") as dash:
+        dash.receive_json()
+        first = client.post("/api/speech", json={"text": "Hi my name is Sharan", "zone": "wearer"})
+        assert first.json()["ok"] is True
+        intro = dash.receive_json()
+        assert intro["voice"] == "Sharan" and intro["voice_known"] is True
+        client.post("/api/speech", json={"text": "The strobe is by the bed", "zone": "wearer"})
+        follow = dash.receive_json()
+        assert follow["voice"] == "Sharan"
+        assert main.memory.entries[-1]["voice"] == "Sharan"
+
+
 def test_whisper_caption_message_type_and_speaker(monkeypatch):
     monkeypatch.setattr(main.transcriber, "transcribe", lambda audio: "Hi I'm Dana")
     client = TestClient(app)

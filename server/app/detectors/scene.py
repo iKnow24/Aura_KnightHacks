@@ -112,6 +112,29 @@ def from_phone(node_id: str, zone: str, ts: float, objects: list) -> dict:
     return event
 
 
+def from_boxes(node_id: str, zone: str, ts: float, objects: list) -> dict:
+    """Boxes measured on this computer (the laptop camera) when the big vision model is off.
+    Same JSON shape. The photo never arrives."""
+    objs = []
+    for raw in objects[:20]:
+        if not isinstance(raw, dict) or not raw.get("label"):
+            continue
+        item = {"label": str(raw["label"])[:40], "score": round(float(raw.get("score") or 0), 2)}
+        box = raw.get("box")
+        if isinstance(box, list) and len(box) == 4:
+            item["box"] = [round(float(n), 3) for n in box]
+        objs.append(item)
+    counts: dict[str, int] = {}
+    for obj in objs:
+        counts[obj["label"]] = counts.get(obj["label"], 0) + 1
+    people = counts.get("person", 0)
+    event = {"type": "vision", "node_id": node_id, "zone": zone, "ts": ts, "source": "phone",
+             "people": people, "posture": None, "objects": objs, "counts": counts,
+             "summary": summary(counts, people, None), "model": "efficientdet-lite0 (on this Mac)"}
+    event["risk"] = rate(event)
+    return event
+
+
 # Things a person asks about, or that a spill would move. People walking through are not a "difference".
 WATCHED = ("cup", "bottle", "pill bottle", "keys", "glasses", "wallet", "phone", "remote")
 
@@ -121,14 +144,40 @@ def watched_counts(event: dict | None) -> dict[str, int]:
     return {label: int(counts.get(label, 0)) for label in WATCHED if counts.get(label)}
 
 
+def _centers(event: dict | None, label: str) -> list[tuple[float, float]]:
+    out = []
+    for obj in (event or {}).get("objects") or []:
+        box = obj.get("box") if isinstance(obj, dict) else None
+        if obj.get("label") == label and isinstance(box, list) and len(box) == 4:
+            out.append(((box[0] + box[2]) / 2, (box[1] + box[3]) / 2))
+    return out
+
+
+# People and laptops are not "lost" just because a frame missed them. A real shift still gets a line.
+MOVE = WATCHED + ("person", "laptop", "knife")
+
+
+def moved_labels(before: dict | None, after: dict) -> list[str]:
+    """Something important that is still in frame, but its box moved across the picture."""
+    moved = []
+    for label in MOVE:
+        prev, now = _centers(before, label), _centers(after, label)
+        need = 0.18 if label == "person" else 0.12
+        if len(prev) == 1 and len(now) == 1 and math.dist(prev[0], now[0]) >= need:
+            moved.append(label)
+    return moved
+
+
 def change_sentence(zone: str, before: dict | None, after: dict) -> tuple[str, list[str], list[str]] | None:
     """Spot the difference between two scene JSON lines. Returns (sentence, lost labels, still there)."""
     prev, now = watched_counts(before), watched_counts(after)
     lost = [label for label in WATCHED if prev.get(label, 0) > now.get(label, 0)]
     gained = [label for label in WATCHED if now.get(label, 0) > prev.get(label, 0)]
-    if not lost and not gained:
+    moved = moved_labels(before, after)
+    if not lost and not gained and not moved:
         return None
     bits = [f"the {label} is gone" for label in lost] + [f"a {label} showed up" for label in gained]
+    bits += [f"the {label} moved" for label in moved]
     still = [label for label, n in now.items() if n]
     return f"In the {zone}, " + ", ".join(bits) + ".", lost, still
 

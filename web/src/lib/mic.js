@@ -5,10 +5,14 @@ const wsUrl = (path) => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${lo
 
 // Opens this device's mic and calls send(arrayBuffer) with 16 kHz mono float32.
 // The gain into the speakers is zero, so the phone does not play its own mic back.
-export async function attachMic(send, onLevel, stream) {
+export async function attachMic(send, onLevel, stream, opts = {}) {
   const own = !stream
+  // The headset and the laptop webcam sit next to speakers. Echo cancel keeps that from
+  // sounding like a call. Room phones leave it off so a smoke alarm is not cleaned away.
   const mic = stream || await navigator.mediaDevices.getUserMedia({
-    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+    audio: opts.echoCancel
+      ? { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+      : { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
   })
   const ctx = new AudioContext({ sampleRate: 16000 })
   const src = ctx.createMediaStreamSource(mic)

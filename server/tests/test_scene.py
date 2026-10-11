@@ -59,6 +59,12 @@ def test_risk_rating_names_fire_and_a_missing_drink():
     after = {'zone': 'kitchen', 'counts': {}}
     text, lost, _still = scene.change_sentence('kitchen', before, after)
     assert lost == ['cup'] and 'gone' in text
+    still = {'counts': {'cup': 1}, 'objects': [{'label': 'cup', 'box': [0.1, 0.2, 0.2, 0.4]}]}
+    shifted = {'counts': {'cup': 1}, 'objects': [{'label': 'cup', 'box': [0.6, 0.2, 0.7, 0.4]}]}
+    moved, lost2, _ = scene.change_sentence('living', still, shifted)
+    assert lost2 == [] and 'moved' in moved
+    nudge = {'counts': {'cup': 1}, 'objects': [{'label': 'cup', 'box': [0.12, 0.2, 0.22, 0.4]}]}
+    assert scene.change_sentence('living', still, nudge) is None
 
 
 def wait_for(sent, kind):
