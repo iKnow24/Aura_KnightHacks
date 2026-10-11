@@ -11,6 +11,7 @@ import { Wordmark } from '../lib/Logo'
 import { getUser, signOut } from '../lib/user'
 // 3D view of the home (Gaussian splat scan). Three.js only loads when someone taps 3D.
 const HomeScan = lazy(() => import('../lib/HomeScan'))
+const SHOW_3D = false // 3D home scan button switched off for the demo; set true to bring it back
 // The headset wearer as a 3D figure (bottom left). Also three.js, so also split out.
 const Avatar3D = lazy(() => import('../lib/Avatar3D'))
 import { alertText, SEVERITY_COLOR, ZONES, zoneLabel } from '../lib/zones'
@@ -123,10 +124,10 @@ export default function Dashboard() {
         <div className="min-h-0 lg:col-start-3 lg:row-start-2">
           {/* Floor plan. Skeletons and zone status only: no live video, for privacy. */}
           <div className="glass relative aspect-[4/3] h-full overflow-hidden rounded-xl sm:aspect-[16/10] lg:aspect-auto">
-            <button onClick={() => setScan((v) => !v)} aria-pressed={scan}
+            {SHOW_3D && <button onClick={() => setScan((v) => !v)} aria-pressed={scan}
               className="glass absolute right-3 top-3 z-10 rounded-full px-3 py-1 text-xs font-semibold tracking-wide hover:border-white/20">
               {scan ? 'PLAN' : '3D'}
-            </button>
+            </button>}
             {scan ? (
               <Suspense fallback={null}>
                 <HomeScan ripples={ripples} onFail={() => setScan(false)}
