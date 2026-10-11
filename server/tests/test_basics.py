@@ -189,3 +189,12 @@ def test_mic_levels_name_the_loudest_device(monkeypatch):
     levels = next(m for t, m in sent if m["type"] == "mic_levels")
     assert "dashboard" in next(t for t, m in sent if m["type"] == "mic_levels")
     assert levels["levels"]["living"] > levels["levels"]["wearer"]
+
+
+def test_body_map_caption_is_one_clean_line():
+    from app import hazard
+
+    assert hazard.parse_line('```json\n{"text": "Standing, holding a can, facing the camera."}\n```') == \
+        "Standing, holding a can, facing the camera."
+    assert hazard.parse_line("no json here") == ""
+    assert "name" in hazard.DESCRIBE_PROMPT and "race" in hazard.DESCRIBE_PROMPT  # never who someone is
