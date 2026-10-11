@@ -233,12 +233,14 @@ function Scene({ onBeat, overlay, narrow }) {
   const glow = useRef(0)
   const pointer = useRef({ x: 0, y: 0 })
   const [avatar, setAvatar] = useState(null)
+  const [failed, setFailed] = useState(false) // only then show the code-built head
+  const ready = avatar || failed
   const anchors = useRef({ temple: new THREE.Vector3(-0.74, 0.12, 0.5), lens: new THREE.Vector3(0.15, 0.1, 1.05) })
 
   useEffect(() => {
     let live = true
     loadAvatar().then((a) => { if (!live) return; anchors.current = a.anchors; setAvatar(a) })
-      .catch((e) => console.warn('Hero avatar failed to load; keeping the built-in head', e))
+      .catch((e) => { console.warn('Hero avatar failed to load; using the built-in head', e); if (live) setFailed(true) })
     return () => { live = false }
   }, [])
 
@@ -326,6 +328,8 @@ function Scene({ onBeat, overlay, narrow }) {
   }), [])
 
   useFrame((_, dt) => {
+    // Nothing plays until the real face is in, so the loop starts at the name call every time.
+    if (!ready) { clock.current = 0; return }
     const t = (clock.current += Math.min(dt, 0.25))
     if (avatar) { resetRig(avatar.rig); poseRig(avatar.rig, avatar.scene, idlePose(t), Math.min(dt, 0.1)) }
     const lt = t % LOOP
@@ -414,7 +418,7 @@ function Scene({ onBeat, overlay, narrow }) {
       <directionalLight position={[0, -3, 2]} intensity={0.35} color="#FF4F7B" />
       <group ref={head} position={[narrow ? 0.2 : -0.5, 0, 0]} rotation={[0, 0.62, 0]}>
         {avatar && <primitive object={avatar.scene} />}
-        {!avatar && <>
+        {failed && !avatar && <>
         <mesh geometry={geo.head} material={parts.skin} />
         <mesh geometry={geo.hairCap} material={parts.hair} />
         <mesh geometry={geo.mustache} material={parts.hair} />
@@ -434,8 +438,8 @@ function Scene({ onBeat, overlay, narrow }) {
         <mesh geometry={geo.band} material={parts.fabric} position={[0, 0.14, -0.02]} rotation={[-Math.PI / 2 + 0.18, 0, 0]} scale={[0.84, 1.0, 1]} />
         </>}
       </group>
-      {waves.map((w, i) => <primitive key={i} object={w.line} />)}
-      <primitive object={sparks.pts} />
+      {ready && waves.map((w, i) => <primitive key={i} object={w.line} />)}
+      {ready && <primitive object={sparks.pts} />}
     </>
   )
 }
