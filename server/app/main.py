@@ -128,7 +128,7 @@ async def _maybe_direction():
         return
     found = locate(tails)
     if found:
-        await hub.broadcast(["dashboard"], {"type": "direction", **found, "ts": time.time()})
+        await hub.broadcast(["dashboard", "hud"], {"type": "direction", **found, "ts": time.time()})
 
 
 PARTIAL_EVERY_S = float(os.environ.get("PARTIAL_EVERY_S", "0.7"))  # rough caption this often while someone talks (0 = off)
