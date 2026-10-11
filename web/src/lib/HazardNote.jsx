@@ -1,7 +1,7 @@
 import { TriangleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
-// "Watch out" notes along the bottom of the dashboard camera, written by Gemini.
+// "Watch out" notes along the bottom of the dashboard camera, written by Luma (the model behind it is named in the brain, not on screen).
 //
 // Advice only: it never fires an alert or the strobe (the brain's detectors do that, with no AI in the
 // decision). It is opt-in, because the still goes to Google: nothing is sent until someone presses
@@ -43,7 +43,7 @@ export default function HazardNote({ videoRef }) {
           body: JSON.stringify({ jpeg: c.toDataURL('image/jpeg', 0.6), zone: 'living' }),
         }).then((x) => x.json())
         if (dead) return
-        if (r.enabled === false) setStatus(r.error || 'Needs a Gemini key on the brain')
+        if (r.enabled === false) setStatus(r.error || 'Luma needs its AI key on the brain')
         else if (r.error) setStatus(r.error)
         else if (!r.wait) {
           setStatus('')
@@ -69,7 +69,7 @@ export default function HazardNote({ videoRef }) {
         </div>
       )}
       {on && status && <span className="glass-dark rounded-full px-3 py-1 text-xs text-zinc-300">{status}</span>}
-      <button onClick={toggle} title="Sends a still from this camera to Google Gemini every few seconds"
+      <button onClick={toggle} title="Sends a still from this camera to Google's cloud AI every few seconds"
         className="glass-dark pointer-events-auto rounded-full px-3 py-1 text-xs text-zinc-200 hover:text-white">
         AI hazard check: {on ? 'on' : 'off'}
       </button>
