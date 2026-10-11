@@ -189,6 +189,15 @@ def pick_provider() -> tuple[str, str, str, str] | None:
     return None
 
 
+def backup_providers(skip: str) -> list[tuple[str, str, str, str]]:
+    """Other providers that have a key, in PROVIDERS order: tried when the chosen one is down
+    (Gemini answers 503 "high demand" at busy times). Unless LUMEN_LLM=off."""
+    if os.environ.get("LUMEN_LLM", "").lower() == "off":
+        return []
+    return [(name, url, os.environ[key_env], model) for name, (url, key_env, model) in PROVIDERS.items()
+            if name != skip and os.environ.get(key_env)]
+
+
 def fn(name: str, description: str, properties: dict, required: list | None = None) -> dict:
     return {"type": "function", "function": {"name": name, "description": description, "parameters": {
         "type": "object", "properties": properties, "required": required or []}}}
@@ -249,12 +258,21 @@ def answer_llm(question: str, memory: Memory, events: list[dict]) -> dict | None
     provider = pick_provider()
     if not provider:
         return None
+    for p in [provider] + backup_providers(provider[0]):
+        result = answer_with(p, question, memory, events)
+        if result:
+            return result
+    return None
+
+
+def answer_with(provider, question: str, memory: Memory, events: list[dict]) -> dict | None:
     name, base_url, key, model = provider
     try:
         from openai import OpenAI
     except ImportError:
         return None
-    client = OpenAI(base_url=base_url, api_key=key, timeout=30)
+    # No silent retries: if this provider is busy, the next one (or the keyword answers) is faster.
+    client = OpenAI(base_url=base_url, api_key=key, timeout=20, max_retries=0)
     prompt = SYSTEM + (GENIE_NOTE if genie.configured() else "")
     messages = [{"role": "system", "content": prompt}, {"role": "user", "content": question}]
     evidence: list[dict] = []
