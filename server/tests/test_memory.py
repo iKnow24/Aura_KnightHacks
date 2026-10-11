@@ -32,7 +32,7 @@ def test_room_filter_on_speech():
     m = Memory()
     seed_demo(m)
     r = answer_rules("what did they say in the living room", m, [])
-    assert "heading out" in r["answer"]
+    assert "Thursday" in r["answer"]
 
 
 def test_recap_lists_alerts():
@@ -112,15 +112,20 @@ def test_llm_brain_tool_loop(monkeypatch):
 def test_provider_choice(monkeypatch):
     from app.agent import pick_provider
 
-    for k in ("GROQ_API_KEY", "ANTHROPIC_API_KEY", "XAI_API_KEY", "LUMEN_LLM"):
+    for k in ("GROQ_API_KEY", "ANTHROPIC_API_KEY", "XAI_API_KEY", "HF_TOKEN", "LUMEN_LLM", "LUMEN_LLM_MODEL"):
         monkeypatch.delenv(k, raising=False)
     assert pick_provider() is None
+    monkeypatch.setenv("HF_TOKEN", "h")
+    name, url, key, model = pick_provider()
+    assert name == "hf" and "huggingface.co" in url and key == "h" and model == "openai/gpt-oss-20b"
     monkeypatch.setenv("XAI_API_KEY", "x")
     assert pick_provider()[0] == "xai"
     monkeypatch.setenv("GROQ_API_KEY", "g")
     assert pick_provider()[0] == "groq"
     monkeypatch.setenv("LUMEN_LLM", "xai")
     assert pick_provider()[0] == "xai"
+    monkeypatch.setenv("LUMEN_LLM", "hf")
+    assert pick_provider()[0] == "hf"
     monkeypatch.setenv("LUMEN_LLM", "off")
     assert pick_provider() is None
 
@@ -167,5 +172,7 @@ def test_headset_speech_skips_alarm_detectors_and_takes_caption_meta(monkeypatch
         node.send_bytes(np.zeros(SAMPLE_RATE * 4, np.float32).tobytes())
         node.send_text('{"type": "caption_meta", "ts": %r, "speaker": 2, "to_you": true}' % entry["ts"])
         msg = dash.receive_json()
+        while msg['type'] == 'state':
+            msg = dash.receive_json()
     assert msg["type"] == "caption" and msg["to_you"] and msg["speaker"] == 2
     assert not seen

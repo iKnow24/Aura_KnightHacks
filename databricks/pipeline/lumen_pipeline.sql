@@ -15,7 +15,8 @@ AS SELECT
 FROM STREAM read_files(
   '/Volumes/lumen/home/raw_events/',
   format => 'json',
-  schemaHints => 'ts DOUBLE, id STRING, speaker INT, to_you BOOLEAN, confidence DOUBLE'
+  -- The vision columns (scene JSON from the cameras) are listed so the vision tables exist before the first photo.
+  schemaHints => 'ts DOUBLE, id STRING, speaker INT, to_you BOOLEAN, confidence DOUBLE, node_id STRING, people INT, posture STRING, summary STRING, model STRING, device STRING, inference_ms DOUBLE, total_ms DOUBLE, counts MAP<STRING, INT>, objects ARRAY<STRUCT<label: STRING, score: DOUBLE, box: ARRAY<DOUBLE>, bearing: DOUBLE, dist: DOUBLE>>'
 );
 
 -- ============================== SILVER ==============================
@@ -23,7 +24,9 @@ FROM STREAM read_files(
 CREATE OR REFRESH STREAMING TABLE silver_alerts (
   CONSTRAINT has_kind EXPECT (kind IS NOT NULL) ON VIOLATION DROP ROW,
   CONSTRAINT real_time EXPECT (alert_time > '2024-01-01') ON VIOLATION DROP ROW,
-  CONSTRAINT known_severity EXPECT (severity IN ('critical', 'warning', 'info'))
+  CONSTRAINT known_severity EXPECT (severity IN ('critical', 'warning', 'info')),
+  -- the app's test buttons send source 'fake'; those never count as real alerts
+  CONSTRAINT not_a_test_button EXPECT (coalesce(source, '') <> 'fake') ON VIOLATION DROP ROW
 )
 COMMENT 'One row per alert Lumen raised (smoke alarm, doorbell, name called, ...).'
 AS SELECT
@@ -54,6 +57,20 @@ CREATE OR REFRESH STREAMING TABLE silver_sightings (
 COMMENT 'Where the camera last saw everyday items (keys, glasses, wallet).'
 AS SELECT household, item, zone, confidence, timestamp_seconds(ts) AS seen_at
 FROM STREAM bronze_events WHERE type = 'sighting';
+
+CREATE OR REFRESH STREAMING TABLE silver_vision
+COMMENT 'What each camera saw, one row per photo (every 5 s per room phone). No photos, only labels, posture and model speed.'
+AS SELECT household, node_id, zone, source, people, posture, summary, counts, objects,
+  model, device, inference_ms, total_ms, timestamp_seconds(ts) AS seen_at
+FROM STREAM bronze_events WHERE type = 'vision';
+
+CREATE OR REFRESH STREAMING TABLE silver_vision_objects
+COMMENT 'One row per object a camera saw (person, stove, keys, ...), for "how often is the stove in view with nobody there" questions.'
+AS SELECT household, zone, source, seen_at, o.label, o.score
+FROM (
+  SELECT household, zone, source, timestamp_seconds(ts) AS seen_at, explode(objects) AS o
+  FROM STREAM bronze_events WHERE type = 'vision'
+);
 
 -- ============================== GOLD ==============================
 -- What a caregiver actually asks about.
@@ -128,3 +145,21 @@ CREATE OR REFRESH MATERIALIZED VIEW gold_item_last_seen
 COMMENT 'Where each item was seen most recently.'
 AS SELECT household, item, max_by(zone, seen_at) AS zone, max(seen_at) AS last_seen
 FROM silver_sightings GROUP BY household, item;
+
+CREATE OR REFRESH MATERIALIZED VIEW gold_vision_speed
+COMMENT 'How fast the vision model ran on each machine: the AMD GPU number for the pitch. Real measurements, one per photo.'
+AS SELECT household, device, model, to_date(seen_at) AS day,
+  count(*) AS photos,
+  round(percentile(inference_ms, 0.5), 1) AS median_ms,
+  round(percentile(inference_ms, 0.95), 1) AS p95_ms
+FROM silver_vision WHERE source = 'owlv2' AND inference_ms IS NOT NULL
+GROUP BY ALL;
+
+CREATE OR REFRESH MATERIALIZED VIEW gold_room_activity
+COMMENT 'Per room and hour: how many photos had someone in them, and how often they were lying down.'
+AS SELECT household, zone, date_trunc('HOUR', seen_at) AS hour,
+  count(*) AS photos,
+  count_if(people > 0) AS photos_with_someone,
+  count_if(posture = 'lying') AS photos_lying_down
+FROM silver_vision WHERE source = 'owlv2'
+GROUP BY ALL;

@@ -80,4 +80,6 @@ def test_pose_frames_over_node_socket_raise_fall_alert():
             ts += 1 / FPS
             node.send_text(json.dumps({"type": "pose", "ts": ts, "landmarks": pose(tilt, hip)}))
         msg = dash.receive_json()
+        while msg['type'] == 'state':
+            msg = dash.receive_json()
         assert msg["kind"] == "fall" and msg["zone"] == "bedroom" and msg["source"] == "fall"

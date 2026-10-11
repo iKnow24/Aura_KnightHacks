@@ -43,3 +43,34 @@ def test_one_file_per_hour(tmp_path, monkeypatch):
     record({"type": "speech", "text": "a", "ts": 1760000000.0})
     record({"type": "speech", "text": "b", "ts": 1760000000.0 + 3600})
     assert len(list(tmp_path.glob("*.jsonl"))) == 2
+
+
+def test_sync_endpoint_needs_the_key(tmp_path, monkeypatch):
+    # The log holds what people said and the tunnel URL is public, so no key = no log.
+    from fastapi.testclient import TestClient
+    from app import main
+    monkeypatch.setenv("EVENT_LOG_DIR", str(tmp_path))
+    monkeypatch.delenv("LUMEN_SYNC_KEY", raising=False)
+    client = TestClient(main.app)
+    assert client.get("/api/eventlog").status_code == 403
+    monkeypatch.setenv("LUMEN_SYNC_KEY", "pw")
+    assert client.get("/api/eventlog", headers={"X-Lumen-Sync-Key": "nope"}).status_code == 403
+
+
+def test_sync_endpoint_returns_only_new_full_lines(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from app import main
+    monkeypatch.setenv("EVENT_LOG_DIR", str(tmp_path))
+    monkeypatch.setenv("LUMEN_SYNC_KEY", "pw")
+    record({"type": "speech", "text": "a", "ts": 1760000000.0})
+    record({"type": "speech", "text": "b", "ts": 1760000001.0})
+    name = next(tmp_path.glob("*.jsonl")).name
+    with (tmp_path / name).open("a") as f:
+        f.write('{"type": "spe')  # the brain is mid-write
+    client, key = TestClient(main.app), {"X-Lumen-Sync-Key": "pw"}
+    files = client.get("/api/eventlog", headers=key).json()["files"]
+    assert [f["name"] for f in files] == [name]
+    first = client.get(f"/api/eventlog/{name}?offset=0", headers=key).content
+    assert first.count(b"\n") == 2 and first.endswith(b"\n")
+    assert client.get(f"/api/eventlog/{name}?offset={len(first)}", headers=key).content == b""
+    assert client.get("/api/eventlog/..%2Fsecrets.jsonl", headers=key).status_code == 404

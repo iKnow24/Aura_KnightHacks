@@ -2,19 +2,36 @@
 
 What to test first, what to say on stage, and what judges will ask.
 
-## Saturday morning: test the scary stuff first (in this order)
+## Device setup
+
+| Device | Open | Job |
+| --- | --- | --- |
+| AMD box | brain + web (`./run.sh` in the open notebook's terminal) | runs every model on the GPU |
+| Mac | `python3 scripts/jupyter_bridge.py JUPYTER_URL TOKEN`, then `cloudflared tunnel --url http://localhost:5173` | bridge to the box + HTTPS link for phones |
+| Mac webcam + mic | `/node?zone=living` | the one room sensor (hears the alarm) |
+| Wearer's phone, hand-held | `/captions` | portrait = two boxes: camera on top, transcript below |
+| Android phone by the "bed" | `/strobe` (tap to arm) | flashes on alerts |
+| Laptop or Mac tab | `/dashboard` | caregiver view, mode switch, fake alerts, 3D room |
+| Projector | `scrcpy` on the Mac | mirrors the Android phone's screen so the audience sees it |
+
+Keep a notebook open in JupyterLab the whole time: the bridge joins its kernel and can't start a new one.
+Never paste the Jupyter token or any key into chat, slides or the repo.
+
+## Saturday: test the scary stuff first (in this order)
 
 Every item here is something code can't fix. Find out early.
 
-1. **Network.** Put the laptop and every phone on one hotspot or travel router (not venue Wi-Fi).
-   Run `bash run.sh`, open the tunnel link on a phone. Does `/dashboard` say "brain connected"?
-2. **Smoke alarm → strobe.** Phone A on `/node?zone=kitchen`, Android phone B on `/strobe` (tap to arm),
+1. **Network.** Start the brain on the box, the bridge and cloudflared on the Mac (table above), open the
+   cloudflared link on a phone. Does `/dashboard` say "brain connected"? Put the phones on one hotspot if
+   venue Wi-Fi is flaky; the Mac needs internet for the bridge.
+2. **Smoke alarm → strobe.** Mac webcam (or phone A) on `/node?zone=living`, Android phone B on `/strobe` (tap to arm),
    dashboard in Night mode. Press a real smoke detector's test button next to phone A.
    Phone B should flash within ~3 seconds. **This is the hero demo. If it doesn't work by Saturday
    evening, cut everything else until it does.**
-3. **Headset.** Phone in the headset on `/headset`. Is the camera view clear and not blocked by the
-   headset shell? Can you see both halves comfortably? Click a fake alert: does the glow show?
-4. **Fall.** Phone mounted high (about 1.8 m) and angled down on `/node?zone=bedroom`, dashboard in
+3. **Captions phone.** Hand-held phone on `/captions`, portrait. Camera box on top, transcript along the
+   bottom? Click a fake alert on the dashboard: does the glow show? Turn it landscape: full camera with
+   captions over it. (`/headset` just opens `/captions` now.)
+4. **Fall.** Phone mounted high (about 1.8 m) and angled down on `/node?zone=living`, dashboard in
    Watch mode. Check the preview shows "● person tracked". Fall onto a mat 2 to 3 m away and lie still
    8 seconds. Try 10 times. If fewer than 8 work, show a recorded run on stage instead.
 5. **Heat.** Leave one node streaming for an hour on a charger. Does it dim or slow down?
@@ -26,19 +43,19 @@ Every item here is something code can't fix. Find out early.
    dashboard and ask "Where are my keys?". The answer should show a photo crop. If the models won't
    run, press "Seed demo memory" and say so honestly if asked.
 
-8. **Captions over faces.** Headset on, two teammates in front of it taking turns talking, one facing the
+8. **Captions over faces.** `/captions` phone held up, two teammates in front of it taking turns talking, one facing the
    wearer and one turned away. Each sentence should land as a bubble over the right person's head, in their
    color, with "TO YOU" only for the one facing the wearer. If bubbles land on the wrong person, raise
-   `TALKING` in `web/src/pages/Headset.jsx`; if captions never show, check Whisper first with
+   `TALKING` in `web/src/pages/Captions.jsx`; if captions never show, check Whisper first with
    `POST /api/fake-caption`. Glasses, masks and bad light break lip reading: test in the demo room.
 
 ## The 2-minute demo
 
 1. **Problem (15 s).** "Millions of Americans are deaf or hard of hearing. Your phone can hear a smoke alarm next to it. It can't hear the one two rooms away while you're asleep."
-2. **Night mode (30 s).** Kitchen phone hears the real smoke alarm; bedroom phone strobes; the dashboard
-   ripples on the kitchen. "The kitchen heard it, the bedroom flashed."
-3. **Headset (30 s).** Judge wears the headset. A teammate plays a doorbell sound next to the hallway node.
-   The glow appears on the hallway's side. (Name calling works in Wearer mode once Whisper runs: the
+2. **Night mode (30 s).** The room sensor (Mac on `/node?zone=living`) hears the real smoke alarm; the bedside
+   phone strobes; the dashboard ripples on the living room. "The house heard it, the bed flashed."
+3. **Captions (30 s).** Hand a judge the `/captions` phone. A teammate talks to them, then plays a doorbell
+   sound next to a node. The words show up in the transcript and the alert glows on top of them. (Name calling works in Wearer mode once Whisper runs: the
    name comes from the sign-in screen.)
 4. **Fall (30 s).** Teammate falls on the mat, lies still; caregiver dashboard shows "Possible fall · Bedroom".
 5. **Ask Lumen (20 s).** "Lumen also remembers." Ask "What was the last thing said?" (a teammate spoke
@@ -73,7 +90,7 @@ Every item here is something code can't fix. Find out early.
 
 ## Backup plan
 
-- AMD box down: `run.sh` on a laptop. The alarm detector and pose still work; only the AI sound model
+- AMD box or bridge down: `./run.sh` on a laptop (brain + web + its own cloudflared link). The alarm detector and pose still work; only the AI sound model
   needs the GPU (it runs on CPU too, just slower).
 - Tunnel down: phone hotspot plus the laptop's local address won't give phones camera access
   (no https). Fall back to the pre-recorded demo video. **Record it Saturday night.**

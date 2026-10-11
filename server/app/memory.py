@@ -5,7 +5,7 @@ the "Ask Lumen" agent needs:
 
   {"type": "speech",   "ts": 1728540000.1, "zone": "kitchen", "text": "dinner's ready"}
       (lines heard by the headset have zone "wearer", plus "speaker": 1 and "to_you": true
-       once the headset works out who said it)
+       once the headset works out who said it; "voice": "Sharan" / "Person 4" when the voice is known)
   {"type": "sighting", "ts": 1728540000.1, "zone": "living",  "item": "keys",
    "confidence": 0.41, "thumb": "data:image/jpeg;base64,..."}
 
@@ -47,6 +47,8 @@ class Memory:
             line = {"type": "speech", "ts": e["ts"], "zone": e.get("zone", "wearer"), "text": e["text"]}
             if e.get("place"):
                 line["place"] = e["place"]
+            if e.get("voice"):
+                line["voice"] = e["voice"]
             if "speaker" in e:
                 line["speaker"] = e["speaker"]
             if e.get("to_you"):
@@ -74,10 +76,13 @@ class Memory:
                 self.entries.append(e)
         del self.entries[:-MAX_ENTRIES]
 
-    def add_speech(self, zone: str, text: str, ts: float | None = None, place: str | None = None) -> dict:
+    def add_speech(self, zone: str, text: str, ts: float | None = None, place: str | None = None,
+                   voice: str | None = None) -> dict:
         entry = {"type": "speech", "zone": zone, "text": text.strip(), "ts": ts or time.time()}
         if place:
             entry["place"] = place
+        if voice:  # "Sharan" or "Person 4", from detectors/voices.py
+            entry["voice"] = voice
         return self.add(entry)
 
     def add_sighting(self, zone: str, item: str, confidence: float, thumb: str | None = None,

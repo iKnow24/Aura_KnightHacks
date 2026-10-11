@@ -1,5 +1,8 @@
 # Lumen on Databricks
 
+**Real events from a running Lumen, no generated data: see [REAL_DATA.md](REAL_DATA.md).**
+Everything below uses the generated "maria" household.
+
 Live captions and alerts stay on the Lumen brain (they need sub-second speed). Databricks gets the
 history: every alert, tap, caption and sighting, cleaned into tables a caregiver can ask questions of.
 
@@ -10,10 +13,12 @@ generate_household.py  ─┘            │  Auto Loader
                                      ▼
                          BRONZE  bronze_events (raw lines)
                                      ▼  expectations drop bad rows
-                         SILVER  silver_alerts, silver_acks, silver_speech, silver_speakers, silver_sightings
+                         SILVER  silver_alerts, silver_acks, silver_speech, silver_speakers, silver_sightings,
+                         silver_vision, silver_vision_objects (what the cameras saw)
                                      ▼
                          GOLD    gold_alert_response, gold_daily, gold_change_from_normal,
-                                 gold_who_talks, gold_item_last_seen
+                                 gold_who_talks, gold_item_last_seen,
+                                 gold_vision_speed (GPU ms per photo), gold_room_activity
                                      ▼
                          Genie space  +  AI/BI dashboard
 ```

@@ -1,12 +1,11 @@
 import { motion } from 'framer-motion'
-import { ArrowLeft, AudioLines, ChevronRight, BedDouble, Glasses, LayoutDashboard, Mic, Radar, ScanLine } from 'lucide-react'
+import { ArrowLeft, AudioLines, ChevronRight, BedDouble, LayoutDashboard, Mic, Radar, ScanLine } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Wordmark } from '../lib/Logo'
 
 const PAGES = [
   ['/captions', 'Live captions', 'The wearer\'s phone. Words as they\'re spoken, Home / Lecture / Outside modes, alerts that grow until you tap them.', AudioLines],
   ['/dashboard', 'Caregiver dashboard', 'Laptop or tablet. Floor plan, live alerts, Ask Lumen, mode switch. Needs sign in.', LayoutDashboard],
-  ['/headset', 'Headset HUD', 'Phone in the AR headset. Camera passthrough with edge glow toward the alert.', Glasses],
   ['/node?zone=kitchen', 'Camera/mic node', 'Any spare phone. Change ?zone= to the room it sits in. Listens, tracks falls, and watches the counter for a spill.', ScanLine],
   ['/mic', 'Speaker mic', 'One phone in front of each person you talk to. Captions get labeled with their name.', Mic],
   ['/rear', 'Rear guard', 'Outside mode. A phone on the back of your bag. Warns when a person or a car comes up behind you.', Radar],
@@ -18,7 +17,7 @@ export default function Home() {
     <main className="mx-auto max-w-xl px-6 pb-16 pt-[max(2rem,env(safe-area-inset-top))]">
       <div className="flex items-center justify-between">
         <Wordmark size={13} />
-        <Link to="/" className="flex items-center gap-1.5 text-sm text-zinc-500 transition hover:text-white"><ArrowLeft size={15} /> Sign in</Link>
+        <Link to="/start" className="flex items-center gap-1.5 text-sm text-zinc-500 transition hover:text-white"><ArrowLeft size={15} /> Sign in</Link>
       </div>
       <h1 className="mt-16 text-3xl font-semibold tracking-tight">What is this phone for?</h1>
       <p className="mt-2 text-zinc-500">Every device is a web page. Open one per phone.</p>

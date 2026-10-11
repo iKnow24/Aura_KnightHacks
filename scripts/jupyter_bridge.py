@@ -115,6 +115,7 @@ HOP = {"host", "connection", "upgrade", "keep-alive", "transfer-encoding", "cont
 class Bridge:
     def __init__(self, url, token, cookie, port):
         self.base = url.rstrip("/")
+        self.origin = "/".join(self.base.split("/")[:3])  # e.g. https://jupyter.anruicloud.com, as Safari sends
         if self.base.endswith("/lab"):
             self.base = self.base[:-4]
         headers = {}
@@ -156,15 +157,25 @@ class Bridge:
 
     async def connect(self):
         self.http = aiohttp.ClientSession(headers=self.headers, connector=aiohttp.TCPConnector(ssl=SSL_CONTEXT))
-        r = await self.http.post(f"{self.base}/api/kernels", json={"name": "python3"})
+        # AMD's front door refuses to start kernels from outside the browser, but lets us list and join them,
+        # so reuse a kernel that's already running (open any notebook in JupyterLab to start one).
+        r = await self.http.get(f"{self.base}/api/kernels")
         if r.status >= 300:
-            sys.exit(f"Jupyter said {r.status} when starting a kernel: {(await r.text())[:300]}\n"
-                     "Check the Jupyter address and token.")
-        kernel_id = (await r.json())["id"]
-        print("Started a kernel on the box:", kernel_id)
+            sys.exit(f"Jupyter said {r.status}: {(await r.text())[:300]}\nCheck the Jupyter address, token and --cookie.")
+        kernels = [k for k in await r.json() if k.get("name", "").startswith("python")]
+        if kernels:
+            kernel_id = kernels[0]["id"]
+            print("Joining the kernel already running on the box:", kernel_id)
+        else:
+            r = await self.http.post(f"{self.base}/api/kernels", json={"name": "python3"})
+            if r.status >= 300:
+                sys.exit(f"Jupyter said {r.status} when starting a kernel.\n"
+                         "In JupyterLab, click File > New > Notebook (Python 3), leave that tab open, and run this again.")
+            kernel_id = (await r.json())["id"]
+            print("Started a kernel on the box:", kernel_id)
         ws_url = self.base.replace("https://", "wss://").replace("http://", "ws://")
         self.kernel = await self.http.ws_connect(f"{ws_url}/api/kernels/{kernel_id}/channels?session_id={self.session_id}",
-                                                 max_msg_size=0, heartbeat=20)
+                                                 max_msg_size=0, heartbeat=20, origin=self.origin)
         asyncio.ensure_future(self.read())
         await self.send(self.msg("execute_request", {"code": KERNEL_CODE.replace("%PORT%", str(self.port)), "silent": False,
                                                      "store_history": False, "user_expressions": {},

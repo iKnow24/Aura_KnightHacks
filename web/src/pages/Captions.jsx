@@ -1,7 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import AlertStack, { useAlerts } from '../lib/AlertToast'
-import { detectFaces, FaceTracker, loadFaces, toScreen } from '../lib/faces'
+import { detectFaces, loadFaces } from '../lib/faces'
+import { FaceTracker } from '../lib/faceTracker'
+import { lastTwoLines } from '../lib/captionText'
+import SpatialCaptions from '../lib/SpatialCaptions'
+import { pickSpeaker } from '../lib/speakerMatch'
 import { Camera, CameraOff, Clapperboard, Download, Ellipsis, Footprints, GraduationCap, House, Lock, Zap } from 'lucide-react'
 import Logo from '../lib/Logo'
 import Recap from '../lib/Recap'
@@ -12,11 +16,11 @@ import { getUser } from '../lib/user'
 import { askMotion } from '../lib/walking'
 import { alertText, SEVERITY_COLOR, ZONES, zoneLabel } from '../lib/zones'
 
-// The wearer's phone, held up like a window: camera behind, a see-through captions panel on
-// the right that keeps the whole conversation and scrolls back. Tap the screen for the control
-// bar; it hides itself again. Talk to change modes: "switch mode", "lecture mode",
-// "add a new mode" (then describe it). Lower the phone to look at someone and Lumen marks what
-// you missed while you weren't reading.
+// The wearer's phone, held up like a window: camera behind, and each line floats above the head of
+// the person who said it (spatial captions). Lines no face can be matched to sit in a neutral spot
+// at the bottom; the Movie look shows classic subtitles instead. The full transcript is still kept
+// (download button, dashboard). Tap the screen for the control bar; it hides itself again.
+// Talk to change modes: "switch mode", "lecture mode", "add a new mode" (then describe it).
 
 const LISTENING_FOR = {
   wearer: ['timer', 'kettle', 'doorbell', 'knock', 'phone_ring', 'smoke_alarm', 'name_called', 'spill'],
@@ -24,11 +28,10 @@ const LISTENING_FOR = {
   outside: ['car_horn', 'siren', 'vehicle', 'bike_bell', 'person_behind', 'vehicle_behind', 'name_called'],
 }
 const MAIN_MODES = ['wearer', 'lecture', 'outside']
-const SPEAKER_COLORS = ['#fbbf24', '#38bdf8', '#a78bfa', '#34d399', '#f472b6', '#fb923c']
-const speakerColor = (name) => SPEAKER_COLORS[[...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 997, 7) % SPEAKER_COLORS.length]
 const HIDE_BAR_MS = 4000
-const TALKING = 0.04 // lip movement that counts as "this face is talking" (same as the headset)
 const SPEECH_LEVEL = 0.02 // mic loudness that counts as speech (Private engine)
+const HOLD_S = 5 // a spatial caption stays up this long after its last word
+const FACE_MS = 66 // face tracking at about 15 frames a second
 // "Hi, I'm Adam" / "my name is Adam". A capital letter is required after the weak cues ("I'm going"
 // isn't a name); after "my name is" the recognizer's lowercase is trusted.
 const NAME_RE = /\b(?:[Mm]y name's|[Nn]ame's|I'm|I am|[Cc]all me|[Tt]his is)\s+([A-Z][a-z]{2,})/
@@ -40,6 +43,14 @@ export function nameIn(text) {
   if (!m) return null
   const name = m[0].toUpperCase() + m.slice(1).toLowerCase()
   return NOT_NAMES.has(name) ? null : name
+}
+
+// Two transcripts of one sentence (Google on this phone, Whisper on the room phone): most words in common.
+function sameWords(a, b) {
+  const words = (t) => new Set(t.toLowerCase().match(/[a-z']+/g) ?? [])
+  const x = words(a), y = words(b)
+  const common = [...x].filter((w) => y.has(w)).length
+  return common >= 3 && common / Math.max(x.size, y.size) >= 0.5
 }
 
 // Movie captions: how cinemas and streaming subtitles for deaf viewers (SDH) look. White sans,
@@ -74,7 +85,7 @@ function CinemaCaptions({ lines, live, names, recent }) {
   useEffect(() => { const t = setInterval(() => tick((n) => n + 1), 1000); return () => clearInterval(t) }, [])
   const last = lines[lines.length - 1]
   const fresh = last && Date.now() / 1000 - last.ts < CINEMA_HOLD_S
-  const who = (l) => (l?.speaker ? names[l.speaker.id] : l?.zone && !ZONES[l.zone] ? l.zone : null)
+  const who = (l) => (l?.speaker && names[l.speaker.id]) || l?.voice || (l?.zone && !ZONES[l.zone] ? l.zone : null)
   const text = live || (fresh ? last.text : '')
   const speaker = live ? null : who(last)
   // About 2 lines' worth for this screen width, keeping the newest words.
@@ -102,29 +113,6 @@ function CinemaCaptions({ lines, live, names, recent }) {
   )
 }
 
-function NameTag({ person, name, talking, fresh }) {
-  // A "HELLO my name is" sticker once they've said their name; a quiet pill until then.
-  if (!name) {
-    return (
-      <div className="flex items-center gap-1.5 whitespace-nowrap rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold backdrop-blur"
-        style={{ boxShadow: talking ? `0 0 0 2px ${person.color}` : 'none' }}>
-        <span className="h-2 w-2 rounded-full" style={{ background: person.color }} />
-        Person {person.id}{talking && ' 🗣'}{person.facing && <span className="text-green-300"> · looking at you</span>}
-      </div>
-    )
-  }
-  return (
-    <motion.div initial={fresh ? { scale: 0, rotate: -12 } : false} animate={{ scale: talking ? 1.08 : 1, rotate: -3 }}
-      transition={{ type: 'spring', stiffness: 420, damping: 18 }}
-      className="overflow-hidden rounded-xl text-center shadow-2xl" style={{ boxShadow: talking ? `0 0 24px ${person.color}` : '0 8px 24px #0008' }}>
-      <div className="px-4 pb-0.5 pt-1 text-[9px] font-black uppercase tracking-[0.2em] text-white" style={{ background: person.color }}>
-        Hello, my name is
-      </div>
-      <div className="bg-white px-4 py-1 text-xl font-black leading-tight text-black">{name}</div>
-      {person.facing && <div className="bg-white pb-1 text-[10px] font-semibold text-green-600">looking at you</div>}
-    </motion.div>
-  )
-}
 const DOWN_BETA = 35 // phone tilted flatter than this = you're looking at the person, not the screen
 
 const SAMPLE = [
@@ -138,12 +126,6 @@ const SAMPLE = [
 ]
 
 const clean = (t) => t.toLowerCase().replace(/[^a-z0-9' ]/g, ' ').replace(/\s+/g, ' ').trim()
-
-function Words({ text }) {
-  return text.split(/\s+/).filter(Boolean).map((w, i) => (
-    <motion.span key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }}>{w} </motion.span>
-  ))
-}
 
 function Radar({ recent }) {
   // Rear camera alerts glow at the bottom (behind you). One phone mic can't tell direction,
@@ -167,29 +149,77 @@ function Radar({ recent }) {
   )
 }
 
-// Who's talking, from the held-up phone's camera: every face scores points for lip movement
-// while speech is heard; each new caption goes to the face with the most points. Also whether
-// that person was facing you. Runs on the phone; no video or face data leaves it.
-function useFaceSpeakers(videoRef, active, speechActive) {
+// Faces in the held-up phone's camera, tracked on the phone (no video or face data leaves it).
+// Each stretch of speech is timed on the same clock as the camera, so a finished line is matched
+// to the mouth that moved while it was being said (speakerMatch.js).
+function useFaceTracks(videoRef, active, speechActive) {
   const tracker = useRef(new FaceTracker())
-  const [people, setPeople] = useState([])
+  const tracksRef = useRef([])
+  const [ids, setIds] = useState('') // re-render only when someone enters or leaves
+  const [liveSpeaker, setLiveSpeaker] = useState(null)
+  const speechStart = useRef(null)
   const speaking = useRef(speechActive)
   speaking.current = speechActive
   useEffect(() => {
-    if (!active) { setPeople([]); return }
-    let timer, dead = false
+    if (!active) { tracksRef.current = []; setIds(''); return }
+    let timer, dead = false, last = ''
     loadFaces().then(() => {
       if (dead) return
       timer = setInterval(() => {
         const v = videoRef.current
-        if (!v || v.readyState < 2) return
+        if (!v || v.readyState < 2 || document.hidden) return
         const now = performance.now()
-        setPeople(tracker.current.update(detectFaces(v, now), now, speaking.current()).map((p) => ({ ...p })))
-      }, 100)
+        const tracks = tracker.current.update(detectFaces(v, now), now)
+        tracksRef.current = tracks
+        const key = tracks.map((t) => t.id).join(',')
+        if (key !== last) { last = key; setIds(key) }
+        if (speaking.current()) speechStart.current ??= now
+        // While words are still coming in: whose mouth is moving with them (null = not sure yet).
+        const who = speechStart.current == null ? null : pickSpeaker(tracker.current.tracks, speechStart.current, now)?.id ?? null
+        setLiveSpeaker((p) => (p === who ? p : who))
+      }, FACE_MS)
     }).catch(() => {})
     return () => { dead = true; clearInterval(timer) }
   }, [active, videoRef])
-  return { people, claim: () => tracker.current.claim() }
+  // A finished line: match it to the speech just heard, then start timing the next one.
+  const claim = () => {
+    const now = performance.now()
+    const start = (speechStart.current ?? now - 4000) - 300
+    speechStart.current = speaking.current() ? now : null
+    setLiveSpeaker(null)
+    return pickSpeaker(tracker.current.tracks, start, now)
+  }
+  return { tracksRef, ids, liveSpeaker, claim }
+}
+
+// What goes where in the spatial view. Wearer-mic lines matched to a face float over that face
+// while it's in view; everything else, and anything not matched confidently, goes to the neutral
+// spot. Only the last few seconds show; the transcript itself is kept (download, dashboard).
+function spatialLayout({ lines, live, liveSpeaker, visible, names, events }) {
+  const now = Date.now() / 1000
+  const perLine = Math.max(24, Math.floor(Math.min(window.innerWidth * 0.78, 384) / 10.5))
+  const fresh = lines.filter((l) => now - l.ts < HOLD_S)
+  const label = (l) => (l.speaker && names[l.speaker.id]) || l.voice || (l.zone ? (ZONES[l.zone] ? zoneLabel(l.zone) : l.zone) : null)
+  const bubbles = []
+  for (const id of visible) {
+    const talkingNow = !!live && liveSpeaker === id
+    const own = fresh.findLast((l) => l.speaker?.id === id && !l.zone)
+    const text = talkingNow ? live : own?.text
+    if (!text) continue
+    bubbles.push({ trackId: id, key: id, text: lastTwoLines(text, perLine), live: talkingNow, name: names[id] ?? own?.voice,
+      color: own?.speaker.color ?? '#f4f4f5', toYou: !talkingNow && own?.speaker.toYou })
+  }
+  const placed = new Set(bubbles.map((b) => b.trackId))
+  let neutral = null
+  if (live && !placed.has(liveSpeaker)) neutral = { key: 'live', text: lastTwoLines(live, perLine + 8), live: true }
+  else if (!live) {
+    const last = fresh.at(-1)
+    if (last && !(last.speaker && !last.zone && placed.has(last.speaker.id))) {
+      neutral = { key: last.id, text: lastTwoLines(last.text, perLine + 8), name: label(last) }
+    }
+  }
+  const sound = events.filter((a) => now - a.ts < 6 && SOUND_CUE[a.kind]).at(-1)
+  return { bubbles, neutral, cue: sound && { key: sound.id, text: SOUND_CUE[sound.kind] } }
 }
 
 function useLookingDown(active) {
@@ -203,7 +233,21 @@ function useLookingDown(active) {
   return down
 }
 
+// True while the phone is held upright; updates when it rotates.
+function usePortrait() {
+  const query = '(orientation: portrait)'
+  const [portrait, setPortrait] = useState(() => window.matchMedia(query).matches)
+  useEffect(() => {
+    const m = window.matchMedia(query)
+    const onChange = () => setPortrait(m.matches)
+    m.addEventListener('change', onChange)
+    return () => m.removeEventListener('change', onChange)
+  }, [])
+  return portrait
+}
+
 export default function Captions() {
+  const portrait = usePortrait()
   const user = getUser()
   const { alerts, push, drop, ack } = useAlerts('wearer')
   const [started, setStarted] = useState(false)
@@ -219,23 +263,23 @@ export default function Captions() {
   const [recap, setRecap] = useState(null)
   const [busy, setBusy] = useState(false)
   const [sim, setSim] = useState('')
-  const [follow, setFollow] = useState(true)
-  const [missedFrom, setMissedFrom] = useState(null) // id of the first line said while you looked away
   const [whisperOff, setWhisperOff] = useState(false)
-  const scroller = useRef()
   const videoRef = useRef()
   const hideTimer = useRef()
   const lookingDown = useLookingDown(started)
-  const downSince = useRef(null)
   const lastInterim = useRef(0)
-  const [names, setNames] = useState({}) // face person id -> name they said ("I'm Dana")
-  const [freshName, setFreshName] = useState(null) // person id whose tag should pop in
-  const [look, setLook] = useState(() => { try { return localStorage.getItem('lumen_look') || 'panel' } catch { return 'panel' } })
+  const [names, setNames] = useState({}) // face track id -> name they said ("I'm Dana") or their voice is known by
+  const linesRef = useRef([])
+  // 'spatial' (captions over heads) or 'cinema' (movie subtitles). The old side panel is gone.
+  const [look, setLook] = useState(() => { try { return localStorage.getItem('lumen_look') === 'cinema' ? 'cinema' : 'spatial' } catch { return 'spatial' } })
+  const [, tick] = useState(0) // spatial captions expire on their own, so re-check twice a second
+  useEffect(() => { const t = setInterval(() => tick((n) => n + 1), 500); return () => clearInterval(t) }, [])
   useEffect(() => { try { localStorage.setItem('lumen_look', look) } catch { /* private mode */ } }, [look])
   const levelRef = useRef(0)
 
   const { state, connected } = useBrain('hud', push, (msg) => {
     if (msg.type === 'caption') captions.addRemote(msg)
+    if (msg.type === 'caption_partial' && !ZONES[msg.zone]) captions.addPartial(msg) // room nodes only get finished lines
     if (msg.type === 'scene' && msg.side === 'rear') setRearScene({ ...msg, at: Date.now() })
     if (msg.type === 'ack') drop(msg.id)
   })
@@ -267,7 +311,7 @@ export default function Captions() {
     if (/\b(switch|change|show)( the)? modes?\b$|^(switch|change) mode/.test(t)) { setPicker(true); return true }
     if (picker && /\b(close|never mind|cancel)\b/.test(t)) { setPicker(false); setAdding(false); return true }
     if (/\b(movie|cinema|subtitles?) (mode|captions|style|view)\b/.test(t)) { setLook('cinema'); flash('🎬 Movie captions'); return true }
-    if (/\b(normal|panel|transcript|regular) (mode|captions|style|view)\b/.test(t)) { setLook('panel'); flash('Transcript view'); return true }
+    if (/\b(normal|panel|transcript|regular|spatial) (mode|captions|style|view)\b/.test(t)) { setLook('spatial'); flash('Spatial captions'); return true }
     const said = t.match(/\b(?:switch to|go to|lumen|start|turn on)\s+(?:the\s+)?([a-z]+(?: [a-z]+)?)\s+mode\b/)?.[1]
       ?? (picker ? t.replace(/ mode$/, '') : null)
     if (said) {
@@ -278,7 +322,7 @@ export default function Captions() {
     return false
   }
 
-  const faces = useFaceSpeakers(videoRef, started && !!camera,
+  const faces = useFaceTracks(videoRef, started && !!camera,
     () => Date.now() - lastInterim.current < 700 || levelRef.current > SPEECH_LEVEL)
 
   const captions = useLiveCaptions({
@@ -286,15 +330,21 @@ export default function Captions() {
     active: started,
     onFinal: (line) => {
       if (!line.zone && command(line.text)) return true
-      if (line.zone && ZONES[line.zone]) return false // a room node: shown, but not part of the lecture
+      if (line.zone && ZONES[line.zone]) { // a room node: shown, but not part of the lecture
+        // Instant mode: the brain never hears this phone's mic, but the room phone heard the same sentence and
+        // knows the voice. Put that name on the face whose lips moved for it.
+        const mine = line.voiceKnown && linesRef.current.findLast((l) => !l.zone && l.speaker && line.ts - l.ts < 8 && sameWords(l.text, line.text))
+        if (mine && names[mine.speaker.id] !== line.voice) { setNames((n) => ({ ...n, [mine.speaker.id]: line.voice })); flash(`👋 That's ${line.voice}`) }
+        return false
+      }
       if (!line.zone && camera) {
         const who = faces.claim()
         if (who) {
           line.speaker = who
-          const said = nameIn(line.text)
+          // A name they said ("my name is Dana"), else the name the brain knows their voice by.
+          const said = nameIn(line.text) ?? (line.voiceKnown ? line.voice : null)
           if (said && names[who.id] !== said) {
             setNames((n) => ({ ...n, [who.id]: said }))
-            setFreshName(who.id)
             flash(`👋 Met ${said}`)
           }
         }
@@ -303,31 +353,21 @@ export default function Captions() {
       if (realEngine === 'instant' && !line.zone && user?.name && new RegExp(`\\b${user.name}\\b`, 'i').test(line.text)) {
         push({ id: `local-${Date.now()}`, kind: 'name_called', zone: 'wearer', severity: 'warning', ts: Date.now() / 1000 })
       }
-      if (downSince.current && !missedFrom) setMissedFrom(line.id)
       return false
     },
   })
 
+  linesRef.current = captions.lines
   useEffect(() => { if (captions.interim) lastInterim.current = Date.now() }, [captions.interim])
   useEffect(() => { levelRef.current = captions.level }, [captions.level])
 
   // For rehearsing without a mic: window.lumenSay("switch mode") in the browser console.
   useEffect(() => { window.lumenSay = (t) => captions.addLine(t, { local: true }) })
 
-  // Looking away and back: remember where you stopped reading.
-  useEffect(() => {
-    if (lookingDown) downSince.current = Date.now()
-    else downSince.current = null
-  }, [lookingDown])
-
   useEffect(() => {
     if (!started || realEngine !== 'private') return
     fetch('/api/memory').then((r) => r.json()).then((m) => setWhisperOff(m.models?.whisper === 'off')).catch(() => {})
   }, [started, realEngine])
-
-  useEffect(() => {
-    if (follow) scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' })
-  }, [captions.lines.length, captions.interim, sim, follow])
 
   useEffect(() => { if (videoRef.current) videoRef.current.srcObject = camera }, [camera])
 
@@ -339,7 +379,7 @@ export default function Captions() {
   const toggleBar = () => (bar ? setBar(false) : showBar())
 
   const startCamera = async () => {
-    try { setCamera(await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })) } catch { setCamera(null) }
+    try { setCamera(await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false })) } catch { setCamera(null) }
   }
   const stopCamera = () => { camera?.getTracks().forEach((t) => t.stop()); setCamera(null) }
 
@@ -373,21 +413,10 @@ export default function Captions() {
     a.click()
   }
 
-  const jumpToMissed = () => {
-    document.getElementById(`line-${missedFrom}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    setFollow(false)
-    setTimeout(() => setMissedFrom(null), 15000)
-  }
-
-  const onScroll = () => {
-    const el = scroller.current
-    setFollow(el.scrollTop + el.clientHeight >= el.scrollHeight - 60)
-  }
-
   const recent = state.events.filter((e) => Date.now() / 1000 - e.ts < 20 && !e.acked).slice(-4)
   const live = sim || captions.interim
-  const missedIndex = missedFrom ? captions.lines.findIndex((l) => l.id === missedFrom) : -1
-  const missedCount = missedIndex >= 0 ? captions.lines.length - missedIndex : 0
+  const spatial = spatialLayout({ lines: captions.lines, live, liveSpeaker: camera ? faces.liveSpeaker : null,
+    visible: camera ? faces.ids.split(',').filter(Boolean).map(Number) : [], names, events: state.events })
 
   if (!started) {
     return (
@@ -406,19 +435,6 @@ export default function Captions() {
   return (
     <main className="relative h-full overflow-hidden bg-[radial-gradient(ellipse_at_top,#1c1917,#000_60%)]" onClick={toggleBar}>
       {camera && <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />}
-      {camera && faces.people.map((p) => {
-        const v = videoRef.current
-        const root = v?.parentElement
-        if (!v || !root) return null
-        const { left, top } = toScreen(v, root, p.x, p.y)
-        const talking = p.talk > TALKING
-        return (
-          <motion.div key={p.id} className="pointer-events-none absolute z-[15] -translate-x-1/2 -translate-y-full"
-            animate={{ left, top: top - 8 }} transition={{ type: 'spring', stiffness: 300, damping: 30 }}>
-            <NameTag person={p} name={names[p.id]} talking={talking} fresh={freshName === p.id} />
-          </motion.div>
-        )
-      })}
       <AlertStack alerts={alerts} onAck={ack} />
 
       {/* Top-left: who you are and what mode. Always visible, quiet. */}
@@ -429,7 +445,9 @@ export default function Captions() {
         {lookingDown && <span className="text-xs text-amber-300">· holding your place</span>}
       </div>
       {mode === 'outside' && <div className="absolute left-3 top-16 z-10"><Radar recent={recent} /></div>}
-      {camera && <Surround videoRef={videoRef} active={started} rear={rearScene} raised={bar} />}
+      {/* The walking view only shows in landscape; in portrait it would cover the people being captioned.
+          Not mounted at all in portrait, so its 3D scene and object detector don't run for nothing. */}
+      {camera && !portrait && <Surround videoRef={videoRef} active={started} rear={rearScene} raised={bar} />}
 
       <AnimatePresence>
         {notice && (
@@ -440,54 +458,17 @@ export default function Captions() {
 
       {look === 'cinema' ? (
         <CinemaCaptions lines={captions.lines} live={live} names={names} recent={state.events} />
-      ) : (<>
-      {/* Right: the see-through transcript. Scroll up for history; it stops following until you come back down. */}
-      <section onClick={(e) => e.stopPropagation()}
-        className={`absolute bottom-0 right-0 top-0 z-10 flex flex-col glass-dark border-y-0 border-r-0 ${camera ? 'w-[64%] rounded-l-3xl sm:w-[42%]' : 'w-full'}`}>
-        <div ref={scroller} onScroll={onScroll} className="flex-1 overflow-y-auto px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
-          {whisperOff && realEngine === 'private' && (
-            <p className="mb-3 rounded-xl bg-amber-950/80 p-3 text-xs text-amber-200">Private captions need Whisper on the Lumen brain, and it isn’t running.{mode !== 'outside' && ' Switch to Instant.'}</p>
-          )}
-          {captions.error && <p className="mb-3 rounded-xl bg-red-950/80 p-3 text-xs text-red-200">{captions.error}</p>}
-          {captions.lines.map((l, i) => {
-            const speaker = l.zone && !ZONES[l.zone]
-            const missed = missedIndex >= 0 && i >= missedIndex
-            return (
-              <motion.p id={`line-${l.id}`} key={l.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                className={`mb-2.5 text-[17px] font-medium leading-snug ${missed ? 'border-l-2 border-amber-400 pl-2' : ''}`}>
-                {l.speaker && (
-                  <span className="mr-1.5 align-middle text-xs font-semibold" style={{ color: l.speaker.color }}>
-                    {names[l.speaker.id] ?? `Person ${l.speaker.id}`}{l.speaker.toYou && <span className="text-green-300"> → you</span>}
-                  </span>
-                )}
-                {!l.speaker && l.zone && (
-                  <span className="mr-1.5 align-middle text-xs font-semibold" style={{ color: speaker ? speakerColor(l.zone) : '#a1a1aa' }}>
-                    {speaker ? l.zone : zoneLabel(l.zone)}
-                  </span>
-                )}
-                {l.text}
-              </motion.p>
-            )
-          })}
-          {live && <p className="text-[17px] font-medium leading-snug text-amber-200/90"><Words text={live} /></p>}
-          {!captions.lines.length && !live && (
-            <p className="pt-10 text-center text-sm text-zinc-400">{captions.listening ? 'Listening… start talking.' : 'Starting the microphone…'}</p>
-          )}
-        </div>
-        <AnimatePresence>
-          {!lookingDown && missedCount > 0 && (
-            <motion.button initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ opacity: 0 }} onClick={jumpToMissed}
-              className="absolute bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-black shadow-lg">
-              ↑ You missed {missedCount} line{missedCount > 1 ? 's' : ''}
-            </motion.button>
-          )}
-          {!follow && missedCount === 0 && (
-            <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setFollow(true)}
-              className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-zinc-800/90 px-4 py-2 text-sm">↓ Live</motion.button>
-          )}
-        </AnimatePresence>
-      </section>
-      </>)}
+      ) : (
+        <SpatialCaptions videoRef={videoRef} tracksRef={faces.tracksRef} bubbles={spatial.bubbles} cue={spatial.cue} raised={bar}
+          neutral={spatial.neutral ?? (!captions.lines.length && !live
+            ? { key: 'status', text: captions.listening ? 'Listening… start talking.' : 'Starting the microphone…' } : null)} />
+      )}
+      {/* Problems with the captions themselves, where they can't be missed. */}
+      {(captions.error || (whisperOff && realEngine === 'private')) && (
+        <p className="absolute inset-x-0 top-[max(3.5rem,calc(env(safe-area-inset-top)+3rem))] z-20 mx-auto w-fit max-w-[90%] glass-dark rounded-xl p-3 text-center text-sm text-amber-200">
+          {captions.error ?? `Private captions need Whisper on the Lumen brain, and it isn’t running.${mode !== 'outside' ? ' Switch to Instant.' : ''}`}
+        </p>
+      )}
 
       {/* Left: mode picker. Opens by voice ("switch mode") or from the bar. */}
       <AnimatePresence>

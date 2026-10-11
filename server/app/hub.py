@@ -13,6 +13,7 @@ class Hub:
         self.clients: dict[str, set[WebSocket]] = {}
         # node_id -> {"zone": str, "last_seen": float}
         self.nodes: dict[str, dict] = {}
+        self.node_sockets: dict[str, WebSocket] = {}
         self.events: list[dict] = []
 
     async def connect(self, ws: WebSocket, role: str):
@@ -33,6 +34,20 @@ class Hub:
 
     def heartbeat(self, node_id: str, zone: str):
         self.nodes[node_id] = {"zone": zone, "last_seen": time.time()}
+
+    async def register_node(self, ws: WebSocket, node_id: str, zone: str):
+        self.node_sockets[node_id] = ws
+        self.heartbeat(node_id, zone)
+        await self.broadcast(["dashboard"], {"type": "state", **self.state()})
+
+    async def unregister_node(self, ws: WebSocket, node_id: str):
+        # A reconnect may already have replaced this connection.
+        if self.node_sockets.get(node_id) is ws:
+            self.node_sockets.pop(node_id, None)
+            self.nodes.pop(node_id, None)
+            await self.broadcast(["dashboard"], {"type": "state", **self.state()})
+            return True
+        return False
 
     async def broadcast(self, roles: list[str], msg: dict):
         for role in roles:

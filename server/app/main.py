@@ -1,24 +1,29 @@
 import asyncio
+import base64
 import json
+from collections import deque
 import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import numpy as np
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Header, HTTPException, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .detectors import alarm_dsp
 from .detectors.ast_sound import SoundClassifier, loudness_rise, to_alerts
 from .detectors.fall import FallDetector
-from .detectors.items import ItemFinder, decode
+from .detectors import scene
+from .detectors.items import ItemFinder, decode, items_from_hits
 from .detectors.speech import Segmenter, Transcriber, mentions_name
+from .detectors.voices import Voices
 from .agent import answer
 from .llm import local as local_llm
 from .recap import recap
 from .speakers import CrossTalk
+from . import eventlog
 from .history import history
 from .hub import Hub
 from .memory import Memory, seed_demo
@@ -30,7 +35,7 @@ async def lifespan(app):
     # One after another, sound model first: transformers' lazy imports aren't thread-safe, and loading
     # all four in parallel threads made Whisper and the item finder fail on the AMD box with
     # "cannot import name 'pipeline' from 'transformers'".
-    models = (sound_model, transcriber, item_finder, local_llm)
+    models = (sound_model, transcriber, voices, item_finder, local_llm)
     asyncio.get_running_loop().run_in_executor(None, lambda: [m.available() for m in models])
     yield
 
@@ -59,9 +64,17 @@ memory = Memory(None if os.environ.get("LUMEN_TESTING") == "1"
                 else Path(__file__).resolve().parents[2] / "data" / "conversations.jsonl")
 profile = {"name": os.environ.get("LUMEN_NAME", "")}  # set at login; used for name calling
 transcriber = Transcriber()
+voices = Voices()  # who's talking, by voiceprint (named ones saved to VOICE_FILE)
 segmenters: dict[str, Segmenter] = {}
 item_finder = ItemFinder()
 items_busy: set[str] = set()
+
+# Scene JSON (detectors/scene.py): the latest one per camera for the dashboard, recent model
+# times for /api/vision, and each node's latest pose so a photo can say "standing" or "lying".
+latest_vision: dict[str, dict] = {}
+vision_ms: deque = deque(maxlen=500)
+last_pose: dict[str, tuple[float, list | None]] = {}
+last_phone_scene: dict[str, float] = {}
 
 
 async def emit_detected(kind: str, zone: str, severity: str, source: str, confidence: float = 1.0):
@@ -94,12 +107,35 @@ def caption_id(entry: dict) -> str:
 WEARER = "wearer"  # zone name the headset uses for its own mic
 
 
+PARTIAL_EVERY_S = 1.0  # while someone talks, a rough caption this often (0 turns partials off)
+partial_at: dict[str, float] = {}
+partial_busy: set[str] = set()  # one partial per phone at a time, so a slow CPU never backs up
+
+
 def feed_speech(node_id: str, zone: str, chunk: np.ndarray):
     if transcriber._failed:
         return
-    utterance = segmenters.setdefault(node_id, Segmenter()).feed(chunk)
+    seg = segmenters.setdefault(node_id, Segmenter())
+    utterance = seg.feed(chunk)
     if utterance is not None:
         asyncio.create_task(run_speech(zone, utterance))
+    elif PARTIAL_EVERY_S and node_id not in partial_busy and time.time() - partial_at.get(node_id, 0) >= PARTIAL_EVERY_S:
+        audio = seg.so_far()
+        if audio is not None:
+            partial_at[node_id] = time.time()
+            partial_busy.add(node_id)
+            asyncio.create_task(run_partial(node_id, seg, zone, audio))
+
+
+async def run_partial(node_id: str, seg: Segmenter, zone: str, audio: np.ndarray):
+    """Words so far, shown greyed out on the caption screens until the finished line replaces them."""
+    done = seg.done
+    try:
+        text = await asyncio.to_thread(transcriber.transcribe, audio)
+    finally:
+        partial_busy.discard(node_id)
+    if text and seg.done == done:  # skip it if the sentence already finished while Whisper ran
+        await hub.broadcast(["hud", "dashboard"], {"type": "caption_partial", "zone": zone, "text": text, "ts": time.time()})
 
 
 async def run_speech(zone: str, audio: np.ndarray):
@@ -109,8 +145,9 @@ async def run_speech(zone: str, audio: np.ndarray):
     keep, replaced = crosstalk.check(zone, text, float(np.sqrt(np.mean(audio ** 2))))
     if not keep:
         return  # a louder phone already captioned this sentence
-    entry = memory.add_speech(zone, text)
-    msg = {**entry, "type": "caption", "id": caption_id(entry)}
+    voice = await asyncio.to_thread(voices.label, audio, text)
+    entry = memory.add_speech(zone, text, voice=voice["voice"] if voice else None)
+    msg = {**entry, "type": "caption", "id": caption_id(entry), **(voice or {})}
     if replaced:
         old = next((e for e in reversed(memory.entries) if e.get("type") == "speech"
                     and e["zone"] == replaced["zone"] and e["text"] == replaced["text"]), None)
@@ -123,17 +160,50 @@ async def run_speech(zone: str, audio: np.ndarray):
         await emit_detected("name_called", zone, "warning", source="whisper")
 
 
+def pose_now(node_id: str) -> tuple[str | None, bool]:
+    """(posture, someone in view) from this node's pose stream, if it reported in the last 2 s."""
+    seen_at, landmarks = last_pose.get(node_id, (0, None))
+    if time.monotonic() - seen_at > 2:
+        return None, False
+    return scene.posture(landmarks), bool(landmarks)
+
+
+async def look_at(node_id: str, zone: str, jpeg: str) -> dict | None:
+    """One OWLv2 pass per still: item sightings for Ask Lumen + one scene JSON line. The photo is dropped here."""
+    prompts, thresholds, labels = scene.queries()
+
+    def look():
+        image = decode(jpeg)
+        hits, timing = item_finder.detect(image, prompts, thresholds)
+        return hits, timing, items_from_hits(image, hits), image.size
+
+    hits, timing, items, (width, height) = await asyncio.to_thread(look)
+    for h in items:
+        memory.add_sighting(zone, h["item"], h["confidence"], h["thumb"])
+        await hub.broadcast(["dashboard"], {"type": "sighting", "item": h["item"], "zone": zone, "ts": time.time()})
+    if not timing:
+        return None
+    event = scene.build(node_id, zone, time.time(), hits, labels, width, height, timing, *pose_now(node_id))
+    await publish_vision(event)
+    return event
+
+
 async def run_items(node_id: str, zone: str, jpeg: str):
     items_busy.add(node_id)
     try:
-        hits = await asyncio.to_thread(lambda: item_finder.find(decode(jpeg)))
-        for h in hits:
-            memory.add_sighting(zone, h["item"], h["confidence"], h["thumb"])
-            await hub.broadcast(["dashboard"], {"type": "sighting", "item": h["item"], "zone": zone, "ts": time.time()})
+        await look_at(node_id, zone, jpeg)
     except Exception as e:  # a bad frame shouldn't kill the node socket
         print("item finder error:", e)
     finally:
         items_busy.discard(node_id)
+
+
+async def publish_vision(event: dict):
+    latest_vision[event["node_id"]] = event
+    if "inference_ms" in event:
+        vision_ms.append(event["inference_ms"])
+    eventlog.record(event)
+    await hub.broadcast(["dashboard"], event)
 
 
 # Rear-facing phone (Outside mode): the phone's own object detector says something behind
@@ -205,6 +275,11 @@ class Segment(BaseModel):
     ts: float | None = None
 
 
+class Look(BaseModel):
+    jpeg: str
+    zone: str = "living"
+
+
 class RecapRequest(BaseModel):
     segments: list[Segment]
     title: str = "Lecture"
@@ -219,6 +294,52 @@ def health():
 def get_history(household: str | None = None):
     """History tab: Databricks Gold tables when configured, else the committed sample week."""
     return history(household)
+
+
+@app.get("/api/eventlog")
+def get_eventlog(x_lumen_sync_key: str | None = Header(None)):
+    """Hourly event files, for scripts/databricks_sync.py. Needs LUMEN_SYNC_KEY (the log holds speech)."""
+    if not eventlog.sync_allowed(x_lumen_sync_key):
+        raise HTTPException(403, "event log sync is off (set EVENT_LOG_DIR and LUMEN_SYNC_KEY on the brain)")
+    return {"files": eventlog.list_files()}
+
+
+@app.get("/api/eventlog/{name}")
+def get_eventlog_file(name: str, offset: int = 0, x_lumen_sync_key: str | None = Header(None)):
+    """New lines of one hourly file, starting at byte offset."""
+    if not eventlog.sync_allowed(x_lumen_sync_key):
+        raise HTTPException(403, "event log sync is off")
+    try:
+        return Response(eventlog.read_from(name, offset), media_type="application/x-ndjson")
+    except (ValueError, FileNotFoundError):
+        raise HTTPException(404, "no such file")
+
+
+@app.get("/api/vision")
+def get_vision():
+    """Latest scene JSON per camera, and how fast the model has been (the AMD GPU number)."""
+    ms = sorted(vision_ms)
+    pick = lambda q: ms[min(len(ms) - 1, int(q * len(ms)))] if ms else None  # noqa: E731
+    return {"latest": list(latest_vision.values()),
+            "speed": {"frames": len(ms), "p50_ms": pick(0.5), "p95_ms": pick(0.95),
+                      "device": item_finder.device_name, "model": scene.MODEL_ID}}
+
+
+@app.post("/api/look")
+async def look(body: Look):
+    """The dashboard's own laptop camera, about once a second: what's in this frame (the white headset
+    is one of the scene words), so the camera wall can draw the boxes on the same frame. The photo is dropped; only the JSON is kept."""
+    if item_finder._failed:
+        raise HTTPException(503, "vision model is off")
+    if not body.jpeg.startswith("data:image/jpeg;base64,") or len(body.jpeg) > 400_000:
+        raise HTTPException(400, "send a small JPEG data URL")
+    if "dashboard-camera" in items_busy:
+        raise HTTPException(429, "still looking at the last frame")
+    items_busy.add("dashboard-camera")
+    try:
+        return await look_at("dashboard-camera", body.zone, body.jpeg) or {}
+    finally:
+        items_busy.discard("dashboard-camera")
 
 
 @app.get("/api/state")
@@ -304,17 +425,69 @@ async def ask(body: Question):
     return await asyncio.to_thread(answer, body.question, memory, hub.events)
 
 
+@app.get("/api/voices")
+def get_voices():
+    """Whose voices the brain knows (names and line counts, never the voiceprints) and recent match scores."""
+    return {"model": model_status(voices), **voices.book.summary()}
+
+
+class VoiceClip(BaseModel):
+    audio: str  # base64 of 16 kHz mono float32, from the Voices page
+    name: str = ""
+
+
+def clip_vec(body: VoiceClip):
+    try:
+        audio = np.frombuffer(base64.b64decode(body.audio), np.float32)
+        return voices.embed_clip(audio)
+    except ValueError as e:
+        raise HTTPException(400, str(e) or "Couldn't read that recording.")
+
+
+@app.post("/api/voices/enroll")
+def enroll_voice(body: VoiceClip):
+    """Voices page: save this person's voice (each extra recording makes it more reliable)."""
+    name = " ".join(body.name.split())[:30].title()
+    if not name:
+        raise HTTPException(400, "Type a name first.")
+    voices.book.enroll(name, clip_vec(body))
+    return voices.book.summary()
+
+
+@app.post("/api/voices/who")
+def who_is_this(body: VoiceClip):
+    """Voices page test: which saved voice does this recording match?"""
+    return voices.book.who(clip_vec(body))
+
+
+class VoiceName(BaseModel):
+    name: str
+
+
+@app.post("/api/voices/remove")
+def remove_voice(body: VoiceName):
+    voices.book.remove(body.name)
+    return voices.book.summary()
+
+
+@app.post("/api/voices/forget")
+def forget_voices():
+    voices.book.forget()
+    return {"ok": True}
+
+
 @app.get("/api/memory")
 def get_memory():
     speech = [e for e in memory.entries if e.get("type") == "speech"][-500:]
     other = [e for e in memory.entries if e.get("type") != "speech"][-50:]
     return {"entries": [{k: v for k, v in e.items() if k != "thumb"} for e in other + speech],
-            "models": {"whisper": model_status(transcriber), "items": model_status(item_finder),
+            "models": {"whisper": model_status(transcriber), "voices": model_status(voices), "items": model_status(item_finder),
                        "llm": model_status(local_llm)}}
 
 
 def model_status(model) -> str:
-    return "off" if model._failed else "ready" if model._pipe is not None else "loading"
+    loaded = getattr(model, "_pipe", None) or getattr(model, "_model", None)  # item finder holds _model
+    return "off" if model._failed else "ready" if loaded is not None else "loading"
 
 
 @app.post("/api/memory/seed")
@@ -346,12 +519,18 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
     """Camera/mic phones. Binary messages = 16 kHz mono float32 audio.
     Text = JSON: {"type": "pose", ...} at 10 fps, {"type": "snapshot", "jpeg": dataURL} every few seconds."""
     await hub.connect(ws, "node")
-    hub.heartbeat(node_id, zone)
+    await hub.register_node(ws, node_id, zone)
+    last_status = 0
+    last_preview = 0
     try:
         while True:
             msg = await ws.receive()
             if msg["type"] == "websocket.disconnect":
                 break
+            hub.heartbeat(node_id, zone)
+            if time.monotonic() - last_status >= 2:
+                last_status = time.monotonic()
+                await hub.broadcast(["dashboard"], {"type": "state", **hub.state()})
             if msg.get("bytes"):
                 chunk = np.frombuffer(msg["bytes"], dtype=np.float32)
                 # The wearer's own mic: speech only, alarms are the room nodes' job. Except Outside,
@@ -372,7 +551,19 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
                 feed_speech(node_id, zone, chunk)
             elif msg.get("text"):
                 data = json.loads(msg["text"])
-                if data.get("type") == "pose" and enabled("fall"):
+                if data.get("type") == "camera_preview":
+                    # Explicit demo-only opt-in. Never pass full frames to memory or the event log.
+                    jpeg = data.get("jpeg")
+                    if (os.environ.get("LUMEN_DEMO_PREVIEW") == "1"
+                            and isinstance(jpeg, str) and jpeg.startswith("data:image/jpeg;base64,")
+                            and len(jpeg) <= 400_000 and time.monotonic() - last_preview >= 0.9):
+                        last_preview = time.monotonic()
+                        await hub.broadcast(["dashboard"], {"type": "camera_preview", "node_id": node_id,
+                                                            "zone": zone, "ts": time.time(), "jpeg": jpeg})
+                elif data.get("type") == "pose":
+                    last_pose[node_id] = (time.monotonic(), data.get("landmarks"))  # posture for the scene JSON
+                    if not enabled("fall"):
+                        continue
                     stillness = MODES[hub.mode].get("fall_stillness_s", 8)
                     det = fall_detectors.setdefault(node_id, FallDetector(stillness))
                     det.stillness_s = stillness
@@ -387,14 +578,21 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
                     side = "rear" if zone == "behind" else "front"
                     await hub.broadcast(["hud"], {"type": "scene", "side": side, "objects": data.get("objects", [])[:10],
                                                   "fov": data.get("fov", 50), "ts": time.time()})
+                    if time.monotonic() - last_phone_scene.get(node_id, 0) >= scene.EVERY_S:
+                        last_phone_scene[node_id] = time.monotonic()
+                        await publish_vision(scene.from_phone(node_id, zone, time.time(), data.get("objects") or []))
                 elif data.get("type") == "caption_meta":
                     entry = memory.tag_speech(data["ts"], data.get("speaker"), bool(data.get("to_you")))
                     if entry:
                         await hub.broadcast(["dashboard"], {**entry, "type": "caption"})
                 elif data.get("type") == "snapshot" and node_id not in items_busy and not item_finder._failed:
                     asyncio.create_task(run_items(node_id, zone, data["jpeg"]))
-            hub.heartbeat(node_id, zone)
     except WebSocketDisconnect:
         pass
     finally:
         hub.disconnect(ws, "node")
+        if await hub.unregister_node(ws, node_id):
+            # Do not join audio or pose from before a disconnect to a new session.
+            for cache in (audio_buffers, fall_detectors, ast_pending, segmenters, latest_vision, last_pose,
+                          last_phone_scene):
+                cache.pop(node_id, None)

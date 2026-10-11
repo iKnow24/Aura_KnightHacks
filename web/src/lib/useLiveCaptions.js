@@ -5,8 +5,8 @@ import { streamMic } from './mic'
 // - 'instant': the browser's own speech recognition. Words show up while they're being said,
 //   free, zero setup. Catch: Chrome sends the audio to Google to do it, so it isn't private.
 // - 'private': the mic streams to our own brain (Whisper on the AMD GPU). Nothing leaves our
-//   server, and the same audio feeds the sound detectors. Catch: a line appears about a second
-//   after the speaker pauses, not word by word.
+//   server, and the same audio feeds the sound detectors. Catch: words arrive in rough chunks about
+//   once a second, and the clean line a moment after the speaker pauses.
 // Android can't give the mic to both at once, so Outside mode (which needs the sound detectors)
 // always uses 'private'.
 const SR = typeof window !== 'undefined' ? window.SpeechRecognition || window.webkitSpeechRecognition : null
@@ -80,8 +80,18 @@ export function useLiveCaptions({ engine, active, onFinal }) {
   // `replaces`: a louder phone heard the same sentence, so it takes over the label.
   const addRemote = useCallback((msg) => {
     if (msg.zone === 'wearer' && engine !== 'private') return
-    addLine(msg.text, { id: msg.id ?? `${msg.ts}-${msg.zone}`, zone: msg.zone === 'wearer' ? null : msg.zone, ts: msg.ts, replaces: msg.replaces })
+    setInterim('')
+    // voice: who said it by voiceprint ("Sharan", or "Person 4" when we don't know their name).
+    addLine(msg.text, { id: msg.id ?? `${msg.ts}-${msg.zone}`, zone: msg.zone === 'wearer' ? null : msg.zone, ts: msg.ts, replaces: msg.replaces,
+      ...(msg.voice && { voice: msg.voice, voiceKnown: !!msg.voice_known }) })
   }, [engine, addLine])
 
-  return { lines, interim, listening, error, level, addRemote, clear: () => setLines([]), addLine }
+  // While someone is still talking the brain sends the words so far about once a second
+  // (caption_partial). They show greyed out until the finished line arrives.
+  const addPartial = useCallback((msg) => {
+    if (msg.zone === 'wearer' && engine !== 'private') return
+    setInterim(msg.text)
+  }, [engine])
+
+  return { lines, interim, listening, error, level, addRemote, addPartial, clear: () => setLines([]), addLine }
 }

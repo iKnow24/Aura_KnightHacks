@@ -1,7 +1,7 @@
 """Ask Lumen: answers questions about the house from the memory log and the alert timeline.
 
 Two brains, same tools:
-- With an LLM key set (Groq, Claude or xAI; see PROVIDERS), the model gets three tools
+- With an LLM key set (Groq, Claude, xAI or Hugging Face; see PROVIDERS), the model gets three tools
   (last_seen, transcript, alerts) and decides which to call, so free-form questions work
   ("did anyone say anything about milk?").
 - Without a key, or if the API call fails, a keyword router answers the core questions.
@@ -72,7 +72,8 @@ def tool_last_seen(memory: Memory, item: str) -> dict:
 def tool_transcript(memory: Memory, zone: str | None = None, minutes: float = 60, limit: int = 10) -> dict:
     lines = memory.speech(zone=zone, since=time.time() - minutes * 60, limit=limit)
     return {"lines": [{"zone": e["zone"], "text": e["text"], "ago": ago(e["ts"]),
-                       "said_to_you": e.get("to_you", False), "speaker": e.get("speaker")} for e in lines],
+                       "said_to_you": e.get("to_you", False), "speaker": e.get("speaker"),
+                       "voice": e.get("voice")} for e in lines],
             "entries": lines}
 
 
@@ -139,13 +140,16 @@ def answer_rules(question: str, memory: Memory, events: list[dict]) -> dict:
 
 # ---- LLM brain --------------------------------------------------------------------------
 # Any provider with an OpenAI-compatible API works through the same client. Pick one with
-# LUMEN_LLM=groq|claude|xai|off, or leave it unset to use the first one that has a key.
+# LUMEN_LLM=groq|claude|xai|hf|off, or leave it unset to use the first one that has a key.
 
 PROVIDERS = {
     # name: (base URL, env var holding the key, default model)
     "groq": ("https://api.groq.com/openai/v1", "GROQ_API_KEY", "openai/gpt-oss-20b"),  # free tier
     "claude": ("https://api.anthropic.com/v1/", "ANTHROPIC_API_KEY", "claude-haiku-5-5"),
     "xai": ("https://api.x.ai/v1", "XAI_API_KEY", "grok-4.7"),
+    # Hugging Face Inference Providers: one HF token, many open models. Last, so it never
+    # takes over from Groq when both keys are set; pick it with LUMEN_LLM=hf.
+    "hf": ("https://router.huggingface.co/v1", "HF_TOKEN", "openai/gpt-oss-20b"),
 }
 
 
@@ -182,7 +186,8 @@ SYSTEM = ("You are Lumen, the memory of a home. You help a deaf or hard-of-heari
           "do (a time, a pill, an appointment), say that clearly first. Only state what the tools return; if they "
           "return nothing, say you haven't seen or heard it. Say times as relative ('12 minutes ago'). "
           "Zone 'living' is the living room; zone 'wearer' means said in the same room as the user, and "
-          "said_to_you=true means the speaker was facing them.")
+          "said_to_you=true means the speaker was facing them. voice is who said it, when known (a name, or "
+          "'Person 4' for someone whose name we don't know).")
 
 
 def run_tool(name: str, args: dict, memory: Memory, events: list[dict]) -> dict:
