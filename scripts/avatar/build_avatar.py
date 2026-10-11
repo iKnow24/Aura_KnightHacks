@@ -136,6 +136,72 @@ def shrink_images(max_size=1024):
             img.pack()
 
 
+def plastic(name, rgba, roughness):
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    bsdf = next(n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+    bsdf.inputs["Base Color"].default_value = rgba
+    bsdf.inputs["Roughness"].default_value = roughness
+    return m
+
+
+def add_headset(rig):
+    """The white phone-VR headset from the demo photos: visor over the eyes, black strap round and over the head.
+    Parented to the head bone so it moves with him."""
+    eyes = find("high-poly")[0]
+    pts = [eyes.matrix_world @ v.co for v in eyes.data.vertices]
+    c = sum(pts, Vector()) / len(pts)
+    front = min(p.y for p in pts)  # MakeHuman faces -Y
+    white = plastic("headset_white", (0.86, 0.86, 0.84, 1), 0.35)
+    black = plastic("headset_strap", (0.02, 0.02, 0.022, 1), 0.8)
+    parts = []
+
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(c.x, front - 0.055, c.z + 0.004))
+    visor = bpy.context.object
+    visor.scale = (0.205, 0.105, 0.112)  # width, depth, height
+    bpy.ops.object.transform_apply(scale=True)
+    bevel = visor.modifiers.new("round", "BEVEL")
+    bevel.width, bevel.segments = 0.03, 6
+    bpy.ops.object.modifier_apply(modifier="round")
+    bpy.ops.object.shade_smooth()
+    visor.data.materials.append(white)
+    parts.append(visor)
+
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(c.x, front - 0.11, c.z + 0.004))  # seam across the front
+    seam = bpy.context.object
+    seam.scale = (0.16, 0.003, 0.004)
+    bpy.ops.object.transform_apply(scale=True)
+    seam.data.materials.append(plastic("headset_seam", (0.55, 0.55, 0.53, 1), 0.5))
+    parts.append(seam)
+
+    head_c = Vector((c.x, front + 0.085, c.z + 0.01))
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.098, minor_radius=0.011, location=head_c)
+    band = bpy.context.object
+    band.scale = (1.0, 1.12, 1.0)
+    bpy.ops.object.transform_apply(scale=True)
+    bpy.ops.object.shade_smooth()
+    band.data.materials.append(black)
+    parts.append(band)
+
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.1, minor_radius=0.01, location=head_c + Vector((0, 0.01, 0)),
+                                     rotation=(0, math.pi / 2, 0))
+    over = bpy.context.object
+    bm = bmesh.new(); bm.from_mesh(over.data)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if (over.matrix_world @ v.co).z < head_c.z], context="VERTS")
+    bm.to_mesh(over.data); bm.free()
+    bpy.ops.object.shade_smooth()
+    over.data.materials.append(black)
+    parts.append(over)
+
+    for p in parts:
+        p.name = "headset_" + p.name
+        world = p.matrix_world.copy()
+        p.parent = rig
+        p.parent_type = "BONE"
+        p.parent_bone = "mixamorig:Head"
+        p.matrix_world = world
+
+
 def build():
     for o in list(bpy.data.objects):
         bpy.data.objects.remove(o, do_unlink=True)
@@ -194,6 +260,7 @@ def build():
             v.co += v.normal * 0.009
 
     opaque_materials()
+    add_headset(rig)
 
     shrink_images()
     bpy.ops.object.select_all(action="DESELECT")
