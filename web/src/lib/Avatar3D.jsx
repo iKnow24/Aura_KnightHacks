@@ -1,6 +1,7 @@
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
@@ -18,6 +19,74 @@ import { detectPoseWorld, loadPose } from './pose'
 // in code (outfit.js) like the team member who wears the headset in the demo.
 const MODELS = ['avatar.glb', 'walker.glb'].map((f) => `${import.meta.env.BASE_URL}models/${f}`)
 const POSE_FPS = 20
+const LOOK_AT = new THREE.Vector3(0, 1.05, 0)
+const INTRO_SECONDS = 4.6
+
+// One full turn on open, then the same orbit is the user's to drag. Ease in and out so it
+// settles facing the front instead of stopping mid-spin.
+function smoothstep(t) {
+  t = Math.min(1, Math.max(0, t))
+  return 0.5 - 0.5 * Math.cos(Math.PI * t)
+}
+
+function Stage({ ready, onSettled }) {
+  const { camera, gl } = useThree()
+  const controls = useRef(null)
+  const intro = useRef(0)
+  const held = useRef(false)
+  const told = useRef(false)
+
+  useEffect(() => {
+    const c = new OrbitControls(camera, gl.domElement)
+    c.target.copy(LOOK_AT)
+    c.enablePan = false
+    c.enableDamping = false
+    c.dampingFactor = 0.08
+    c.minDistance = 1.8
+    c.maxDistance = 5.4
+    c.minPolarAngle = 0.35
+    c.maxPolarAngle = Math.PI / 2 + 0.08
+    controls.current = c
+    const el = gl.domElement
+    el.style.touchAction = 'none'
+    el.style.cursor = 'grab'
+    const grab = () => { held.current = true; el.style.cursor = 'grabbing' }
+    const release = () => { el.style.cursor = 'grab' }
+    el.addEventListener('pointerdown', grab)
+    el.addEventListener('pointerup', release)
+    return () => {
+      el.removeEventListener('pointerdown', grab)
+      el.removeEventListener('pointerup', release)
+      c.dispose()
+    }
+  }, [camera, gl])
+
+  useFrame((_, dt) => {
+    const c = controls.current
+    if (!c) return
+    const settle = () => {
+      if (told.current) return
+      told.current = true
+      c.enableDamping = true
+      onSettled()
+    }
+    // Wait until the figure is on screen, or the turn finishes before anyone can see it.
+    if (!ready) return
+    const spinning = !held.current && intro.current < INTRO_SECONDS
+    if (spinning) {
+      intro.current += Math.min(dt, 0.05)
+      const turn = smoothstep(intro.current / INTRO_SECONDS) * Math.PI * 2
+      camera.position.set(Math.sin(turn) * 3.4, 1.25, Math.cos(turn) * 3.4)
+      camera.lookAt(LOOK_AT)
+      c.update()
+      if (intro.current >= INTRO_SECONDS) settle()
+      return
+    }
+    settle()
+    c.update()
+  })
+  return null
+}
 
 async function loadFigure() {
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
@@ -27,7 +96,7 @@ async function loadFigure() {
   throw new Error('No 3D figure found')
 }
 
-function Figure({ poseRef }) {
+function Figure({ poseRef, onReady }) {
   const [fig, setFig] = useState(null)
   useEffect(() => {
     let live = true
@@ -53,6 +122,7 @@ function Figure({ poseRef }) {
       const idle = gltf.animations.find((c) => /idle/i.test(c.name)) ?? gltf.animations[0]
       if (idle) mixer.clipAction(idle).play()
       setFig({ scene, mixer, rig: makeRig(scene), hasIdle: !!idle })
+      onReady()
     }).catch((e) => console.warn('Avatar figure failed to load', e))
     return () => { live = false }
   }, [])
@@ -73,6 +143,8 @@ export default function Avatar3D({ cams }) {
   const [deviceId, setDeviceId] = useState(() => { try { return localStorage.getItem('lumen.avatarCam') || '' } catch { return '' } })
   const [on, setOn] = useState(false)
   const [status, setStatus] = useState('Off')
+  const [hint, setHint] = useState('')
+  const [figureReady, setFigureReady] = useState(false)
   const video = useRef()
   const poseRef = useRef(null)
   const cam = cams.find((c) => c.id === deviceId) ?? cams[0]
@@ -111,10 +183,11 @@ export default function Avatar3D({ cams }) {
 
   return (
     <figure className="glass relative h-full min-h-[200px] overflow-hidden rounded-xl bg-[#0d0d0f]">
-      <Canvas dpr={[1, 2]} camera={{ position: [0, 1.25, 3.4], fov: 32 }} onCreated={({ camera }) => camera.lookAt(0, 1.0, 0)}>
+      <Canvas dpr={[1, 2]} camera={{ position: [0, 1.25, 3.4], fov: 32 }} onCreated={({ camera }) => camera.lookAt(LOOK_AT)}>
+        <Stage ready={figureReady} onSettled={() => setHint('Drag to turn')} />
         <hemisphereLight args={['#ffffff', '#222226', 1.4]} />
         <directionalLight position={[2, 4, 3]} intensity={1.6} />
-        <Figure poseRef={poseRef} />
+        <Figure poseRef={poseRef} onReady={() => setFigureReady(true)} />
         <mesh rotation-x={-Math.PI / 2}><circleGeometry args={[0.9, 48]} /><meshBasicMaterial color="#18181b" /></mesh>
       </Canvas>
       {/* Small self-view so the person can see they're in frame. */}
@@ -133,6 +206,7 @@ export default function Avatar3D({ cams }) {
           {on ? 'Stop' : 'Start'}
         </button>
       </figcaption>
+      <p className="pointer-events-none absolute bottom-7 left-0 right-0 text-center text-xs text-zinc-500">{hint}</p>
       <p className="absolute bottom-2 left-3 text-xs text-zinc-400" aria-live="polite">{cam ? status : 'No laptop camera found'}</p>
     </figure>
   )
