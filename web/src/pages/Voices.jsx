@@ -5,7 +5,15 @@ import { recordClip } from '../lib/mic'
 // the voiceprint on its own disk (never in the repo), so it knows you after restarts. Anyone not saved
 // here shows up in captions as Person 4, Person 5, ... and is never saved.
 const SECONDS = 6
+const LONG_SECONDS = 60
 const LINE = 'Read this: "Hi, I\'m on the Lumen team. We help deaf people know who is talking and what is happening around them."'
+// About a minute of plain speech with lots of different sounds, for the long recording.
+const SCRIPT = `Hi, I'm on the Lumen team. Lumen helps deaf and hard-of-hearing people know what's happening around them.
+Phones around the house listen for smoke alarms, doorbells, timers and someone calling your name.
+When something happens, the phone you're holding shows it, the caregiver gets a message, and at night a light flashes by the bed.
+Captions show who is talking, right above their head, so you can follow a conversation with three or four people.
+We built it in one weekend at Knight Hacks, on an AMD graphics card, with open models from Hugging Face.
+Nothing leaves the house, and no faces are ever recognized. Thanks for listening, that's about a minute.`
 
 async function post(path, body) {
   const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -17,7 +25,7 @@ async function post(path, body) {
 export default function Voices() {
   const [known, setKnown] = useState(null)
   const [name, setName] = useState('')
-  const [busy, setBusy] = useState(null) // 'save' | 'test' while recording
+  const [busy, setBusy] = useState(null) // 'save' | 'long' | 'test' while recording
   const [left, setLeft] = useState(0)
   const [level, setLevel] = useState(0)
   const [note, setNote] = useState(null)
@@ -28,9 +36,21 @@ export default function Voices() {
   const record = async (kind) => {
     setNote(null)
     setBusy(kind)
-    setLeft(SECONDS)
+    setLeft(kind === 'long' ? LONG_SECONDS : SECONDS)
     const tick = setInterval(() => setLeft((s) => Math.max(0, s - 1)), 1000)
     try {
+      if (kind === 'long') {
+        // One minute, sent as 6 s pieces. Each piece makes the saved voice a little more reliable.
+        const pieces = await recordClip(LONG_SECONDS, setLevel, SECONDS)
+        let used = 0, last = null
+        for (const audio of pieces) {
+          try { last = await post('/api/voices/enroll', { name, audio }); used++ } catch { /* a silent piece */ }
+        }
+        if (!used) throw new Error('Couldn\'t hear any talking. Hold the phone closer.')
+        setKnown({ ...known, ...last })
+        setNote({ ok: true, text: `Saved ${name.trim()} from ${used} pieces of the reading.` })
+        return
+      }
       const audio = await recordClip(SECONDS, setLevel)
       if (kind === 'save') {
         setKnown({ ...known, ...(await post('/api/voices/enroll', { name, audio })) })
@@ -50,6 +70,20 @@ export default function Voices() {
   }
 
   const remove = async (who) => setKnown({ ...known, ...(await post('/api/voices/remove', { name: who })) })
+
+  // Backup file: the team's voiceprints as JSON, to put back if the AMD box is ever rebuilt.
+  const backup = async () => {
+    const data = await (await fetch('/api/voices/backup')).json()
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' })), download: 'lumen-voices.json' })
+    a.click()
+  }
+  const restore = async (file) => {
+    if (!file) return
+    try {
+      setKnown({ ...known, ...(await post('/api/voices/restore', JSON.parse(await file.text()))) })
+      setNote({ ok: true, text: 'Voices restored from the backup.' })
+    } catch (e) { setNote({ ok: false, text: e.message || 'That file isn\'t a Lumen voices backup.' }) }
+  }
 
   return (
     <main className="mx-auto flex min-h-full max-w-md flex-col gap-6 p-6">
@@ -86,6 +120,14 @@ export default function Voices() {
           className="w-full rounded-full bg-white py-3 font-semibold text-black disabled:opacity-40">
           {busy === 'save' ? `Recording… ${left}s` : 'Record and save'}
         </button>
+        <details className="rounded-xl bg-zinc-900 p-4">
+          <summary className="cursor-pointer text-sm font-medium text-zinc-300">Stronger: read a 1-minute script</summary>
+          <p className="mt-3 whitespace-pre-line text-[15px] leading-relaxed text-zinc-300">{SCRIPT}</p>
+          <button onClick={() => record('long')} disabled={!name.trim() || !!busy}
+            className="mt-4 w-full rounded-full border border-zinc-600 py-3 font-semibold disabled:opacity-40">
+            {busy === 'long' ? `Recording… ${left}s` : 'Record 1 minute and save'}
+          </button>
+        </details>
         <button onClick={() => record('test')} disabled={!!busy || !known?.people.length}
           className="w-full rounded-full border border-zinc-700 py-3 font-semibold disabled:opacity-40">
           {busy === 'test' ? `Listening… ${left}s` : 'Test: who is talking?'}
@@ -93,6 +135,14 @@ export default function Voices() {
         {busy && <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800"><div className="h-full bg-white transition-all" style={{ width: `${Math.min(100, level * 800)}%` }} /></div>}
         {note && <p className={note.ok ? 'text-center text-lg' : 'text-center text-lg text-amber-400'}>{note.text}</p>}
       </section>
+
+      <footer className="flex items-center justify-center gap-6 text-sm text-zinc-400">
+        <button onClick={backup} disabled={!known?.people.length} className="underline disabled:opacity-40">Download backup</button>
+        <label className="cursor-pointer underline">
+          Restore backup
+          <input type="file" accept="application/json,.json" className="hidden" onChange={(e) => restore(e.target.files[0])} />
+        </label>
+      </footer>
     </main>
   )
 }

@@ -55,7 +55,7 @@ export default function Dashboard() {
   }, [])
   const laptop = useLaptopCameras()
   const wall = useCameraWall({ nodes: state.nodes, previews, now, connected, cams: laptop.cams, camError: laptop.error,
-    onAskCameras: () => laptop.refresh(true) })
+    onAskCameras: () => laptop.refresh(true), alert: ripples.at(-1) })
 
   const header = (
     <header className="mb-3 flex flex-wrap items-center gap-3">
@@ -102,6 +102,7 @@ export default function Dashboard() {
   return (
     <main className="h-full overflow-y-auto overflow-x-hidden p-4">
       {header}
+      {wall.full}
 
       <Stage title="Cameras" context="Every camera in the house, including the headset captions view. Tap a name to make it the main picture. Press 1 or 2 to swap a side camera in.">
         {showQr && <QrPanel />}
