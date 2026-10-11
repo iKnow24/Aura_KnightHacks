@@ -10,6 +10,7 @@ import QrPanel from '../lib/QrPanel'
 import { Wordmark } from '../lib/Logo'
 import { getUser, signOut } from '../lib/user'
 const Avatar3D = lazy(() => import('../lib/Avatar3D'))
+import { playDemoSound } from '../lib/demoSounds'
 import { alertText, SEVERITY_COLOR, ZONES, zoneLabel } from '../lib/zones'
 
 const FAKES = [
@@ -179,7 +180,7 @@ export default function Dashboard() {
       <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
         <span className="shrink-0 self-center text-xs uppercase tracking-[0.2em] text-zinc-500">Demo alerts</span>
         {FAKES.map(([kind, zone, severity]) => (
-          <button key={kind} onClick={() => api('/api/fake-alert', { kind, zone, severity })}
+          <button key={kind} onClick={() => { playDemoSound(kind, user?.name); api('/api/fake-alert', { kind, zone, severity }) }}
             className="glass flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 py-1.5 text-sm hover:border-white/20">
             <AlertIcon kind={kind} className="text-amber-300" /> {alertText(kind).text} <span className="text-zinc-500">{zoneLabel(zone)}</span>
           </button>
