@@ -178,7 +178,7 @@ def test_headset_speech_is_analyzed_locally_and_takes_caption_meta(monkeypatch):
         node.send_bytes(np.zeros(SAMPLE_RATE * 4, np.float32).tobytes())
         node.send_text('{"type": "caption_meta", "ts": %r, "speaker": 2, "to_you": true}' % entry["ts"])
         msg = dash.receive_json()
-        while msg['type'] == 'state':
+        while msg['type'] in ('state', 'mic_levels'):
             msg = dash.receive_json()
     assert msg["type"] == "caption" and msg["to_you"] and msg["speaker"] == 2
     assert seen  # the local beep detector looked at the headset mic; no network call
