@@ -510,6 +510,22 @@ async def make_recap(body: RecapRequest):
     return await asyncio.to_thread(recap, segs, body.title)
 
 
+class PresenterDir(BaseModel):
+    corner: int  # 1 top right, 2 top left, 3 bottom right, 4 bottom left
+
+
+@app.post("/api/presenter_dir")
+async def presenter_dir(body: PresenterDir):
+    """The presenter says which corner a sound came from (keys 1-4 on the dashboard). This is a
+    demo control, not sound localization: it is sent as `presenter_set` and logged that way."""
+    if body.corner not in (1, 2, 3, 4):
+        return {"error": "corner must be 1, 2, 3 or 4"}
+    msg = {"type": "presenter_dir", "corner": body.corner, "presenter_set": True, "ts": time.time()}
+    eventlog.record(msg)
+    await hub.broadcast(["hud", "dashboard"], msg)
+    return {"ok": True}
+
+
 @app.post("/api/mode")
 async def set_mode(body: ModeChange):
     if body.mode not in MODES:
