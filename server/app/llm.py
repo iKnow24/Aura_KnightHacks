@@ -1,6 +1,6 @@
 """Ask a language model for JSON (lecture recap, voice-made modes).
 
-Uses the same provider switch as Ask Lumen (agent.py: LUMEN_LLM=groq|claude|xai|hf|off, first key
+Uses the same provider switch as Ask Lumen (agent.py: LUMEN_LLM=groq|claude|xai|gemini|hf|off, first key
 found wins), so there is one setting for the whole app. Optionally, a small open model on our own
 AMD GPU (set LUMEN_LOCAL_LLM to a Hugging Face model id, e.g. Qwen/Qwen2.5-3B-Instruct) answers
 when no provider does: nothing leaves the box, but it's far weaker and shares the GPU with Whisper.
