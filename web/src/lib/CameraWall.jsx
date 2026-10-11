@@ -2,10 +2,13 @@ import { AnimatePresence, motion, useMotionValue, useReducedMotion, useSpring } 
 import { Maximize2, RefreshCw, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { closeCameras, listCameras, localSource, openCamera, phoneSource } from './cameras'
+import { assign, closeCameras, fillSlots, listCameras, localSource, openCamera, phoneSource } from './cameras'
 import TalkingHeads from './TalkingHeads'
-import { zoneLabel } from './zones'
+import { alertText, SEVERITY_COLOR, zoneLabel } from './zones'
 
+const STORE = 'lumen.wall'
+const load = () => { try { return JSON.parse(localStorage.getItem(STORE)) || {} } catch { return {} } }
+const save = (slots) => { try { localStorage.setItem(STORE, JSON.stringify(slots)) } catch { /* private window */ } }
 
 // Laptop cameras, refreshed when one is plugged in or unplugged.
 export function useLaptopCameras() {
@@ -22,59 +25,55 @@ export function useLaptopCameras() {
   return { cams, error, refresh }
 }
 
-const MAIN = 'lumen.stage'
-const loadMain = () => { try { return localStorage.getItem(MAIN) } catch { return null } }
-const saveMain = (id) => { try { localStorage.setItem(MAIN, id) } catch { /* private window */ } }
-
-// The control center's camera stage: one big live view that tilts slightly toward the mouse, and every
-// other source as a small angled card beside it. Click a card (or press 1-9) to put it on the stage;
-// click the stage to open it full screen (Esc closes). Only sources that exist get a card: no empty boxes.
-export function useCameraStage({ nodes, previews, now, connected, cams, camError, onAskCameras }) {
+// The control center's camera wall: one big main view and a camera on each side.
+// Click a side camera (or press 1 / 2) to swap it into the main view; each tile's menu picks any source.
+// The main view is a 3D stage wired to the brain: what OWLv2 sees on the AMD GPU (and how long it took)
+// runs along its bottom, alerts light up its edge, and clicking it opens it full screen (Esc closes).
+// Returns the three tiles plus the full-screen layer so the dashboard can place them in its own grid.
+export function useCameraWall({ nodes, previews, now, connected, cams, camError, onAskCameras, alert }) {
   const sources = useMemo(() => {
     const phones = [...new Set(Object.values(nodes).filter((n) => now - n.last_seen < 10).map((n) => n.zone))]
       .map((zone) => ({ id: phoneSource(zone), label: `${zoneLabel(zone)} phone`, zone }))
-    // Laptop cameras first: on the demo, the Mac webcam is the camera worth looking at.
+    // Laptop cameras first: on the demo the Mac webcam is the camera worth putting in the middle.
     return [...cams.map((c) => ({ id: localSource(c.id), label: c.label.replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, ''), deviceId: c.id })), ...phones]
   }, [nodes, now, cams])
-  const [picked, setPicked] = useState(loadMain)
-  const [open, setOpen] = useState(false)
-  const main = sources.find((s) => s.id === picked) ?? sources[0]
-  const others = sources.filter((s) => s !== main)
-  const show = (id) => { setPicked(id); saveMain(id) }
-  const previewOf = (s) => s?.zone && latestPreview(previews, nodes, s.zone, now, connected)
+  const ids = sources.map((s) => s.id)
+  const [picked, setPicked] = useState(load)
+  const slots = fillSlots(picked, ids)
+  const choose = (slot, id) => setPicked(() => { const next = assign(slots, slot, id); save(next); return next })
 
-  const latest = useRef(others)
-  latest.current = others
+  const [open, setOpen] = useState(false)
+  const latest = useRef(slots)
+  latest.current = slots
   useEffect(() => {
     const onKey = (e) => {
       if (e.target.closest?.('input, textarea, select') || e.metaKey || e.ctrlKey || e.altKey) return
       if (e.key === 'Escape') setOpen(false)
-      const next = latest.current[Number(e.key) - 1]
-      if (next) show(next.id)
+      const side = { 1: 'left', 2: 'right' }[e.key]
+      if (side && latest.current[side]) choose('center', latest.current[side])
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
-  useEffect(() => { if (!main) setOpen(false) }, [main])
+  })
 
-  const stage = !main
-    ? <div className="relative aspect-video overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
-        <Empty anySources={false} hasCams={cams.length > 0} camError={camError} onAskCameras={onAskCameras} />
-      </div>
-    : open
-      ? <div className="aspect-video rounded-2xl border border-white/5" />
-      : <Stage key={main.id} source={main} preview={previewOf(main)} onOpen={() => setOpen(true)} />
-
-  const side = others.map((s, i) => (
-    <SideCard key={s.id} source={s} n={i + 1} preview={previewOf(s)} onShow={() => show(s.id)} />
-  ))
-
+  const mainSource = sources.find((s) => s.id === slots.center)
+  useEffect(() => { if (!mainSource) setOpen(false) }, [mainSource])
+  const tile = (slot) => {
+    const source = sources.find((s) => s.id === slots[slot])
+    return (
+      <Tile key={slot} slot={slot} source={source} sources={sources} onChoose={(id) => choose(slot, id)}
+        alert={slot === 'center' ? alert : null} open={slot === 'center' && open} onOpen={() => setOpen(true)}
+        onPromote={slot === 'center' || !source ? null : () => choose('center', source.id)}
+        preview={source?.zone && latestPreview(previews, nodes, source.zone, now, connected)}
+        empty={<Empty slot={slot} anySources={sources.length > 0} camError={camError} onAskCameras={onAskCameras} hasCams={cams.length > 0} />} />
+    )
+  }
   const full = createPortal(
     <AnimatePresence>
-      {open && main && <FullView key="full" source={main} preview={previewOf(main)} onClose={() => setOpen(false)} />}
+      {open && mainSource && <FullView key="full" source={mainSource} alert={alert} onClose={() => setOpen(false)}
+        preview={mainSource.zone && latestPreview(previews, nodes, mainSource.zone, now, connected)} />}
     </AnimatePresence>, document.body)
-
-  return { stage, side, full, count: sources.length }
+  return { center: tile('center'), left: tile('left'), right: tile('right'), full }
 }
 
 // Newest preview from any phone in this room that's still connected.
@@ -86,74 +85,89 @@ function latestPreview(previews, nodes, zone, now, connected) {
 
 const EASE = [0.2, 0.7, 0.2, 1]
 
-// The big view. A few degrees of tilt toward the mouse and a soft glow underneath give it depth.
-function Stage({ source, preview, onOpen }) {
+function Tile({ slot, source, sources, onChoose, onPromote, preview, empty, alert, open, onOpen }) {
+  const main = slot === 'center'
   const still = useReducedMotion()
+  // Side cameras lean in toward the main view, like screens around a desk; they straighten on hover.
+  const lean = still ? 0 : slot === 'left' ? 9 : slot === 'right' ? -9 : 0
+  // The main view tilts a few degrees toward the mouse.
   const rx = useMotionValue(0), ry = useMotionValue(0)
   const tiltX = useSpring(rx, { stiffness: 120, damping: 18 }), tiltY = useSpring(ry, { stiffness: 120, damping: 18 })
   const move = (e) => {
-    if (still) return
+    if (!main || still) return
     const r = e.currentTarget.getBoundingClientRect()
-    ry.set(((e.clientX - r.left) / r.width - 0.5) * 6)
-    rx.set(-((e.clientY - r.top) / r.height - 0.5) * 5)
+    ry.set(((e.clientX - r.left) / r.width - 0.5) * 5)
+    rx.set(-((e.clientY - r.top) / r.height - 0.5) * 4)
   }
-  const leave = () => { rx.set(0); ry.set(0) }
+  const glow = alert ? SEVERITY_COLOR[alert.severity] : null
   return (
-    <div className="relative" style={{ perspective: 1600 }}>
-      <div aria-hidden className="pointer-events-none absolute -inset-x-6 -bottom-8 top-1/3 rounded-[40px] opacity-25 blur-[60px]"
-        style={{ background: 'linear-gradient(90deg, #FF8A3D, #FF4F7B 50%, #8B6CFF)' }} />
-      <motion.div layoutId={`cam-${source.id}`} onMouseMove={move} onMouseLeave={leave}
-        initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
-        style={{ rotateX: tiltX, rotateY: tiltY }} transition={{ duration: 0.55, ease: EASE }}
-        className="group relative aspect-video overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_40px_80px_-30px_rgb(0_0_0_/_0.9)]">
-        <Feed source={source} preview={preview} look />
-        <button onClick={onOpen} className="absolute inset-0 z-[1] cursor-zoom-in" aria-label={`Open ${source.label} full screen`} />
-        <Label source={source} />
-        <span className="glass-dark pointer-events-none absolute right-3 top-3 z-[2] flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium opacity-70 transition group-hover:opacity-100">
-          <Maximize2 size={13} /> Full screen
-        </span>
-        {/* A thin sheen across the glass, like a screen catching the light. */}
-        <span aria-hidden className="pointer-events-none absolute inset-0 z-[1] rounded-2xl"
-          style={{ background: 'linear-gradient(120deg, rgb(255 255 255 / 0.06), transparent 35%)', boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.06)' }} />
-      </motion.div>
+    <div className="relative h-full" style={{ perspective: 1400 }}>
+      {main && <div aria-hidden className="pointer-events-none absolute -inset-x-4 -bottom-6 top-1/2 rounded-[40px] opacity-25 blur-[50px]"
+        style={{ background: glow ?? 'linear-gradient(90deg, #FF8A3D, #FF4F7B 50%, #8B6CFF)' }} />}
+      <motion.figure onMouseMove={move} onMouseLeave={() => { rx.set(0); ry.set(0) }}
+        style={main ? { rotateX: tiltX, rotateY: tiltY } : undefined}
+        initial={main ? false : { rotateY: lean }} animate={main ? undefined : { rotateY: lean }}
+        whileHover={main || !source ? undefined : { rotateY: 0, scale: 1.015 }} transition={{ duration: 0.5, ease: EASE }}
+        className={`group relative h-full min-h-0 overflow-hidden rounded-2xl border bg-black shadow-[0_30px_60px_-30px_rgb(0_0_0_/_0.9)] ${main ? 'min-h-[240px]' : 'min-h-[150px]'}`}
+        >
+        <div className="absolute inset-0 rounded-2xl transition-[box-shadow,border-color] duration-500"
+          style={{ boxShadow: glow ? `inset 0 0 0 2px ${glow}, inset 0 0 60px ${glow}55` : 'inset 0 0 0 1px rgb(255 255 255 / 0.08)' }} />
+        {!source ? empty
+          : open ? <div className="absolute inset-0 grid place-items-center text-sm text-zinc-500">Showing full screen</div>
+          : <Feed source={source} preview={preview} look={main} />}
+        {onPromote && (
+          <button onClick={onPromote} className="absolute inset-0 z-[1] cursor-pointer" aria-label={`Show ${source.label} in the main view`} />
+        )}
+        {main && source && !open && (
+          <button onClick={onOpen} className="absolute inset-0 z-[1] cursor-zoom-in" aria-label={`Open ${source.label} full screen`} />
+        )}
+        <figcaption className="glass-dark absolute left-2 top-2 z-[2] flex max-w-[calc(100%-1rem)] items-center gap-2 rounded-full py-0.5 pl-1 pr-1 text-xs">
+          {!main && <kbd className="rounded-full bg-zinc-800 px-1.5 text-[10px] text-zinc-400">{slot === 'left' ? 1 : 2}</kbd>}
+          {source && <span className="live-dot ml-1 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />}
+          <select value={source?.id ?? ''} onChange={(e) => onChoose(e.target.value)} aria-label={`${slot} camera`}
+            className="min-w-0 max-w-44 truncate rounded-full bg-transparent py-0.5 font-medium outline-none">
+            {!source && <option value="">No camera</option>}
+            {sources.map((s) => <option key={s.id} value={s.id} className="bg-ink">{s.label}</option>)}
+          </select>
+        </figcaption>
+        {main && source && !open && (
+          <button onClick={onOpen} className="glass-dark absolute right-2 top-2 z-[2] flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium"
+            title="Full screen" aria-label="Full screen">
+            <Maximize2 size={13} /> Full screen
+          </button>
+        )}
+        {main && <AlertBanner alert={alert} />}
+      </motion.figure>
     </div>
   )
 }
 
-// A smaller source, angled like a card on a shelf. It straightens up on hover; click to put it on the stage.
-function SideCard({ source, n, preview, onShow }) {
+// The alert the brain just fired, across the top of the main view.
+function AlertBanner({ alert }) {
   return (
-    <div style={{ perspective: 1000 }}>
-      <motion.button onClick={onShow} transition={{ duration: 0.45, ease: EASE }}
-        initial={{ rotateY: -14 }} whileHover={{ rotateY: 0, scale: 1.02 }} animate={{ rotateY: -14 }}
-        className="relative block aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-black text-left shadow-[0_24px_50px_-24px_rgb(0_0_0_/_0.9)]"
-        aria-label={`Show ${source.label} on the main view`}>
-        <Feed source={source} preview={preview} />
-        <Label source={source} small n={n} />
-      </motion.button>
-    </div>
+    <AnimatePresence>
+      {alert && (
+        <motion.div key={alert.id} initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.4, ease: EASE }}
+          className="glass-dark pointer-events-none absolute left-1/2 top-12 z-[3] -translate-x-1/2 rounded-full px-4 py-2 text-sm font-semibold"
+          style={{ boxShadow: `0 0 0 1px ${SEVERITY_COLOR[alert.severity]}, 0 0 30px ${SEVERITY_COLOR[alert.severity]}88` }}>
+          {alertText(alert.kind).text} <span className="font-normal text-zinc-400">· {zoneLabel(alert.zone)}</span>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
 
-function Label({ source, small, n }) {
-  return (
-    <span className={`glass-dark pointer-events-none absolute left-2 top-2 z-[2] flex max-w-[calc(100%-1rem)] items-center gap-2 rounded-full ${small ? 'px-2 py-0.5 text-[11px]' : 'px-3 py-1.5 text-xs'} font-medium`}>
-      {n && <kbd className="rounded-full bg-white/10 px-1.5 text-[10px] text-zinc-300">{n}</kbd>}
-      <span className="live-dot h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
-      <span className="truncate">{source.label}</span>
-    </span>
-  )
-}
-
-// Full screen: the stage zooms out to fill the window. Faces, names and the headset box keep running.
-function FullView({ source, preview, onClose }) {
+// Full screen: the main camera fills the window. Faces, names, the headset box and the brain readout keep running.
+function FullView({ source, preview, alert, onClose }) {
   const box = useRef()
   return (
-    <motion.div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      transition={{ duration: 0.35 }} onClick={onClose}>
-      <motion.div ref={box} layoutId={`cam-${source.id}`} transition={{ duration: 0.55, ease: EASE }} onClick={(e) => e.stopPropagation()}
+    <motion.div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }} onClick={onClose}>
+      <motion.div ref={box} initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+        transition={{ duration: 0.45, ease: EASE }} onClick={(e) => e.stopPropagation()}
         className="absolute inset-0 overflow-hidden bg-black sm:inset-4 sm:rounded-2xl sm:border sm:border-white/10">
         <Feed source={source} preview={preview} look />
+        <AlertBanner alert={alert} />
         <div className="absolute inset-x-0 top-0 z-[3] flex items-center gap-2 bg-gradient-to-b from-black/70 to-transparent p-4">
           <span className="glass-dark flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium">
             <span className="live-dot h-2 w-2 rounded-full bg-emerald-400" /> {source.label}
@@ -208,7 +222,8 @@ function LaptopFeed({ deviceId, label, look }) {
   if (error) return <p className="absolute inset-0 grid place-items-center p-4 text-center text-sm text-zinc-400">{label}: {error}</p>
   return <>
     <video ref={video} playsInline muted aria-label={`${label} camera`} className="absolute inset-0 h-full w-full object-contain" />
-    {seen && <Highlights seen={seen} />}
+    {seen?.objects && <Highlights seen={seen} />}
+    {look && seen !== 'off' && <BrainReadout seen={seen} />}
     {look && <TalkingHeads videoRef={video} />}
   </>
 }
@@ -233,13 +248,31 @@ function useSeen(video, on) {
         c.getContext('2d').drawImage(v, 0, 0, c.width, c.height)
         const r = await fetch('/api/look', { method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ jpeg: c.toDataURL('image/jpeg', 0.6) }) })
-        if (r.status === 503 || r.status === 404) clearInterval(timer)  // no vision model / demo site
+        if (r.status === 503 || r.status === 404) { clearInterval(timer); if (live) setSeen('off') } // no vision model / demo site
         if (r.ok && live) setSeen({ ...(await r.json()), aspect: c.width / c.height })
       } catch { /* brain offline: try again next tick */ } finally { busy = false }
     }, LOOK_MS)
     return () => { live = false; clearInterval(timer); setSeen(null) }
   }, [on])
   return seen
+}
+
+// Along the bottom of the main view: what the brain saw in the last frame, on which GPU, how fast.
+// Straight from POST /api/look (OWLv2 on the AMD box); nothing here is made up on the laptop.
+function BrainReadout({ seen }) {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] flex items-end gap-3 bg-gradient-to-t from-black/75 to-transparent px-4 pb-3 pt-10 text-xs">
+      <span className="flex items-center gap-2 font-medium uppercase tracking-[0.25em] text-zinc-400">
+        <span className={`h-1.5 w-1.5 rounded-full ${seen ? 'live-dot bg-[#FF4F7B]' : 'bg-zinc-600'}`} /> Brain
+      </span>
+      {seen
+        ? <>
+            <span className="min-w-0 flex-1 truncate text-sm font-medium text-white">{seen.summary || 'nothing new'}</span>
+            <span className="tabular shrink-0 text-zinc-400">{seen.model} · {Math.round(seen.inference_ms)} ms{seen.device ? ` · ${seen.device}` : ''}</span>
+          </>
+        : <span className="text-zinc-500">waiting for the first frame from the AMD brain</span>}
+    </div>
+  )
 }
 
 // Boxes drawn in the same space as the video (object-contain), so they line up at any tile size.
@@ -265,12 +298,12 @@ function Highlights({ seen }) {
   )
 }
 
-function Empty({ anySources, hasCams, camError, onAskCameras }) {
+function Empty({ slot, anySources, hasCams, camError, onAskCameras }) {
   return (
     <div className="absolute inset-0 grid place-items-center p-4 text-center text-sm text-zinc-400">
       <div className="space-y-2">
-        <p>{anySources ? 'Pick a camera.' : 'No cameras yet. Add phones, or use this laptop’s cameras.'}</p>
-        {!hasCams && (
+        <p>{anySources ? 'Pick a camera from the menu.' : slot === 'center' ? 'No cameras yet. Add phones, or use this laptop’s cameras.' : 'No camera'}</p>
+        {!hasCams && (slot === 'center' || camError) && (
           <button onClick={onAskCameras} className="glass inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-zinc-200 hover:border-white/20">
             <RefreshCw size={14} /> Use laptop cameras
           </button>
