@@ -6,9 +6,9 @@ import { Wordmark } from '../lib/Logo'
 const PAGES = [
   ['/captions', 'Live captions', 'The wearer\'s phone. Words as they\'re spoken, Home / Lecture / Outside modes, alerts that grow until you tap them.', AudioLines],
   ['/dashboard', 'Caregiver dashboard', 'Laptop or tablet. Floor plan, live alerts, Ask Lumen, mode switch. Needs sign in.', LayoutDashboard],
-  ['/node?zone=living', 'Camera/mic node', 'Any spare phone. Change ?zone= to the room it sits in. Listens, tracks falls, remembers where things are.', ScanLine],
+  ['/node?zone=kitchen', 'Camera/mic node', 'Any spare phone. Change ?zone= to the room it sits in. Listens, tracks falls, and watches the counter for a spill.', ScanLine],
   ['/mic', 'Speaker mic', 'One phone in front of each person you talk to. Captions get labeled with their name.', Mic],
-  ['/rear', 'Rear guard', 'Outside mode. A phone on the back of your bag that warns you when someone or something comes up behind you.', Radar],
+  ['/rear', 'Rear guard', 'Outside mode. A phone on the back of your bag. Warns when a person or a car comes up behind you.', Radar],
   ['/strobe', 'Bedside strobe', 'Android phone by the bed. Flashes and vibrates on critical alerts (Night mode).', BedDouble],
 ]
 

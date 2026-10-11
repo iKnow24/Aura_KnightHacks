@@ -5,6 +5,7 @@ from collections import deque
 import os
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import numpy as np
 from fastapi import FastAPI, Header, HTTPException, Response, WebSocket, WebSocketDisconnect
@@ -58,7 +59,9 @@ COOLDOWN_S = 10
 last_alert: dict[tuple[str, str], float] = {}
 
 # Memory for "Ask Lumen": what was said (Whisper) and where things were last seen (OWLv2).
-memory = Memory()
+# Spoken lines land in data/conversations.jsonl (text only). Tests opt out with LUMEN_TESTING=1.
+memory = Memory(None if os.environ.get("LUMEN_TESTING") == "1"
+                else Path(__file__).resolve().parents[2] / "data" / "conversations.jsonl")
 profile = {"name": os.environ.get("LUMEN_NAME", "")}  # set at login; used for name calling
 transcriber = Transcriber()
 voices = Voices()  # who's talking, by voiceprint (named ones saved to VOICE_FILE)
@@ -150,6 +153,7 @@ async def run_speech(zone: str, audio: np.ndarray):
                     and e["zone"] == replaced["zone"] and e["text"] == replaced["text"]), None)
         if old:
             memory.entries.remove(old)
+            memory.save()
             msg["replaces"] = caption_id(old)
     await hub.broadcast(["dashboard", "hud"], msg)
     if enabled("name_call") and mentions_name(text, profile["name"]):
@@ -213,6 +217,13 @@ async def handle_approach(zone: str, data: dict):
     hit = APPROACH_KINDS.get(data.get("label", ""))
     if hit and enabled("rear_vision"):
         await emit_detected(hit[0], zone, hit[1], source="rear_vision", confidence=float(data.get("score", 1.0)))
+
+
+async def handle_spill(zone: str, data: dict):
+    # The kitchen phone decided a new puddle is sitting on the counter. Same rule as a
+    # rear-camera approach: the phone measures, the brain only sends the alert.
+    if enabled("spill"):
+        await emit_detected("spill", zone, "warning", source="spill_vision", confidence=float(data.get("score", 0.8)))
 
 
 def enabled(detector: str) -> bool:
@@ -489,7 +500,9 @@ def forget_voices():
 
 @app.get("/api/memory")
 def get_memory():
-    return {"entries": [{k: v for k, v in e.items() if k != "thumb"} for e in memory.entries[-100:]],
+    speech = [e for e in memory.entries if e.get("type") == "speech"][-500:]
+    other = [e for e in memory.entries if e.get("type") != "speech"][-50:]
+    return {"entries": [{k: v for k, v in e.items() if k != "thumb"} for e in other + speech],
             "models": {"whisper": model_status(transcriber), "voices": model_status(voices), "items": model_status(item_finder),
                        "llm": model_status(local_llm)}}
 
@@ -580,6 +593,8 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
                         await emit_detected("fall", zone, "critical", source="fall")
                 elif data.get("type") == "approach":
                     await handle_approach(zone, data)
+                elif data.get("type") == "spill":
+                    await handle_spill(zone, data)
                 elif data.get("type") == "scene":
                     # What a camera phone sees right now, for the walking-figure view. Not stored.
                     side = "rear" if zone == "behind" else "front"

@@ -10,7 +10,7 @@ const ICONS = {
   baby_cry: Baby, timer: Timer, kettle: Coffee, phone_ring: PhoneCall, knock: DoorClosed,
   alarm_clock: AlarmClock, water_running: Droplets, dog_bark: Dog, car_alarm: Siren, car_horn: Megaphone,
   siren: Ambulance, vehicle: Car, bike_bell: Bike, reversing: Truck, person_behind: Footprints,
-  vehicle_behind: Car, bike_behind: Bike,
+  vehicle_behind: Car, bike_behind: Bike, spill: Droplets,
 }
 
 // Sized in em so it follows the surrounding text size, like the emoji it replaces.

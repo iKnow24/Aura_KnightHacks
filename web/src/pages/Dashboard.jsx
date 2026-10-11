@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, useBrain } from '../lib/useBrain'
 import AlertIcon from '../lib/AlertIcon'
 import AskLumen from '../lib/AskLumen'
@@ -9,11 +9,6 @@ import Conversation, { useCaptions } from '../lib/Conversation'
 import QrPanel from '../lib/QrPanel'
 import { Wordmark } from '../lib/Logo'
 import { getUser, signOut } from '../lib/user'
-// 3D view of the home (Gaussian splat scan). Three.js only loads when someone taps 3D.
-const HomeScan = lazy(() => import('../lib/HomeScan'))
-const SHOW_3D = false // 3D home scan button switched off for the demo; set true to bring it back
-// The headset wearer as a 3D figure (bottom left). Also three.js, so also split out.
-const Avatar3D = lazy(() => import('../lib/Avatar3D'))
 import { alertText, SEVERITY_COLOR, ZONES, zoneLabel } from '../lib/zones'
 
 const FAKES = [
@@ -24,6 +19,8 @@ const FAKES = [
   ['timer', 'living', 'warning'],
   ['car_horn', 'wearer', 'critical'],
   ['person_behind', 'behind', 'warning'],
+  ['vehicle_behind', 'behind', 'critical'],
+  ['spill', 'kitchen', 'warning'],
 ]
 
 // Room outlines behind the zone labels, drawn in the same 0-100 space as ZONES x/y.
@@ -40,7 +37,6 @@ export default function Dashboard() {
   const [ripples, setRipples] = useState([])
   const [showQr, setShowQr] = useState(false)
   const [tab, setTab] = useState('live')
-  const [scan, setScan] = useState(false)
   const [previews, setPreviews] = useState({})
   const [vision, setVision] = useState({})
   const user = getUser()
@@ -107,8 +103,7 @@ export default function Dashboard() {
     )
   }
 
-  // Control center: main camera in the middle, a camera on each side, the headset wearer in 3D
-  // bottom left, the house plan bottom right. Messages and the timeline below.
+  // Control center: main camera in the middle, a camera on the left, a camera and the house plan on the right.
   return (
     <main className="min-h-full overflow-x-hidden p-4">
       {header}
@@ -116,32 +111,26 @@ export default function Dashboard() {
 
       <section className="grid gap-3 lg:h-[min(74vh,780px)] lg:grid-cols-[minmax(0,1fr)_minmax(0,2.3fr)_minmax(0,1fr)] lg:grid-rows-2">
         <div className="min-h-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">{wall.center}</div>
-        <div className="min-h-0 lg:col-start-1 lg:row-start-1">{wall.left}</div>
+        <div className="min-h-0 lg:col-start-1 lg:row-span-2 lg:row-start-1">{wall.left}</div>
         <div className="min-h-0 lg:col-start-3 lg:row-start-1">{wall.right}</div>
-        <div className="min-h-0 lg:col-start-1 lg:row-start-2">
-          <Suspense fallback={<div className="glass h-full min-h-[200px] rounded-xl" />}><Avatar3D cams={laptop.cams} /></Suspense>
-        </div>
         <div className="min-h-0 lg:col-start-3 lg:row-start-2">
           {/* Floor plan. Skeletons and zone status only: no live video, for privacy. */}
           <div className="glass relative aspect-[4/3] h-full overflow-hidden rounded-xl sm:aspect-[16/10] lg:aspect-auto">
-            {SHOW_3D && <button onClick={() => setScan((v) => !v)} aria-pressed={scan}
-              className="glass absolute right-3 top-3 z-10 rounded-full px-3 py-1 text-xs font-semibold tracking-wide hover:border-white/20">
-              {scan ? 'PLAN' : '3D'}
-            </button>}
-            {scan ? (
-              <Suspense fallback={null}>
-                <HomeScan ripples={ripples} onFail={() => setScan(false)}
-                  live={new Set(Object.values(state.nodes).filter((n) => now - n.last_seen < 10).map((n) => n.zone))} />
-              </Suspense>
-            ) : <>
             <FloorPlan />
             {Object.entries(ZONES).filter(([, z]) => z.map !== false).map(([id, z]) => {
               const alive = Object.values(state.nodes).some((n) => n.zone === id && now - n.last_seen < 10)
+              const said = captions.lines.filter((l) => l.zone === id)
+              const latest = said[said.length - 1]
               return (
                 <div key={id} className="absolute -translate-x-1/2 -translate-y-1/2 text-center" style={{ left: `${z.x}%`, top: `${z.y}%` }}>
                   <div className={`mx-auto mb-2 h-2 w-2 rounded-full ${alive ? 'live-dot bg-emerald-400' : 'border border-zinc-600'}`} />
                   <div className="text-sm font-medium">{z.label}</div>
                   <div className={`text-xs ${alive ? 'text-emerald-300' : 'text-zinc-500'}`}>{alive ? 'node live' : 'no node'}</div>
+                  {latest && (
+                    <div className="mx-auto mt-1 max-w-[9rem] text-xs font-semibold leading-snug text-white">
+                      “{latest.text.length > 42 ? `${latest.text.slice(0, 41)}…` : latest.text}”
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -162,7 +151,6 @@ export default function Dashboard() {
                 )
               })}
             </AnimatePresence>
-            </>}
           </div>
         </div>
       </section>

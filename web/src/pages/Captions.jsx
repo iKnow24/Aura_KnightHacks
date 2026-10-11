@@ -23,9 +23,9 @@ import { alertText, SEVERITY_COLOR, ZONES, zoneLabel } from '../lib/zones'
 // Talk to change modes: "switch mode", "lecture mode", "add a new mode" (then describe it).
 
 const LISTENING_FOR = {
-  wearer: ['timer', 'kettle', 'doorbell', 'knock', 'phone_ring', 'smoke_alarm', 'name_called'],
+  wearer: ['timer', 'kettle', 'doorbell', 'knock', 'phone_ring', 'smoke_alarm', 'name_called', 'spill'],
   lecture: ['name_called', 'smoke_alarm', 'phone_ring'],
-  outside: ['car_horn', 'siren', 'vehicle', 'bike_bell', 'person_behind', 'name_called'],
+  outside: ['car_horn', 'siren', 'vehicle', 'bike_bell', 'person_behind', 'vehicle_behind', 'name_called'],
 }
 const MAIN_MODES = ['wearer', 'lecture', 'outside']
 const HIDE_BAR_MS = 4000
@@ -70,7 +70,8 @@ const SOUND_CUE = {
   phone_ring: 'PHONE RINGING', knock: 'KNOCKING', alarm_clock: 'ALARM CLOCK RINGING', water_running: 'WATER RUNNING',
   dog_bark: 'DOG BARKING', car_horn: 'CAR HORN HONKS', siren: 'SIREN WAILING', vehicle: 'CAR APPROACHING',
   bike_bell: 'BIKE BELL RINGS', reversing: 'TRUCK REVERSING', glass_break: 'GLASS SHATTERS', baby_cry: 'BABY CRYING',
-  name_called: 'SOMEONE CALLS YOUR NAME', person_behind: 'FOOTSTEPS BEHIND YOU', vehicle_behind: 'VEHICLE BEHIND YOU',
+  name_called: 'SOMEONE CALLS YOUR NAME', person_behind: 'SOMEONE BEHIND YOU', vehicle_behind: 'CAR BEHIND YOU',
+  spill: 'SOMETHING SPILLED',
 }
 
 function tail(text, maxChars) {

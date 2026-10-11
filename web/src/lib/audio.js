@@ -35,7 +35,7 @@ export async function streamMic(send, onLevel, { cleanup = false } = {}) {
 }
 
 // A node socket that reconnects on its own. Returns { send, close }.
-export function nodeSocket(nodeId, zone, onStatus) {
+export function nodeSocket(nodeId, zone, onStatus, onMessage) {
   let ws, retry, heartbeat, closed = false
   const connect = () => {
     if (closed) return
@@ -48,6 +48,7 @@ export function nodeSocket(nodeId, zone, onStatus) {
         if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'heartbeat' }))
       }, 3000)
     }
+    ws.onmessage = (e) => { try { onMessage?.(JSON.parse(e.data)) } catch { /* not json */ } }
     ws.onclose = () => {
       clearInterval(heartbeat)
       if (closed) return

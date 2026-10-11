@@ -12,14 +12,14 @@ STREET_SOUNDS = ["car_horn", "siren", "vehicle", "bike_bell", "reversing", "dog_
 MODES = {
     "watch": {
         "label": "Watch (caregiver)",
-        "detectors": ["alarm_dsp", "ast_sound", "fall"],
+        "detectors": ["alarm_dsp", "ast_sound", "fall", "spill"],
         "sound_kinds": HOME_SOUNDS,
         "fall_stillness_s": 8,
         "routes": {"critical": ["dashboard", "hud"], "warning": ["dashboard", "hud"], "info": ["dashboard"]},
     },
     "wearer": {
         "label": "Home",
-        "detectors": ["alarm_dsp", "ast_sound", "name_call", "fall"],
+        "detectors": ["alarm_dsp", "ast_sound", "name_call", "fall", "spill"],
         "sound_kinds": HOME_SOUNDS,
         "fall_stillness_s": 8,
         "routes": {"critical": ["hud", "dashboard"], "warning": ["hud", "dashboard"], "info": ["hud"]},

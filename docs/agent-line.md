@@ -47,7 +47,8 @@ Every alert in the system is this JSON, and nothing else (see `server/app/hub.py
 ```
 
 - `kind`: smoke_alarm, doorbell, name_called, fall, glass_break, baby_cry
-  - everyday (home): timer, kettle, phone_ring, knock, alarm_clock, water_running, dog_bark, car_alarm
+  - everyday (home): timer, kettle, phone_ring, knock, alarm_clock, water_running, dog_bark, car_alarm, spill
+    (spill comes from a still kitchen camera, not from a sound model)
   - outside: car_horn, siren, vehicle (only when getting louder), bike_bell, reversing,
     person_behind, vehicle_behind, bike_behind (from the rear camera phone, zone `behind`)
   - Each mode's `sound_kinds` in `server/app/modes.py` decides which of these it listens for.
@@ -87,6 +88,7 @@ Voice "add a new mode": `POST /api/modes {"description"}` builds a mode, switche
 Acknowledging: any screen calls `POST /api/ack {"id": alert_id, "by": "wearer"}`; every screen gets
 `{"type": "ack", "id", "ts", "by"}` and drops the alert, and the dashboard timeline shows "seen at".
 Rear guard phone sends `{"type": "approach", "label": "person" | "car" | ..., "score", "area"}` on its node socket.
+A room camera sends `{"type": "spill", "score", "area"}` when a new puddle sits still on the counter (Home and Watch modes).
 Lecture recap: `POST /api/recap {"segments": [{"text", "ts"}], "title"}` returns
 `{"title", "summary", "points", "map": {"center", "branches": [{"label", "ts", "details"}]}, "quiz": [{"q", "choices", "answer"}], "people", "brain": "groq" | "claude" | "xai" | "local" | "rules"}`.
 Ask Lumen: `POST /api/ask {"question": "..."}` returns `{"answer", "evidence": [log entries], "brain": "groq" | "claude" | "xai" | "rules"}`.
