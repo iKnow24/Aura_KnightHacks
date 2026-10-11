@@ -120,7 +120,7 @@ def test_provider_choice(monkeypatch):
     assert name == "hf" and "huggingface.co" in url and key == "h" and model == "openai/gpt-oss-20b"
     monkeypatch.setenv("GEMINI_API_KEY", "m")
     name, url, key, model = pick_provider()
-    assert name == "gemini" and "googleapis.com" in url and key == "m" and model == "gemini-2.5-flash"
+    assert name == "gemini" and "googleapis.com" in url and key == "m" and model == "gemini-3.8-flash"
     monkeypatch.setenv("XAI_API_KEY", "x")
     assert pick_provider()[0] == "xai"
     monkeypatch.setenv("GROQ_API_KEY", "g")
@@ -182,3 +182,34 @@ def test_headset_speech_is_analyzed_locally_and_takes_caption_meta(monkeypatch):
             msg = dash.receive_json()
     assert msg["type"] == "caption" and msg["to_you"] and msg["speaker"] == 2
     assert seen  # the local beep detector looked at the headset mic; no network call
+
+
+def test_gemini_thought_signature_is_sent_back(monkeypatch):
+    """Gemini rejects the second request if a tool call's extra_content isn't echoed back."""
+    import sys
+    import types
+    from app import agent
+
+    def B(**kw): return types.SimpleNamespace(**kw)
+
+    sig = {"google": {"thought_signature": "abc"}}
+    call = B(id="t1", function=B(name="last_seen", arguments='{"item": "keys"}'), extra_content=sig)
+    replies = [B(content=None, tool_calls=[call]), B(content="Living room.", tool_calls=None)]
+    sent = []
+
+    class Client:
+        def __init__(self, **kw):
+            self.chat = B(completions=B(create=self.create))
+        def create(self, **kw):
+            sent.append(list(kw["messages"]))
+            return B(choices=[B(message=replies.pop(0))])
+
+    monkeypatch.setitem(sys.modules, "openai", types.SimpleNamespace(OpenAI=Client))
+    for k in ("LUMEN_LLM", "GROQ_API_KEY", "ANTHROPIC_API_KEY", "XAI_API_KEY"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    m = Memory()
+    seed_demo(m)
+    agent.answer("where are my keys", m, [])
+    assistant = [msg for msg in sent[1] if msg["role"] == "assistant"][0]
+    assert assistant["tool_calls"][0]["extra_content"] == sig
