@@ -15,8 +15,8 @@ AS SELECT
 FROM STREAM read_files(
   '/Volumes/lumen/home/raw_events/',
   format => 'json',
-  -- The vision columns (scene JSON from the cameras) are listed so the vision tables exist before the first photo.
-  schemaHints => 'ts DOUBLE, id STRING, speaker INT, to_you BOOLEAN, confidence DOUBLE, node_id STRING, people INT, posture STRING, summary STRING, model STRING, device STRING, inference_ms DOUBLE, total_ms DOUBLE, counts MAP<STRING, INT>, objects ARRAY<STRUCT<label: STRING, score: DOUBLE, box: ARRAY<DOUBLE>, bearing: DOUBLE, dist: DOUBLE>>'
+  -- Vision columns (scene JSON) plus the risk fields, so those tables exist before the first event.
+  schemaHints => 'ts DOUBLE, id STRING, speaker INT, to_you BOOLEAN, confidence DOUBLE, danger DOUBLE, risk_limit DOUBLE, over_limit BOOLEAN, node_id STRING, people INT, posture STRING, summary STRING, model STRING, device STRING, inference_ms DOUBLE, total_ms DOUBLE, counts MAP<STRING, INT>, objects ARRAY<STRUCT<label: STRING, score: DOUBLE, box: ARRAY<DOUBLE>, bearing: DOUBLE, dist: DOUBLE>>'
 );
 
 -- ============================== SILVER ==============================
@@ -50,6 +50,24 @@ CREATE OR REFRESH STREAMING TABLE silver_speakers
 COMMENT 'Who said each line (person number) and whether they were facing the wearer.'
 AS SELECT household, ts AS speech_ts, speaker, to_you
 FROM STREAM bronze_events WHERE type = 'caption_meta';
+
+CREATE OR REFRESH STREAMING TABLE silver_risks
+COMMENT 'Street warnings. danger is how dangerous this one was, from 0 to 1. risk_limit is the line; at or above it, warning is warning or critical.'
+AS SELECT
+  household, id AS risk_id, kind, zone, place, danger, risk_limit, warning, over_limit,
+  timestamp_seconds(ts) AS at
+FROM STREAM bronze_events WHERE type = 'risk';
+
+CREATE OR REFRESH STREAMING TABLE silver_reminders
+COMMENT 'Reminders Lumen gave Maria, such as a pill or locking the door.'
+AS SELECT household, id AS reminder_id, what, zone, place, timestamp_seconds(ts) AS at
+FROM STREAM bronze_events WHERE type = 'reminder' AND length(trim(what)) > 0;
+
+CREATE OR REFRESH STREAMING TABLE silver_interactions
+COMMENT 'What someone did next: stepped aside, took the pill, locked the door.'
+AS SELECT
+  household, action, `by` AS who, risk_id, reminder_id, timestamp_seconds(ts) AS at
+FROM STREAM bronze_events WHERE type = 'interaction';
 
 CREATE OR REFRESH STREAMING TABLE silver_sightings (
   CONSTRAINT confident EXPECT (confidence >= 0.3) ON VIOLATION DROP ROW

@@ -19,7 +19,7 @@ export function useCaptions() {
   // A line arrives once from Whisper, then again once the headset says who said it: merge by ts.
   const add = (c) => setLines((list) => {
     const i = list.findIndex((x) => x.ts === c.ts)
-    return i < 0 ? [...list, c].slice(-40) : list.map((x, j) => (j === i ? { ...x, ...c } : x))
+    return i < 0 ? [...list, c].slice(-500) : list.map((x, j) => (j === i ? { ...x, ...c } : x))
   })
   return { lines, add, reload: () => fetch('/api/memory').then((r) => r.json()).then((m) => setLines(m.entries.filter((e) => e.type === 'speech'))) }
 }

@@ -29,7 +29,7 @@ Real data starts when you turn this on, so it covers hours, not weeks.
 **1. Databricks (browser).** Sign up for Free Edition. In the SQL editor run the three `CREATE`
 lines from `README.md` step 2. Create the pipeline from `README.md` step 3 but don't run it yet (it needs at least one file), and
 don't upload the sample files.
-Then **Settings → Developer → Access tokens → Generate**. Keep the token on your Mac only, never in chat.
+The sync does not use an access token. On the Mac, sign in once with the Databricks CLI (step 4). That login stays in `~/.databrickscfg` under the profile name `lumen`.
 
 **2. A job that runs the pipeline.** Jobs & Pipelines → **Create → Job** → task type **Pipeline** →
 pick the Lumen pipeline → Create. The job id is the number in the page's URL (`/jobs/<id>`).
@@ -43,12 +43,12 @@ EVENT_LOG_DIR=$HOME/lumen_events LUMEN_HOUSEHOLD=home LUMEN_SYNC_KEY=pick-a-pass
 **4. Your Mac**, in the repo folder (`git pull` first), in a new Terminal tab while the Jupyter bridge is running:
 
 ```bash
-export DATABRICKS_HOST=https://YOUR-WORKSPACE.cloud.databricks.com
-export DATABRICKS_TOKEN=PASTE-TOKEN-HERE
-export DATABRICKS_JOB_ID=PASTE-JOB-ID-HERE
+databricks auth login --host https://dbc-2559c3a9-bfb4.cloud.databricks.com --profile lumen
 export LUMEN_SYNC_KEY=pick-a-password
 python3 scripts/databricks_sync.py
 ```
+
+The script signs in with the `lumen` profile, uploads to `/Volumes/lumen/home/raw_events/`, and starts job `1103380381835252`. If that job was recreated, set `DATABRICKS_JOB_ID` to the new id from the job's side panel. Before the demo, run the login command again in case it expired, then `databricks jobs list --profile lumen` and look for `lumen_pipeline_run`.
 
 It prints a line each time it uploads (`uploaded 2026-10-10_19-000000.jsonl (12 events)`) and
 when it starts the job. Leave it running.

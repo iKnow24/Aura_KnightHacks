@@ -184,7 +184,7 @@ function Figure({ poseRef, onReady, onGait }) {
     if (!fig) return
     dt = Math.min(dt, 0.1)
     const walking = isWalking(poseRef.current, gait.current, dt)
-    if (walking !== wasWalking.current) { wasWalking.current = walking; onGait(walking) }
+    if (walking !== wasWalking.current) { wasWalking.current = walking; onGait?.(walking) }
     resetRig(fig.rig)
     fig.mixer.update(dt)
     // A walk cycle fills in the legs the camera cannot see. Tracked points still win, so a real step shows.

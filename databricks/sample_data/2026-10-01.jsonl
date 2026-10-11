@@ -3,55 +3,165 @@
 {"type": "alert", "id": "1790840820.000", "kind": "car_alarm", "zone": "outside", "severity": "warning", "source": "ast", "confidence": 0.85, "ts": 1790840820.0, "household": "maria"}
 {"type": "ack", "id": "1790840820.000", "by": "wearer", "ts": 1790840827.6154146, "household": "maria"}
 {"type": "mode", "mode": "watch", "ts": 1790852400.0, "household": "maria"}
+{"type": "risk", "id": "risk-1790852881", "kind": "vehicle", "zone": "behind", "place": "Oak Street", "danger": 0.85, "risk_limit": 0.55, "warning": "critical", "over_limit": true, "ts": 1790852881.0, "household": "maria"}
+{"type": "interaction", "action": "stepped onto the curb and waited", "by": "Rosa", "ts": 1790852969.0, "risk_id": "risk-1790852881", "household": "maria"}
+{"type": "risk", "id": "risk-1790853096", "kind": "reversing", "zone": "behind", "place": "Driveway", "danger": 0.61, "risk_limit": 0.55, "warning": "warning", "over_limit": true, "ts": 1790853096.0, "household": "maria"}
+{"type": "interaction", "action": "stopped walking until it passed", "by": "Rosa", "ts": 1790853140.0, "risk_id": "risk-1790853096", "household": "maria"}
+{"type": "speech", "zone": "hallway", "place": "Porch", "text": "Good morning, Maria. It's Rosa.", "ts": 1790853145.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790853145.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "hallway", "place": "Front door", "text": "Shoes are by the door. Short walk first, then breakfast.", "ts": 1790853252.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790853252.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "risk", "id": "risk-1790853278", "kind": "car_horn", "zone": "behind", "place": "Intersection", "danger": 0.53, "risk_limit": 0.55, "warning": "none", "over_limit": false, "ts": 1790853278.0, "household": "maria"}
+{"type": "interaction", "action": "kept walking, under the risk limit", "by": "Rosa", "ts": 1790853324.0, "risk_id": "risk-1790853278", "household": "maria"}
+{"type": "sighting", "item": "glasses", "zone": "bedroom", "place": "Nightstand", "confidence": 0.89, "ts": 1790853647.0, "household": "maria"}
 {"type": "alert", "id": "1790853961.000", "kind": "alarm_clock", "zone": "bedroom", "severity": "warning", "source": "ast", "confidence": 0.95, "ts": 1790853961.0, "household": "maria"}
 {"type": "ack", "id": "1790853961.000", "by": "wearer", "ts": 1790853966.263356, "household": "maria"}
+{"type": "reminder", "id": "rem-1790854814", "what": "Take the blue pill", "zone": "kitchen", "place": "Table", "ts": 1790854814.0, "household": "maria"}
+{"type": "speech", "zone": "kitchen", "place": "Table", "text": "Sit here. I set out the blue pill and a glass of water.", "ts": 1790854881.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790854881.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "kitchen", "place": "Table", "text": "Did you take the blue pill this morning?", "ts": 1790854991.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790854991.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "interaction", "action": "took the blue pill", "by": "Maria", "ts": 1790855058.0, "reminder_id": "rem-1790854814", "household": "maria"}
+{"type": "sighting", "item": "pills", "zone": "kitchen", "place": "Table", "confidence": 0.52, "ts": 1790855286.0, "household": "maria"}
+{"type": "interaction", "action": "called Ana, like last night's reminder", "by": "Maria", "ts": 1790855412.0, "household": "maria"}
 {"type": "alert", "id": "1790856360.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.84, "ts": 1790856360.0, "household": "maria"}
 {"type": "ack", "id": "1790856360.000", "by": "wearer", "ts": 1790856363.6305711, "household": "maria"}
+{"type": "speech", "zone": "kitchen", "place": "Stove", "text": "Oatmeal is ready. The kettle just clicked off.", "ts": 1790856400.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790856400.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "sighting", "item": "keys", "zone": "hallway", "place": "Front door", "confidence": 0.64, "ts": 1790856935.0, "household": "maria"}
+{"type": "speech", "zone": "living", "place": "Sofa", "text": "Blood pressure is the usual. I'll write it in the book.", "ts": 1790857320.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790857320.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "living", "place": "Sofa", "text": "Mom, I'm heading out, back around six.", "ts": 1790858913.0, "speaker": 1, "household": "maria"}
+{"type": "caption_meta", "ts": 1790858913.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "hallway", "place": "Front door", "text": "Call me if you need anything. Rosa has my number.", "ts": 1790858940.0, "speaker": 1, "household": "maria"}
+{"type": "caption_meta", "ts": 1790858940.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "sighting", "item": "wallet", "zone": "kitchen", "place": "Table", "confidence": 0.88, "ts": 1790859345.0, "household": "maria"}
 {"type": "alert", "id": "1790859792.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.87, "ts": 1790859792.0, "household": "maria"}
 {"type": "ack", "id": "1790859792.000", "by": "wearer", "ts": 1790859798.0717943, "household": "maria"}
-{"type": "speech", "zone": "wearer", "text": "I'm making soup, want some?", "ts": 1790863065.0, "household": "maria"}
-{"type": "caption_meta", "ts": 1790863065.0, "speaker": 3, "to_you": true, "household": "maria"}
-{"type": "speech", "zone": "wearer", "text": "Grandma, look at this video!", "ts": 1790864662.0, "household": "maria"}
-{"type": "caption_meta", "ts": 1790864662.0, "speaker": 4, "to_you": true, "household": "maria"}
-{"type": "sighting", "item": "keys", "zone": "kitchen", "confidence": 0.54, "ts": 1790866920.0, "household": "maria"}
+{"type": "speech", "zone": "bedroom", "place": "Nightstand", "text": "Glasses are on the nightstand, not the bed.", "ts": 1790860581.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790860581.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "bedroom", "place": "Bed", "text": "Did you sleep okay last night?", "ts": 1790860709.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790860709.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "kitchen", "place": "Table", "text": "Grocery list is on the table: milk, bread, bananas, and the blue pill refill.", "ts": 1790862927.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790862927.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "kitchen", "place": "Sink", "text": "I'm washing the breakfast pan. Stay clear of the wet floor.", "ts": 1790863508.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790863508.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "living", "place": "Coffee table", "text": "Mail is here. One letter from the clinic, the rest can wait.", "ts": 1790863928.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790863928.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "hallway", "place": "Porch", "text": "Your package is on the porch.", "ts": 1790865194.0, "speaker": 3, "household": "maria"}
+{"type": "caption_meta", "ts": 1790865194.0, "speaker": 3, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "hallway", "place": "Front door", "text": "I'll bring the package in so it doesn't sit in the sun.", "ts": 1790865307.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790865307.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "sighting", "item": "keys", "zone": "hallway", "place": "Front door", "confidence": 0.61, "ts": 1790865637.0, "household": "maria"}
+{"type": "speech", "zone": "hallway", "place": "Porch", "text": "Maria, the sprinkler on my side is off. Yours looked fine this morning.", "ts": 1790866219.0, "speaker": 3, "household": "maria"}
+{"type": "caption_meta", "ts": 1790866219.0, "speaker": 3, "to_you": true, "household": "maria"}
 {"type": "alert", "id": "1790867715.000", "kind": "phone_ring", "zone": "living", "severity": "warning", "source": "ast", "confidence": 0.74, "ts": 1790867715.0, "household": "maria"}
 {"type": "ack", "id": "1790867715.000", "by": "wearer", "ts": 1790867721.5631182, "household": "maria"}
-{"type": "speech", "zone": "wearer", "text": "The plumber is coming Tuesday at ten.", "ts": 1790870933.0, "household": "maria"}
-{"type": "caption_meta", "ts": 1790870933.0, "speaker": 1, "to_you": false, "household": "maria"}
+{"type": "speech", "zone": "living", "place": "Sofa", "text": "Your appointment moved to Thursday at 2.", "ts": 1790868008.0, "speaker": 2, "household": "maria"}
+{"type": "caption_meta", "ts": 1790868008.0, "speaker": 2, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "living", "place": "Coffee table", "text": "Please bring your medication list to the visit.", "ts": 1790868158.0, "speaker": 2, "household": "maria"}
+{"type": "caption_meta", "ts": 1790868158.0, "speaker": 2, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "kitchen", "place": "Table", "text": "I'll put the medication list next to your wallet.", "ts": 1790868251.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790868251.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "kitchen", "place": "Sink", "text": "Windows are open a crack. Tell me if it gets too warm.", "ts": 1790870110.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790870110.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "reminder", "id": "rem-1790870402", "what": "Eat lunch", "zone": "kitchen", "place": "Table", "ts": 1790870402.0, "household": "maria"}
+{"type": "sighting", "item": "glasses", "zone": "kitchen", "place": "Table", "confidence": 0.76, "ts": 1790870713.0, "household": "maria"}
+{"type": "speech", "zone": "kitchen", "place": "Table", "text": "Lunch is soup and a sandwich today.", "ts": 1790871028.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790871028.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "interaction", "action": "sat down for lunch", "by": "Maria", "ts": 1790871155.0, "reminder_id": "rem-1790870402", "household": "maria"}
 {"type": "alert", "id": "1790871332.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.85, "ts": 1790871332.0, "household": "maria"}
 {"type": "ack", "id": "1790871332.000", "by": "wearer", "ts": 1790871335.3754246, "household": "maria"}
 {"type": "alert", "id": "1790871948.000", "kind": "doorbell", "zone": "hallway", "severity": "warning", "source": "ast", "confidence": 0.75, "ts": 1790871948.0, "household": "maria"}
 {"type": "ack", "id": "1790871948.000", "by": "wearer", "ts": 1790871955.496963, "household": "maria"}
-{"type": "sighting", "item": "glasses", "zone": "living", "confidence": 0.49, "ts": 1790872620.0, "household": "maria"}
-{"type": "speech", "zone": "wearer", "text": "I fixed the TV remote.", "ts": 1790874218.0, "household": "maria"}
-{"type": "caption_meta", "ts": 1790874218.0, "speaker": 4, "to_you": false, "household": "maria"}
-{"type": "sighting", "item": "glasses", "zone": "bedroom", "confidence": 0.5, "ts": 1790874420.0, "household": "maria"}
+{"type": "speech", "zone": "kitchen", "place": "Stove", "text": "Soup is hot. Give it a minute.", "ts": 1790872106.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790872106.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "kitchen", "place": "Sink", "text": "Dishes can wait. You eat first.", "ts": 1790873180.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790873180.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "living", "place": "Sofa", "text": "News is on low. I'll turn it up if you want the weather.", "ts": 1790874307.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790874307.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "living", "place": "TV", "text": "Afternoon storms again. We'll stay in if the thunder starts.", "ts": 1790874509.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790874509.0, "speaker": 5, "to_you": true, "household": "maria"}
 {"type": "alert", "id": "1790874699.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.79, "ts": 1790874699.0, "household": "maria"}
 {"type": "ack", "id": "1790874699.000", "by": "wearer", "ts": 1790874708.935668, "household": "maria"}
 {"type": "alert", "id": "1790875056.000", "kind": "phone_ring", "zone": "living", "severity": "warning", "source": "ast", "confidence": 0.78, "ts": 1790875056.0, "household": "maria"}
 {"type": "ack", "id": "1790875056.000", "by": "wearer", "ts": 1790875060.3133914, "household": "maria"}
-{"type": "sighting", "item": "wallet", "zone": "hallway", "confidence": 0.42, "ts": 1790875680.0, "household": "maria"}
+{"type": "speech", "zone": "living", "place": "Sofa", "text": "Mom, I paid the electric bill. The confirmation is in your email.", "ts": 1790875341.0, "speaker": 1, "household": "maria"}
+{"type": "caption_meta", "ts": 1790875341.0, "speaker": 1, "to_you": true, "household": "maria"}
 {"type": "alert", "id": "1790876657.000", "kind": "kettle", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.82, "ts": 1790876657.0, "household": "maria"}
 {"type": "ack", "id": "1790876657.000", "by": "wearer", "ts": 1790876665.5912187, "household": "maria"}
-{"type": "speech", "zone": "wearer", "text": "I'm making soup, want some?", "ts": 1790884131.0, "household": "maria"}
-{"type": "caption_meta", "ts": 1790884131.0, "speaker": 3, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "kitchen", "place": "Table", "text": "Snack is cheese and crackers. Water is the glass on your right.", "ts": 1790880003.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790880003.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "sighting", "item": "remote", "zone": "living", "place": "Coffee table", "confidence": 0.8, "ts": 1790882435.0, "household": "maria"}
+{"type": "speech", "zone": "hallway", "place": "Front door", "text": "Walker is by the door, brakes on.", "ts": 1790883909.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790883909.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "bedroom", "place": "Bed", "text": "I changed the sheets. The light blanket is at the foot of the bed.", "ts": 1790885115.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790885115.0, "speaker": 5, "to_you": true, "household": "maria"}
 {"type": "alert", "id": "1790885474.000", "kind": "doorbell", "zone": "hallway", "severity": "warning", "source": "ast", "confidence": 0.74, "ts": 1790885474.0, "household": "maria"}
+{"type": "risk", "id": "risk-1790885474", "kind": "reversing", "zone": "behind", "place": "Driveway", "danger": 0.84, "risk_limit": 0.55, "warning": "critical", "over_limit": true, "ts": 1790885474.017, "household": "maria"}
 {"type": "ack", "id": "1790885474.000", "by": "wearer", "ts": 1790885482.9045413, "household": "maria"}
-{"type": "sighting", "item": "glasses", "zone": "living", "confidence": 0.48, "ts": 1790888040.0, "household": "maria"}
+{"type": "interaction", "action": "stepped onto the curb and waited", "by": "Ana", "ts": 1790885546.0, "risk_id": "risk-1790885474", "household": "maria"}
+{"type": "risk", "id": "risk-1790885642", "kind": "car_horn", "zone": "behind", "place": "Intersection", "danger": 0.76, "risk_limit": 0.55, "warning": "warning", "over_limit": true, "ts": 1790885642.0, "household": "maria"}
+{"type": "interaction", "action": "stopped walking until it passed", "by": "Ana", "ts": 1790885703.0, "risk_id": "risk-1790885642", "household": "maria"}
+{"type": "sighting", "item": "pills", "zone": "bedroom", "place": "Nightstand", "confidence": 0.57, "ts": 1790885744.0, "household": "maria"}
+{"type": "reminder", "id": "rem-1790885881", "what": "Check the pill organizer", "zone": "bedroom", "place": "Nightstand", "ts": 1790885881.0, "household": "maria"}
+{"type": "speech", "zone": "bedroom", "place": "Nightstand", "text": "I refilled your pill organizer for the week.", "ts": 1790886028.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790886028.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "interaction", "action": "checked the organizer with Rosa", "by": "Maria", "ts": 1790886259.0, "reminder_id": "rem-1790885881", "household": "maria"}
+{"type": "speech", "zone": "living", "place": "Coffee table", "text": "Remote is on the coffee table, keys are by the door.", "ts": 1790886972.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790886972.0, "speaker": 5, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "hallway", "place": "Front door", "text": "I'll be back tomorrow at nine.", "ts": 1790888714.0, "speaker": 5, "household": "maria"}
+{"type": "caption_meta", "ts": 1790888714.0, "speaker": 5, "to_you": true, "household": "maria"}
 {"type": "alert", "id": "1790888810.000", "kind": "timer", "zone": "kitchen", "severity": "info", "source": "ast", "confidence": 0.81, "ts": 1790888810.0, "household": "maria"}
 {"type": "ack", "id": "1790888810.000", "by": "wearer", "ts": 1790888823.5059416, "household": "maria"}
-{"type": "speech", "zone": "wearer", "text": "I put your glasses on the nightstand.", "ts": 1790889182.0, "household": "maria"}
-{"type": "caption_meta", "ts": 1790889182.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "hallway", "place": "Porch", "text": "Thanks, Rosa. I've got her from here.", "ts": 1790888891.0, "speaker": 1, "household": "maria"}
+{"type": "caption_meta", "ts": 1790888891.0, "speaker": 1, "to_you": true, "household": "maria"}
 {"type": "alert", "id": "1790889409.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.93, "ts": 1790889409.0, "household": "maria"}
 {"type": "ack", "id": "1790889409.000", "by": "wearer", "ts": 1790889411.8240895, "household": "maria"}
 {"type": "alert", "id": "1790889610.000", "kind": "doorbell", "zone": "hallway", "severity": "warning", "source": "ast", "confidence": 0.98, "ts": 1790889610.0, "household": "maria"}
 {"type": "ack", "id": "1790889610.000", "by": "wearer", "ts": 1790889615.9757152, "household": "maria"}
 {"type": "alert", "id": "1790889733.000", "kind": "name_called", "zone": "kitchen", "severity": "warning", "source": "ast", "confidence": 0.71, "ts": 1790889733.0, "household": "maria"}
 {"type": "ack", "id": "1790889733.000", "by": "wearer", "ts": 1790889742.0995798, "household": "maria"}
-{"type": "speech", "zone": "wearer", "text": "I'm making soup, want some?", "ts": 1790891652.0, "household": "maria"}
-{"type": "caption_meta", "ts": 1790891652.0, "speaker": 3, "to_you": false, "household": "maria"}
-{"type": "speech", "zone": "wearer", "text": "I put your glasses on the nightstand.", "ts": 1790895054.0, "household": "maria"}
-{"type": "caption_meta", "ts": 1790895054.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "kitchen", "place": "Stove", "text": "Rice is on. You can sit at the table.", "ts": 1790892120.0, "speaker": 1, "household": "maria"}
+{"type": "caption_meta", "ts": 1790892120.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "kitchen", "place": "Table", "text": "Fork is on the left. The soup is the front bowl.", "ts": 1790892375.0, "speaker": 1, "household": "maria"}
+{"type": "caption_meta", "ts": 1790892375.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "sighting", "item": "wallet", "zone": "living", "place": "Sofa", "confidence": 0.73, "ts": 1790892610.0, "household": "maria"}
+{"type": "speech", "zone": "kitchen", "place": "Table", "text": "Can you grab milk if you go out tomorrow?", "ts": 1790892993.0, "speaker": 1, "household": "maria"}
+{"type": "caption_meta", "ts": 1790892993.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "kitchen", "place": "Sink", "text": "I wiped the counter. The stove is off.", "ts": 1790893349.0, "speaker": 1, "household": "maria"}
+{"type": "caption_meta", "ts": 1790893349.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "kitchen", "place": "Stove", "text": "Dinner's ready, come eat!", "ts": 1790894073.0, "speaker": 1, "household": "maria"}
+{"type": "caption_meta", "ts": 1790894073.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "kitchen", "place": "Table", "text": "How was the soup? Too salty, or fine?", "ts": 1790894881.0, "speaker": 1, "household": "maria"}
+{"type": "caption_meta", "ts": 1790894881.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "living", "place": "Sofa", "text": "Want the news, or quiet?", "ts": 1790895091.0, "speaker": 1, "household": "maria"}
+{"type": "caption_meta", "ts": 1790895091.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "living", "place": "Sofa", "text": "Please bring your medication list to the visit.", "ts": 1790895726.0, "speaker": 2, "household": "maria"}
+{"type": "caption_meta", "ts": 1790895726.0, "speaker": 2, "to_you": false, "household": "maria"}
+{"type": "speech", "zone": "living", "place": "TV", "text": "Volume is at 18. Tell me if you want it louder.", "ts": 1790895924.0, "speaker": 1, "household": "maria"}
+{"type": "caption_meta", "ts": 1790895924.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "living", "place": "TV", "text": "The power might go out tonight, there's a storm coming.", "ts": 1790896328.0, "speaker": 3, "household": "maria"}
+{"type": "caption_meta", "ts": 1790896328.0, "speaker": 3, "to_you": false, "household": "maria"}
+{"type": "speech", "zone": "living", "place": "Coffee table", "text": "Water is on the coaster. I'll refill it before bed.", "ts": 1790897432.0, "speaker": 1, "household": "maria"}
+{"type": "caption_meta", "ts": 1790897432.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "bedroom", "place": "Bed", "text": "Bathroom light is on, so the hall isn't dark.", "ts": 1790899344.0, "speaker": 1, "household": "maria"}
+{"type": "caption_meta", "ts": 1790899344.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "bedroom", "place": "Bed", "text": "Call me when you wake up.", "ts": 1790899830.0, "speaker": 1, "household": "maria"}
+{"type": "caption_meta", "ts": 1790899830.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "speech", "zone": "bedroom", "place": "Nightstand", "text": "I put your glasses on the nightstand.", "ts": 1790900072.0, "speaker": 1, "household": "maria"}
+{"type": "caption_meta", "ts": 1790900072.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "sighting", "item": "glasses", "zone": "bedroom", "place": "Nightstand", "confidence": 0.87, "ts": 1790900303.0, "household": "maria"}
+{"type": "speech", "zone": "bedroom", "place": "Nightstand", "text": "Phone is charging. The big button calls me.", "ts": 1790900524.0, "speaker": 1, "household": "maria"}
+{"type": "caption_meta", "ts": 1790900524.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "reminder", "id": "rem-1790901304", "what": "Lock the front door", "zone": "hallway", "place": "Front door", "ts": 1790901304.0, "household": "maria"}
+{"type": "speech", "zone": "hallway", "place": "Front door", "text": "Door is locked. Night mode is on, so the bedroom phone will flash if the alarm goes.", "ts": 1790901631.0, "speaker": 1, "household": "maria"}
+{"type": "caption_meta", "ts": 1790901631.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "interaction", "action": "locked the door", "by": "Ana", "ts": 1790901662.0, "reminder_id": "rem-1790901304", "household": "maria"}
+{"type": "sighting", "item": "keys", "zone": "hallway", "place": "Front door", "confidence": 0.68, "ts": 1790901941.0, "household": "maria"}
+{"type": "speech", "zone": "hallway", "place": "Porch", "text": "Porch light is on. I'm heading out, back in the morning.", "ts": 1790903109.0, "speaker": 1, "household": "maria"}
+{"type": "caption_meta", "ts": 1790903109.0, "speaker": 1, "to_you": true, "household": "maria"}
+{"type": "reminder", "id": "rem-1790903411", "what": "Call Ana in the morning", "zone": "bedroom", "place": "Nightstand", "ts": 1790903411.0, "household": "maria"}
 {"type": "mode", "mode": "night", "ts": 1790908200.0, "household": "maria"}
 {"type": "alert", "id": "1790911620.000", "kind": "doorbell", "zone": "hallway", "severity": "warning", "source": "ast", "confidence": 0.96, "ts": 1790911620.0, "household": "maria"}
 {"type": "ack", "id": "1790911620.000", "by": "wearer", "ts": 1790911636.3800366, "household": "maria"}
