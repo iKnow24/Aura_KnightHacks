@@ -101,7 +101,7 @@ export default function Landing() {
 
       {/* Hero */}
       <section className="relative flex min-h-[100svh] flex-col items-center justify-center px-6 text-center">
-        <div aria-hidden className="pointer-events-none absolute left-1/2 top-[42%] h-[60vmin] w-[60vmin] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-25 blur-[90px]" style={{ background: ECLIPSE }} />
+        <div aria-hidden className="pointer-events-none absolute left-1/2 top-[42%] h-[60vmin] w-[60vmin] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-[0.12] blur-[90px]" style={{ background: ECLIPSE }} />
         {show3d ? (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1.4, ease }}
             className="relative mt-10 h-[clamp(280px,46svh,540px)] w-screen max-w-[1500px]">
@@ -160,7 +160,7 @@ export default function Landing() {
       </section>
       <section className="px-4 pb-[6vh] pt-[14vh] sm:px-10" style={{ perspective: 1400 }}>
         <motion.div ref={shot} style={{ scale: shotScale, rotateX: shotTilt }} className="relative mx-auto max-w-6xl origin-bottom">
-          <div aria-hidden className="absolute -inset-x-10 -bottom-10 top-1/3 rounded-[48px] opacity-30 blur-[80px]" style={{ background: ECLIPSE }} />
+          <div aria-hidden className="absolute -inset-x-10 -bottom-10 top-1/3 rounded-[48px] opacity-[0.14] blur-[80px]" style={{ background: ECLIPSE }} />
           <img src={img('history.jpg')} alt="The History tab: time to notice alerts and missed alerts per day"
             width={1920} height={1333} className="relative h-auto w-full rounded-2xl border border-white/10 shadow-2xl" loading="lazy" />
         </motion.div>
@@ -196,7 +196,7 @@ export default function Landing() {
 
       {/* Hand-off */}
       <section id="start" className="relative flex min-h-[90svh] flex-col items-center justify-center overflow-hidden px-6 text-center">
-        <div aria-hidden className="pointer-events-none absolute bottom-[-30vmin] left-1/2 h-[70vmin] w-[90vmin] -translate-x-1/2 rounded-full opacity-25 blur-[100px]" style={{ background: ECLIPSE }} />
+        <div aria-hidden className="pointer-events-none absolute bottom-[-30vmin] left-1/2 h-[70vmin] w-[90vmin] -translate-x-1/2 rounded-full opacity-[0.12] blur-[100px]" style={{ background: ECLIPSE }} />
         <motion.div {...rise()}><Logo size={56} /></motion.div>
         <motion.h2 {...rise(0.05)} className="mt-8 text-[clamp(2.5rem,7vw,5.5rem)] font-semibold leading-[0.95] tracking-[-0.04em]">See it live.</motion.h2>
         <motion.p {...rise(0.1)} className="mt-5 max-w-md text-lg text-zinc-400">The phones in this room are listening right now.</motion.p>

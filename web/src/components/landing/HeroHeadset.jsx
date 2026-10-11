@@ -14,21 +14,18 @@ import { idlePose, makeRig, poseRig, resetRig } from '../../lib/avatarRig'
 import { ECLIPSE } from '../ui/Timeline'
 
 // Landing hero: a head in a headset. Sound travels in from the left as a waveform, enters the headset
-// at the temple, and comes out in front of the lens as a caption card. A loop of three moments: a name
-// called from the kitchen, the doorbell, someone talking. All built in code (no model files), the only
-// color is the Eclipse gradient, used as rim light, the waveform and the strip under the lens.
+// at the temple, and comes out in front of the lens as a caption card. One moment, repeated: someone
+// calls Maya's name from the kitchen. The Eclipse gradient is the only color, on the wave and the card.
 
 const ORANGE = new THREE.Color('#FF8A3D')
 const PINK = new THREE.Color('#FF4F7B')
 const PURPLE = new THREE.Color('#8B6CFF')
 const TRAVEL = 1.1 // seconds for sound to cross from the left edge to the headset
-const LOOP = 17
+const LOOP = 8.4
 const WORD_EVERY = 0.26
 
 const BEATS = [
   { kind: 'speech', at: 0.3, len: 5.6, who: 'Dad', where: 'Kitchen', text: 'Maya, dinner’s ready. Come on down!', name: true },
-  { kind: 'bell', at: 6.4, len: 4.3, title: 'Doorbell', where: 'Front door' },
-  { kind: 'speech', at: 11.2, len: 5.4, who: 'Sam', where: 'Living room', text: 'It’s the package. I’ll grab it.' },
 ].map((b) => ({ ...b, words: b.text?.split(' ') }))
 
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t) }
@@ -49,7 +46,7 @@ function loudness(t) {
   }
   return a
 }
-const isBell = (t) => { t = ((t % LOOP) + LOOP) % LOOP; return t > BEATS[1].at - 0.2 && t < BEATS[1].at + 3 }
+const isBell = () => false // the hero has no doorbell beat any more; kept so the spark code reads the same
 
 // A head built from a rounded box, not a stretched sphere: a box has real flat planes (forehead,
 // cheek, jaw) meeting at edges, which reads as "a face" at a glance in a way any sphere, however it's
@@ -192,10 +189,21 @@ function loadAvatar() {
       o.frustumCulled = false
       for (const m of [o.material].flat()) {
         if (!m) continue
-        if (/hair|afro|eyebrow|eyelash/i.test(m.name)) Object.assign(m, { alphaTest: 0.45, transparent: false, depthWrite: true, side: THREE.DoubleSide })
+        if (/hair|afro|eyebrow|eyelash/i.test(m.name)) Object.assign(m, { alphaTest: 0.62, transparent: false, depthWrite: true, side: THREE.DoubleSide })
         else if (!/high-poly|cornea/i.test(m.name)) m.transparent = false
         if (/high-poly/i.test(m.name)) o.visible = false // eye-wetness shell, would show as a grey film
       }
+    })
+    // A smaller headset, closer to the Tecknet in the team's photos: shrink the shell about its own center.
+    scene.traverse((o) => {
+      if (!o.isMesh || !/^headset_Cube/.test(o.name)) return
+      o.geometry.computeBoundingBox()
+      const mid = o.geometry.boundingBox.getCenter(new THREE.Vector3())
+      o.updateMatrix()
+      const before = mid.clone().applyMatrix4(o.matrix)
+      o.scale.multiply(new THREE.Vector3(0.7, 0.66, 0.62))
+      o.updateMatrix()
+      o.position.add(before.sub(mid.applyMatrix4(o.matrix)))
     })
     // Arms down and relaxed (the file is in a T-pose), then measure where the headset ended up.
     scene.scale.setScalar(SCALE)
@@ -401,9 +409,9 @@ function Scene({ onBeat, overlay, narrow }) {
     <>
       <ambientLight intensity={0.08} />
       <directionalLight position={[3, 4, 5]} intensity={1.7} />
-      <directionalLight position={[-5, 1.5, -3]} intensity={5} color="#FF8A3D" />
-      <directionalLight position={[5, 2.5, -4]} intensity={5} color="#8B6CFF" />
-      <directionalLight position={[0, -3, 2]} intensity={0.6} color="#FF4F7B" />
+      <directionalLight position={[-5, 1.5, -3]} intensity={2.2} color="#FF8A3D" />
+      <directionalLight position={[5, 2.5, -4]} intensity={2.2} color="#8B6CFF" />
+      <directionalLight position={[0, -3, 2]} intensity={0.35} color="#FF4F7B" />
       <group ref={head} position={[narrow ? 0.2 : -0.5, 0, 0]} rotation={[0, 0.62, 0]}>
         {avatar && <primitive object={avatar.scene} />}
         {!avatar && <>
