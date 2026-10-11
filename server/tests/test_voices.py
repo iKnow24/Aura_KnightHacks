@@ -109,3 +109,22 @@ def test_teammates_are_saved_and_judges_are_not(tmp_path):
     assert again.guests == [] and "Person" not in open(path).read()
     again.forget()
     assert not (tmp_path / "voices.json").exists()
+
+
+def test_voices_page_enroll_who_remove(monkeypatch):
+    import base64
+    sharan, kha = person(), person()
+    current = {"voice": sharan}
+    monkeypatch.setattr(main, "voices", Voices(embed=lambda audio: clip(current["voice"])))
+    client = TestClient(main.app)
+    clip_b64 = base64.b64encode(np.full(16000 * 3, 0.05, np.float32).tobytes()).decode()
+    r = client.post("/api/voices/enroll", json={"name": "  sharan ", "audio": clip_b64})
+    assert r.json()["people"] == [{"name": "Sharan", "lines": 1}]
+    current["voice"] = kha
+    client.post("/api/voices/enroll", json={"name": "Kha", "audio": clip_b64})
+    assert client.post("/api/voices/who", json={"audio": clip_b64}).json()["voice"] == "Kha"
+    short = base64.b64encode(np.full(8000, 0.05, np.float32).tobytes()).decode()
+    assert client.post("/api/voices/enroll", json={"name": "Kha", "audio": short}).status_code == 400
+    assert client.post("/api/voices/enroll", json={"name": "", "audio": clip_b64}).status_code == 400
+    left = client.post("/api/voices/remove", json={"name": "Kha"}).json()["people"]
+    assert left == [{"name": "Sharan", "lines": 1}]

@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 from collections import deque
 import os
@@ -417,6 +418,45 @@ async def ask(body: Question):
 def get_voices():
     """Whose voices the brain knows (names and line counts, never the voiceprints) and recent match scores."""
     return {"model": model_status(voices), **voices.book.summary()}
+
+
+class VoiceClip(BaseModel):
+    audio: str  # base64 of 16 kHz mono float32, from the Voices page
+    name: str = ""
+
+
+def clip_vec(body: VoiceClip):
+    try:
+        audio = np.frombuffer(base64.b64decode(body.audio), np.float32)
+        return voices.embed_clip(audio)
+    except ValueError as e:
+        raise HTTPException(400, str(e) or "Couldn't read that recording.")
+
+
+@app.post("/api/voices/enroll")
+def enroll_voice(body: VoiceClip):
+    """Voices page: save this person's voice (each extra recording makes it more reliable)."""
+    name = " ".join(body.name.split())[:30].title()
+    if not name:
+        raise HTTPException(400, "Type a name first.")
+    voices.book.enroll(name, clip_vec(body))
+    return voices.book.summary()
+
+
+@app.post("/api/voices/who")
+def who_is_this(body: VoiceClip):
+    """Voices page test: which saved voice does this recording match?"""
+    return voices.book.who(clip_vec(body))
+
+
+class VoiceName(BaseModel):
+    name: str
+
+
+@app.post("/api/voices/remove")
+def remove_voice(body: VoiceName):
+    voices.book.remove(body.name)
+    return voices.book.summary()
 
 
 @app.post("/api/voices/forget")

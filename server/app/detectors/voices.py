@@ -35,6 +35,7 @@ MODEL = os.environ.get("VOICE_MODEL", "microsoft/wavlm-base-plus-sv")
 MIN_S = 1.4  # shorter lines get no voice label
 ENROLL_MIN_S = 1.6  # "my name is Sam" needs at least this much audio to become a voiceprint
 MAX_S = 8.0  # only the last 8 s of a long line are used
+CLIP_MIN_S = 2.0  # a Voices page recording must be at least this long
 # Cosine similarity cut-offs. The model card uses 0.86 on clean audio; phone mics in a loud room score
 # the same person lower, so we start a bit under. Tune on the box with GET /api/voices (recent scores).
 MATCH = float(os.environ.get("VOICE_MATCH", "0.80"))  # at or above: same person
@@ -136,6 +137,21 @@ class VoiceBook:
             self.guests.append({"label": label, "vec": vec, "n": 1})
             return {"voice": label, "voice_known": False, "voice_score": round(max(best, 0.0), 3)}
 
+    def who(self, vec: np.ndarray) -> dict:
+        """The Voices page's "Who is this?" check: best named match and its score. Changes nothing."""
+        vec = unit(vec)
+        with self.lock:
+            named = sorted(((float(p["vec"] @ vec), name) for name, p in self.people.items()), reverse=True)
+        if not named:
+            return {"voice": None, "voice_score": None}
+        score, name = named[0]
+        return {"voice": name if score >= MATCH else None, "closest": name, "voice_score": round(score, 3)}
+
+    def remove(self, name: str):
+        with self.lock:
+            self.people.pop(name, None)
+            self._save()
+
     def forget(self):
         with self.lock:
             self.people.clear()
@@ -191,6 +207,18 @@ class Voices:
                 self._failed = True
                 log.warning("Voice ID off (%s). Captions won't say who's talking.", e)
         return self._pipe
+
+    def embed_clip(self, audio: np.ndarray) -> np.ndarray:
+        """A recording from the Voices page. Raises ValueError with a message the page can show."""
+        if len(audio) < CLIP_MIN_S * SAMPLE_RATE:
+            raise ValueError(f"Too short. Talk for at least {CLIP_MIN_S:.0f} seconds.")
+        if float(np.sqrt(np.mean(audio ** 2))) < 0.003:
+            raise ValueError("Too quiet. Hold the phone closer and talk normally.")
+        embed = self._load()
+        if embed is None:
+            raise ValueError("The voice model isn't loaded on the brain.")
+        with self._lock:
+            return embed(audio[-int(MAX_S * SAMPLE_RATE):].astype(np.float32))
 
     def label(self, audio: np.ndarray, text: str) -> dict | None:
         """{"voice": "Sharan" | "Person 4", "voice_known": bool, "voice_score": float}, or None."""

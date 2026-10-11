@@ -48,3 +48,37 @@ export async function streamMic(zone = 'wearer', onLevel) {
     ctx.close()
   }
 }
+
+// Records `seconds` of this device's mic as 16 kHz mono float32 (for the Voices page).
+// onLevel gets the loudness while recording; returns the samples as base64.
+export async function recordClip(seconds, onLevel) {
+  const mic = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+  })
+  const ctx = new AudioContext({ sampleRate: 16000 })
+  const src = ctx.createMediaStreamSource(mic)
+  const proc = ctx.createScriptProcessor(4096, 1, 1)
+  const ratio = ctx.sampleRate / 16000
+  const chunks = []
+  src.connect(proc)
+  proc.connect(ctx.destination)
+  proc.onaudioprocess = (e) => {
+    const x = e.inputBuffer.getChannelData(0)
+    const out = new Float32Array(Math.floor(x.length / ratio))
+    let sum = 0
+    for (let i = 0; i < out.length; i++) { out[i] = x[Math.floor(i * ratio)]; sum += out[i] * out[i] }
+    chunks.push(out)
+    onLevel?.(Math.sqrt(sum / out.length))
+  }
+  await new Promise((r) => setTimeout(r, seconds * 1000))
+  proc.disconnect()
+  mic.getTracks().forEach((t) => t.stop())
+  ctx.close()
+  const all = new Float32Array(chunks.reduce((n, c) => n + c.length, 0))
+  let at = 0
+  for (const c of chunks) { all.set(c, at); at += c.length }
+  const bytes = new Uint8Array(all.buffer)
+  let bin = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  return btoa(bin)
+}
