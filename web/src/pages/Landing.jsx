@@ -44,12 +44,6 @@ const MEMORY = [
   { id: 'ask', step: 'Memory · 03', title: 'Ask the history', body: 'Genie and the History tab answer: is she noticing alerts slower than usual?', color: '#8B6CFF' },
 ]
 
-const MOMENTS = [
-  { kicker: '3:12 AM · Bedroom', line: 'A smoke alarm becomes a strobe by the bed.' },
-  { kicker: 'Kitchen · just now', line: 'Someone calls your name. Your phone tells you, and from which room.' },
-  { kicker: 'Living room', line: 'Captions float beside the face of whoever is talking.' },
-]
-
 const RULES = [
   { icon: EyeOff, title: 'No live video leaves a phone.', body: 'Phones send audio, pose points and one still every 5 seconds. The brain keeps a small crop of each item it finds, never the frame.' },
   { icon: ScanFace, title: 'No face recognition.', body: 'Names only come from someone saying “my name is…”. Voices are matched, faces never are.' },
@@ -139,32 +133,8 @@ export default function Landing() {
         </motion.a>}
       </section>
 
-      {/* Three moments */}
-      <section id="how" className="mx-auto max-w-6xl scroll-mt-16 px-6 py-[18vh] sm:px-10">
-        <motion.p {...rise()} className="text-xs font-medium uppercase tracking-[0.4em] text-zinc-500">What it does</motion.p>
-        <div className="mt-12 space-y-[12vh]">
-          {MOMENTS.map((m, i) => (
-            <motion.div key={m.line} {...rise()} className={i % 2 ? 'sm:ml-[18%]' : ''}>
-              <p className="text-sm tabular text-zinc-500">{m.kicker}</p>
-              <p className="mt-3 max-w-[22ch] text-[clamp(2rem,5vw,4.25rem)] font-semibold leading-[1.02] tracking-[-0.035em]">{m.line}</p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* Pipeline intro, then the pinned timeline */}
-      <section className="mx-auto max-w-6xl px-6 pb-[6vh] pt-[8vh] sm:px-10">
-        <motion.p {...rise()} className="text-xs font-medium uppercase tracking-[0.4em] text-zinc-500">Under the hood</motion.p>
-        <motion.h2 {...rise(0.05)} className="mt-6 max-w-[18ch] text-[clamp(2.25rem,5.5vw,4.75rem)] font-semibold leading-[1] tracking-[-0.04em]">
-          Two paths. One for <span className="whitespace-nowrap" style={gradientText}>right now</span>, one for remembering.
-        </motion.h2>
-        <motion.p {...rise(0.1)} className="mt-6 max-w-xl text-lg leading-relaxed text-zinc-400">
-          The live path turns a sound into light on the right screen. The memory path keeps a plain log so a caregiver can see, weeks later, that something changed.
-        </motion.p>
-      </section>
-
       {/* Live path: the real demo kit, wired to the brain */}
-      <section className="px-5 pb-[10vh] sm:px-10">
+      <section id="how" className="scroll-mt-16 px-5 pb-[10vh] pt-[12vh] sm:px-10">
         <motion.p {...rise()} className="mx-auto max-w-6xl text-xs font-medium uppercase tracking-[0.4em] text-zinc-500">Path one · Live</motion.p>
         <motion.h3 {...rise(0.05)} className="mx-auto mt-4 max-w-6xl text-[clamp(1.75rem,3.5vw,2.75rem)] font-semibold tracking-[-0.03em]">Four devices. One brain.</motion.h3>
         <div className="mt-10 sm:mt-4"><LiveMap /></div>
