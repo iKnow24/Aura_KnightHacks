@@ -166,8 +166,9 @@ def test_conversations_reload_from_disk_without_photos(tmp_path):
     assert Memory(path).entries == []
 
 
-def test_headset_speech_skips_alarm_detectors_and_takes_caption_meta(monkeypatch):
+def test_headset_speech_is_analyzed_locally_and_takes_caption_meta(monkeypatch):
     client = TestClient(main.app)
+    client.post("/api/mode", json={"mode": "wearer"})
     client.delete("/api/memory")
     entry = main.memory.add_speech("wearer", "Your pills are on the counter")
     seen = []
@@ -180,4 +181,4 @@ def test_headset_speech_skips_alarm_detectors_and_takes_caption_meta(monkeypatch
         while msg['type'] == 'state':
             msg = dash.receive_json()
     assert msg["type"] == "caption" and msg["to_you"] and msg["speaker"] == 2
-    assert not seen
+    assert seen  # the local beep detector looked at the headset mic; no network call

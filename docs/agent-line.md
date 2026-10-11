@@ -73,6 +73,7 @@ again with `speaker` and `to_you` filled in. `POST /api/fake-caption {"zone": "w
 Nodes send `{"type": "snapshot", "ts": ..., "jpeg": "data:image/jpeg;base64,..."}` every 5 s (turn off with `?items=0`).
 For an explicitly enabled camera demo, a room node can also send `{"type": "camera_preview", "ts": ..., "jpeg": "data:image/jpeg;base64,..."}` once per second.
 The brain forwards this only when `LUMEN_DEMO_PREVIEW=1`, to dashboard sockets only, with `node_id` and `zone` added.
+While that flag is on, the headset mic (zone `wearer`) is also copied to the dashboard as raw 16 kHz mono float32 binary frames so the laptop can play it with the picture. Those frames are not stored.
 These full-frame previews are never stored in memory or the event log. Normal sensor operation keeps previews off.
 Every snapshot also becomes one scene JSON line (`server/app/detectors/scene.py`), sent to dashboards and written to the event log; the photo itself is dropped:
 `{"type": "vision", "node_id", "zone", "ts", "source": "owlv2" | "phone", "people", "posture": "standing" | "sitting" | "lying" | "upright" | null, "objects": [{"label", "score", "box": [l, t, r, b] 0-1}], "counts", "summary", "model", "device", "inference_ms", "total_ms"}`.

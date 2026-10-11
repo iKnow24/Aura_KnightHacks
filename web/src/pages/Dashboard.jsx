@@ -1,9 +1,11 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { Maximize2, X } from 'lucide-react'
+import { Component, lazy, Suspense, useEffect, useState } from 'react'
 import { api, useBrain } from '../lib/useBrain'
 import AlertIcon from '../lib/AlertIcon'
 import AskLumen from '../lib/AskLumen'
 import { useCameraWall, useLaptopCameras } from '../lib/CameraWall'
 import History from '../lib/History'
+import Story from '../lib/Story'
 import Conversation, { useCaptions } from '../lib/Conversation'
 import QrPanel from '../lib/QrPanel'
 import { Wordmark } from '../lib/Logo'
@@ -53,7 +55,7 @@ export default function Dashboard() {
   }, [])
   const laptop = useLaptopCameras()
   const wall = useCameraWall({ nodes: state.nodes, previews, now, connected, cams: laptop.cams, camError: laptop.error,
-    onAskCameras: () => laptop.refresh(true) })
+    onAskCameras: () => laptop.refresh(true), alert: ripples.at(-1) })
 
   const header = (
     <header className="mb-3 flex flex-wrap items-center gap-3">
@@ -88,7 +90,7 @@ export default function Dashboard() {
 
   if (tab === 'history') {
     return (
-      <main className="min-h-full overflow-x-hidden p-4">
+      <main className="h-full overflow-y-auto overflow-x-hidden p-4">
         {header}
         <History />
       </main>
@@ -98,25 +100,31 @@ export default function Dashboard() {
   // Control center: main camera in the middle, a camera on each side, the headset wearer in 3D
   // bottom left, and the 3D sound field bottom right.
   return (
-    <main className="min-h-full overflow-x-hidden p-4">
+    <main className="h-full overflow-y-auto overflow-x-hidden p-4">
       {header}
-      {showQr && <QrPanel />}
+      {wall.full}
 
-      <section className="grid gap-3 lg:h-[min(74vh,780px)] lg:grid-cols-[minmax(0,1fr)_minmax(0,2.3fr)_minmax(0,1fr)] lg:grid-rows-2">
-        <div className="min-h-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">{wall.center}</div>
-        <div className="min-h-0 lg:col-start-1 lg:row-start-1">{wall.left}</div>
-        <div className="min-h-0 lg:col-start-3 lg:row-start-1">{wall.right}</div>
-        <div className="min-h-0 lg:col-start-1 lg:row-start-2">
-          <Suspense fallback={<div className="glass h-full min-h-[200px] rounded-xl" />}><Avatar3D cams={laptop.cams} /></Suspense>
+      <Stage title="Cameras" context="Every camera in the house, including the headset captions view. Tap a name to make it the main picture. Press 1 or 2 to swap a side camera in.">
+        {showQr && <QrPanel />}
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          {wall.switcher}
         </div>
-        <div className="min-h-0 lg:col-start-3 lg:row-start-2">
-          <div className="glass relative h-full min-h-[200px] overflow-hidden rounded-xl">
-            <Suspense fallback={<div className="h-full min-h-[200px]" />}>
-              <SoundField nodes={state.nodes} now={now} alerts={ripples} vision={vision} />
-            </Suspense>
-          </div>
+        <div className="grid gap-3 lg:h-[min(74vh,780px)] lg:grid-cols-[minmax(0,1fr)_minmax(0,2.3fr)_minmax(0,1fr)] lg:grid-rows-2">
+          <div className="min-h-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">{wall.center}</div>
+          <div className="min-h-0 lg:col-start-1 lg:row-start-1">{wall.left}</div>
+          <div className="min-h-0 lg:col-start-3 lg:row-start-1">{wall.right}</div>
+          <Stage title="Headset figure" context="The person in the headset, drawn in 3D from a laptop camera pointed at them. The other cameras stay on the wall above." className="min-h-0 lg:col-start-1 lg:row-start-2" fill>
+            <Suspense fallback={<div className="glass h-full min-h-[200px] rounded-xl" />}><Avatar3D cams={laptop.cams} /></Suspense>
+          </Stage>
+          <Stage title="Sound around them" context="Each live camera sits around the wearer. A sound shows up as a beam from the camera that heard it." className="min-h-0 lg:col-start-3 lg:row-start-2" fill>
+            <div className="glass relative h-full min-h-[200px] overflow-hidden rounded-xl">
+              <Suspense fallback={<div className="h-full min-h-[200px]" />}>
+                <SoundField nodes={state.nodes} now={now} alerts={ripples} vision={vision} />
+              </Suspense>
+            </div>
+          </Stage>
         </div>
-      </section>
+      </Stage>
 
       {/* Scene JSON from each camera (server/app/detectors/scene.py): labels only, the photos are already gone. */}
       {Object.values(vision).some((v) => now - v.ts < 15) && (
@@ -148,9 +156,14 @@ export default function Dashboard() {
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <AskLumen className="h-[460px]" />
+        <Stage title="Ask Lumen" context="Ask what was said or which alerts happened. This chat only reads memory. It never decides that an alert should fire." fill>
+          <AskLumen className="h-[460px]" />
+        </Stage>
         <aside className="min-w-0 space-y-4">
-          <Conversation lines={captions.lines} />
+          <Stage title="What was said" context="The live transcript from the house, the same words the headset is captioning." fill>
+            <Conversation lines={captions.lines} />
+          </Stage>
+          <Stage title="Timeline" context="Alerts as they happen, with the time someone saw them." fill>
           <div className="glass rounded-xl p-4">
           <h2 className="mb-3 font-semibold">Timeline</h2>
           <ul className="max-h-[420px] space-y-2 overflow-y-auto">
@@ -169,8 +182,60 @@ export default function Dashboard() {
             ))}
           </ul>
           </div>
+          </Stage>
         </aside>
       </div>
+
+      <Guard><Story /></Guard>
     </main>
+  )
+}
+
+class Guard extends Component {
+  state = { error: null }
+  static getDerivedStateFromError(error) { return { error } }
+  render() {
+    if (!this.state.error) return this.props.children
+    return <p className="glass mt-8 rounded-xl p-4 text-sm text-zinc-300">The calendar could not be drawn. The live view above is still on.</p>
+  }
+}
+
+// One feature, with a full-screen view for the pitch. The line under the title is what to say about it.
+function Stage({ title, context, children, className = '', fill = false }) {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
+  const button = (
+    <button type="button" onClick={() => setOpen((v) => !v)}
+      className="glass shrink-0 rounded-full p-1.5 text-zinc-300 hover:border-white/20"
+      aria-label={open ? `Close ${title}` : `Show ${title} full screen`} title={open ? 'Close' : 'Full screen'}>
+      {open ? <X size={14} /> : <Maximize2 size={14} />}
+    </button>
+  )
+  if (!open && fill) {
+    return (
+      <div className={`relative h-full ${className}`}>
+        <div className="absolute right-2 top-2 z-20">{button}</div>
+        {children}
+      </div>
+    )
+  }
+  return (
+    <div className={open ? 'fixed inset-0 z-50 flex flex-col bg-ink p-4' : className}>
+      <div className={`flex items-start gap-3 ${open ? 'mb-3' : 'mb-2'}`}>
+        {open && (
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold">{title}</h2>
+            <p className="text-sm text-zinc-400">{context}</p>
+          </div>
+        )}
+        <div className="ml-auto">{button}</div>
+      </div>
+      <div className={open ? 'min-h-0 flex-1 overflow-auto' : ''}>{children}</div>
+    </div>
   )
 }

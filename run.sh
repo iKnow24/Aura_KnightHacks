@@ -3,6 +3,8 @@
 # Works the same on the AMD box and on a laptop (the laptop is the backup brain).
 set -uo pipefail
 trap 'kill 0' EXIT
+# Lets the dashboard show phone cameras, including the headset captions view. Set to 0 to turn that off.
+export LUMEN_DEMO_PREVIEW="${LUMEN_DEMO_PREVIEW:-1}"
 (cd server && python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000) &
 (cd web && npx vite --host --port 5173) &
 sleep 3

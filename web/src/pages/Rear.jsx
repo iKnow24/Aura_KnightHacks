@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { cameraFov, isApproaching, loadDetector, measure, toObjects } from '../lib/surroundings'
+import { KINDS, cameraFov, closingMph, isApproaching, loadDetector, measure, toObjects } from '../lib/surroundings'
 import { api, keepAwake } from '../lib/useBrain'
 
 // Outside mode: a second phone clipped to the back of a bag, camera facing behind you.
@@ -8,7 +8,7 @@ import { api, keepAwake } from '../lib/useBrain'
 // closes in (the brain decides the alert, Outside mode only), and a few times a second a
 // "scene" list of what's back there for the wearer's walking-figure view.
 // Video never leaves the phone.
-const FPS = 6
+const FPS = 8
 const COOLDOWN_MS = 4000
 
 const wsUrl = (path) => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${path}`
@@ -80,24 +80,31 @@ export default function Rear() {
         ctx.font = '700 18px sans-serif'
         ctx.fillText(`${m.label} ${m.dist} m`, b.originX + 4, b.originY + 22)
       }
-      if (ws.readyState === 1) {
-        ws.send(JSON.stringify({ type: 'scene', objects: toObjects(detections, v.videoWidth, v.videoHeight), fov: cameraFov(v.videoWidth, v.videoHeight) }))
-      }
       for (const label of Object.keys(tracks)) {
         const lastSample = tracks[label][tracks[label].length - 1]
         if (!biggest[label] && now - lastSample.t > 700) delete tracks[label]
       }
+      const mphByLabel = {}
       const live = []
       for (const [label, m] of Object.entries(biggest)) {
         const samples = tracks[label] = [...(tracks[label] ?? []), { t: now, dist: m.dist, area: m.area }].filter((x) => now - x.t < 2000)
-        const closing = samples.length >= 2 && samples[samples.length - 1].dist < samples[0].dist - 0.3
-        live.push({ label, dist: m.dist, closing })
+        const mph = closingMph(samples, now)
+        if (mph != null) mphByLabel[label] = mph
+        const closing = mph != null || (samples.length >= 2 && samples[samples.length - 1].dist < samples[0].dist - 0.3)
+        live.push({ label, dist: m.dist, closing, mph })
         const allowSudden = samples[0].t - startedAt > 2000
         if (isApproaching(label, samples, now, { allowSudden }) && now - (fired[label] ?? 0) > COOLDOWN_MS) {
           fired[label] = now
-          setLast({ label, at: new Date().toLocaleTimeString() })
-          if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'approach', label, score: m.score, area: m.area, ts: Date.now() / 1000 }))
+          setLast({ label, at: new Date().toLocaleTimeString(), mph })
+          if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'approach', label, score: m.score, area: m.area, mph, ts: Date.now() / 1000 }))
         }
+      }
+      if (ws.readyState === 1) {
+        const objects = toObjects(detections, v.videoWidth, v.videoHeight).map((o) => {
+          const mph = Math.max(0, ...Object.entries(mphByLabel).filter(([label]) => KINDS[label]?.kind === o.kind).map(([, n]) => n))
+          return mph > 0 ? { ...o, mph } : o
+        })
+        ws.send(JSON.stringify({ type: 'scene', objects, fov: cameraFov(v.videoWidth, v.videoHeight) }))
       }
       setSeen(live)
     }, 1000 / FPS)
@@ -112,7 +119,7 @@ export default function Rear() {
       {status === 'idle' ? (
         <button onClick={start} className="absolute inset-0 grid place-items-center bg-black p-6 text-center">
           <div>
-            <div className="text-3xl font-semibold">Rear guard</div>
+            <div className="text-3xl font-semibold">Back cam</div>
             <p className="mx-auto mt-3 max-w-sm text-lg text-zinc-300">Clip this phone to the back of the bag, camera facing behind you. Tap to start.</p>
           </div>
         </button>
@@ -122,7 +129,7 @@ export default function Rear() {
           <div className="text-sm text-zinc-300">Brain {link}</div>
           {seen.length > 0 && (
             <div className="mt-2 text-lg font-semibold">
-              {seen.map((s) => `${s.label} ${s.dist} m${s.closing ? ' · closing' : ''}`).join('   ')}
+              {seen.map((s) => `${s.label} ${s.dist} m${s.mph ? ` · ${s.mph} mph` : ''}${s.closing ? ' · closing' : ''}`).join('   ')}
             </div>
           )}
           {mode !== 'outside' && mode !== '?' && (
@@ -133,7 +140,7 @@ export default function Rear() {
               </button>
             </div>
           )}
-          {last && <div className="mt-2 text-base">Warned: {last.label} at {last.at}</div>}
+          {last && <div className="mt-2 text-base">Warned: {last.label}{last.mph ? ` at ${last.mph} mph` : ''} at {last.at}</div>}
         </div>
       )}
     </main>

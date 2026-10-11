@@ -108,11 +108,98 @@ def _status(day, this, before):
     }
 
 
-def from_sample(household: str, folder: Path = SAMPLE_DIR):
+def _read_lines(folder: Path):
     lines = []
     for f in sorted(folder.glob("*.jsonl")):
         lines += [json.loads(l) for l in f.read_text().splitlines() if l.strip()]
-    return _from_rows(_alert_rows(lines), household)
+    return lines
+
+
+def from_sample(household: str, folder: Path = SAMPLE_DIR):
+    return _from_rows(_alert_rows(_read_lines(folder)), household)
+
+
+# Speaker 2 in the generated Maria files is the clinic. Real logs only count as the clinic
+# when the words themselves say so.
+_CLINIC_WORDS = ("appointment", "dr. patel", "doctor", "blood test")
+
+
+def _when(ts):
+    if isinstance(ts, (int, float)):
+        return datetime.fromtimestamp(ts, TZ)
+    text = str(ts).replace("Z", "+00:00")
+    try:
+        t = datetime.fromisoformat(text)
+    except ValueError:
+        t = datetime.fromisoformat(text[:19])
+    return t.astimezone(TZ) if t.tzinfo else t.replace(tzinfo=TZ)
+
+
+def _moment(when, kind, title, detail, missed=False, clinic=False):
+    return {
+        "day": when.date().isoformat(), "time": when.isoformat(), "kind": kind,
+        "title": title, "detail": detail, "missed": missed, "clinic": clinic,
+    }
+
+
+def _places(moments):
+    """Two pins on a simple Orlando map: home, and the clinic when the log has that call."""
+    pins = [{
+        "id": "home", "name": "Home", "city": "Orlando", "x": 36, "y": 64,
+        "detail": "Cameras, captions, and alerts for this household",
+    }]
+    clinic = [m for m in moments if m["clinic"]]
+    if clinic:
+        pins.append({
+            "id": "clinic", "name": "Dr. Patel's office", "city": "Orlando", "x": 70, "y": 34,
+            "detail": clinic[-1]["detail"], "time": clinic[-1]["time"],
+        })
+    return pins
+
+
+def story_from_lines(lines, household: str, named_clinic: bool = False):
+    """Every real alert, plus the clinic calls, for the calendar under the live view."""
+    moments = []
+    for r in _alert_rows(lines):
+        if r["household"] != household:
+            continue
+        moments.append(_moment(r["time"], "alert", r["kind"], r["zone"], missed=r["missed"]))
+    for e in lines:
+        if e.get("household") not in (None, household) or e.get("type") != "speech" or not e.get("text"):
+            continue
+        text = e["text"]
+        low = text.lower()
+        clinic = (named_clinic and e.get("speaker") == 2) or any(w in low for w in _CLINIC_WORDS)
+        if not clinic:
+            continue
+        moments.append(_moment(_when(e["ts"]), "said", "Dr. Patel's office", text, clinic=True))
+    moments.sort(key=lambda m: m["time"])
+    return moments, _places(moments)
+
+
+def story_from_databricks(household: str):
+    t = os.environ.get("DATABRICKS_TABLE_PREFIX", "lumen.home.")
+    alerts = _sql(
+        f"""SELECT alert_time, kind, zone, missed FROM {t}gold_alert_response
+        WHERE household = :household AND severity <> 'info' ORDER BY alert_time""",
+        household,
+    )
+    speech = _sql(
+        f"""SELECT said_at, text FROM {t}silver_speech
+        WHERE household = :household AND (
+          lower(text) LIKE '%appointment%' OR lower(text) LIKE '%dr. patel%'
+          OR lower(text) LIKE '%doctor%' OR lower(text) LIKE '%blood test%'
+        ) ORDER BY said_at""",
+        household,
+    )
+    moments = []
+    for r in alerts:
+        when = _when(r["alert_time"])
+        moments.append(_moment(when, "alert", r["kind"], r["zone"] or "", missed=str(r["missed"]).lower() == "true"))
+    for r in speech:
+        moments.append(_moment(_when(r["said_at"]), "said", "Dr. Patel's office", r["text"] or "", clinic=True))
+    moments.sort(key=lambda m: m["time"])
+    return moments, _places(moments)
 
 
 # ---------------------------------------------------------------- Databricks SQL warehouse
@@ -192,20 +279,31 @@ def history(household: str | None = None):
     if hit and time.time() - hit[0] < CACHE_SECONDS:
         return hit[1]
     source, note = "sample", None
+    moments, places = [], []
     if databricks_configured():
         try:
             days, status, missed = from_databricks(household)
             source = "databricks"
+            try:
+                moments, places = story_from_databricks(household)
+            except Exception as e:
+                note = f"Calendar details unavailable ({type(e).__name__}: {str(e)[:120]})"
         except Exception as e:  # never let a cloud hiccup blank the tab
             note = f"Databricks unavailable, showing sample data ({type(e).__name__}: {str(e)[:160]})"
     if source == "sample" and log_dir and Path(log_dir).is_dir():
-        days, status, missed = from_sample(household, Path(log_dir))
+        folder = Path(log_dir)
+        days, status, missed = from_sample(household, folder)
+        moments, places = story_from_lines(_read_lines(folder), household)
         source = "event_log"
     if source == "sample":
         days, status, missed = from_sample(household)
+        moments, places = story_from_lines(_read_lines(SAMPLE_DIR), household, named_clinic=True)
+    if not places:
+        places = _places(moments)
     result = {
         "household": household, "source": source, "note": note,
         "days": days, "status": status, "missed": missed,
+        "moments": moments, "places": places,
         "dashboard_url": os.environ.get("DATABRICKS_DASHBOARD_URL") or None,
     }
     _cache[household] = (time.time(), result)

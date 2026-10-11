@@ -5,6 +5,17 @@ from fastapi.testclient import TestClient
 from app import history, main
 
 
+def test_sample_story_puts_the_clinic_on_the_map(monkeypatch):
+    for k in ("DATABRICKS_HOST", "DATABRICKS_TOKEN", "DATABRICKS_WAREHOUSE_ID"):
+        monkeypatch.delenv(k, raising=False)
+    history._cache.clear()
+    out = history.history("maria")
+    assert any(p["name"] == "Dr. Patel's office" and p["city"] == "Orlando" for p in out["places"])
+    said = [m for m in out["moments"] if m["clinic"]]
+    assert any("appointment" in m["detail"].lower() for m in said)
+    assert any(m["kind"] == "alert" and m["title"] == "doorbell" for m in out["moments"])
+
+
 def test_sample_history_matches_planted_decline(monkeypatch):
     for k in ("DATABRICKS_HOST", "DATABRICKS_TOKEN", "DATABRICKS_WAREHOUSE_ID"):
         monkeypatch.delenv(k, raising=False)
@@ -42,6 +53,19 @@ def test_databricks_rows_are_parsed(monkeypatch):
     days, status, missed = history.from_databricks("maria")
     assert days[0]["alerts"] == 8 and status["flagged"] and status["pct_slower"] == 50
     assert missed[0]["at_night"] is False
+
+
+def test_event_log_clinic_comes_from_the_words(tmp_path, monkeypatch):
+    from app.eventlog import record
+    for k in ("DATABRICKS_HOST", "DATABRICKS_TOKEN", "DATABRICKS_WAREHOUSE_ID"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("EVENT_LOG_DIR", str(tmp_path))
+    monkeypatch.setenv("LUMEN_HOUSEHOLD", "home")
+    record({"type": "speech", "zone": "living", "text": "Your appointment moved to Thursday at 2.", "ts": 1791519600.0, "speaker": 4})
+    history._cache.clear()
+    out = history.history()
+    history._cache.clear()
+    assert any(p["id"] == "clinic" and "appointment" in p["detail"].lower() for p in out["places"])
 
 
 def test_real_event_log_is_used_and_says_no_baseline_yet(tmp_path, monkeypatch):

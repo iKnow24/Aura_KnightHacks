@@ -10,7 +10,9 @@ import { Camera, CameraOff, Clapperboard, Download, Ellipsis, Footprints, Gradua
 import Logo from '../lib/Logo'
 import Recap from '../lib/Recap'
 import Surround from '../lib/Surround'
+import { nodeSocket } from '../lib/audio'
 import { api, keepAwake, useBrain } from '../lib/useBrain'
+import { attachMic } from '../lib/mic'
 import { instantSupported, useLiveCaptions } from '../lib/useLiveCaptions'
 import { getUser } from '../lib/user'
 import { askMotion } from '../lib/walking'
@@ -252,7 +254,8 @@ export default function Captions() {
   const { alerts, push, drop, ack } = useAlerts('wearer')
   const [started, setStarted] = useState(false)
   const [rearScene, setRearScene] = useState(null) // what the bag phone's camera sees, for the walking view
-  const [engine, setEngine] = useState(instantSupported ? 'instant' : 'private')
+  // Private stays on our brain (local Whisper). Instant sends the mic to Google, so it is not the default.
+  const [engine, setEngine] = useState('private')
   const [camera, setCamera] = useState(null) // MediaStream or null
   const [bar, setBar] = useState(true)
   const [picker, setPicker] = useState(false)
@@ -272,7 +275,7 @@ export default function Captions() {
   const linesRef = useRef([])
   // 'spatial' (captions over heads) or 'cinema' (movie subtitles). The old side panel is gone.
   const [look, setLook] = useState(() => { try { return localStorage.getItem('lumen_look') === 'cinema' ? 'cinema' : 'spatial' } catch { return 'spatial' } })
-  const [, tick] = useState(0) // spatial captions expire on their own, so re-check twice a second
+  const [clock, tick] = useState(0) // spatial captions expire on their own, so re-check twice a second
   useEffect(() => { const t = setInterval(() => tick((n) => n + 1), 500); return () => clearInterval(t) }, [])
   useEffect(() => { try { localStorage.setItem('lumen_look', look) } catch { /* private mode */ } }, [look])
   const levelRef = useRef(0)
@@ -284,6 +287,13 @@ export default function Captions() {
     if (msg.type === 'ack') drop(msg.id)
   })
   const mode = state.modes[state.mode] ? state.mode : 'wearer'
+  const rearCar = (() => {
+    void clock
+    if (!rearScene || Date.now() - rearScene.at > 1200) return null
+    const hits = (rearScene.objects || []).filter((o) => (o.kind === 'car' || o.kind === 'truck') && o.mph >= 3)
+    if (!hits.length) return null
+    return hits.reduce((best, o) => (o.mph > best.mph ? o : best))
+  })()
   const realEngine = mode === 'outside' ? 'private' : engine
   const modeLabel = state.modes[mode] ?? 'Home'
 
@@ -328,6 +338,7 @@ export default function Captions() {
   const captions = useLiveCaptions({
     engine: realEngine,
     active: started,
+    externalMic: true, // this page sends the mic itself, with the camera picture
     onFinal: (line) => {
       if (!line.zone && command(line.text)) return true
       if (line.zone && ZONES[line.zone]) { // a room node: shown, but not part of the lecture
@@ -415,6 +426,50 @@ export default function Captions() {
 
   const recent = state.events.filter((e) => Date.now() / 1000 - e.ts < 20 && !e.acked).slice(-4)
   const live = sim || captions.interim
+  // The laptop dashboard shows this phone as the "Headset" camera: one still a second, with the
+  // current caption drawn on it, plus the mic audio. The brain only forwards the picture and
+  // the sound when LUMEN_DEMO_PREVIEW=1, and neither is saved.
+  const mirrorText = useRef('')
+  const pushLevel = useRef(() => {})
+  mirrorText.current = (live || captions.lines.at(-1)?.text || '').trim()
+  pushLevel.current = captions.setLevel
+  useEffect(() => {
+    if (!started) return
+    let id = `headset-${Math.random().toString(36).slice(2, 6)}`
+    try { id = sessionStorage.getItem('lumen.headset') || id; sessionStorage.setItem('lumen.headset', id) } catch { /* private window */ }
+    const sock = nodeSocket(id, 'wearer')
+    let stopMic = () => {}
+    let dead = false
+    attachMic((buf) => sock.send(buf), (level) => pushLevel.current(level))
+      .then((stop) => { if (dead) stop(); else stopMic = stop })
+      .catch(() => {})
+    const timer = setInterval(() => {
+      const v = videoRef.current
+      if (!v?.videoWidth) return
+      const w = 640
+      const h = Math.max(1, Math.round((w * v.videoHeight) / v.videoWidth))
+      const c = document.createElement('canvas')
+      c.width = w
+      c.height = h
+      const g = c.getContext('2d')
+      g.drawImage(v, 0, 0, w, h)
+      const line = mirrorText.current
+      if (line) {
+        const bar = Math.round(Math.min(120, h * 0.18))
+        g.fillStyle = 'rgba(0,0,0,0.78)'
+        g.fillRect(24, h - bar - 28, w - 48, bar)
+        g.fillStyle = '#fff'
+        g.font = '600 26px sans-serif'
+        g.textAlign = 'center'
+        g.textBaseline = 'middle'
+        const shown = line.length > 90 ? `${line.slice(0, 89)}…` : line
+        g.fillText(shown, w / 2, h - bar / 2 - 28)
+      }
+      const jpeg = c.toDataURL('image/jpeg', 0.55)
+      if (jpeg.length <= 400_000) sock.send(JSON.stringify({ type: 'camera_preview', ts: Date.now() / 1000, jpeg }))
+    }, 1000)
+    return () => { dead = true; clearInterval(timer); stopMic(); sock.close() }
+  }, [started])
   const spatial = spatialLayout({ lines: captions.lines, live, liveSpeaker: camera ? faces.liveSpeaker : null,
     visible: camera ? faces.ids.split(',').filter(Boolean).map(Number) : [], names, events: state.events })
 
@@ -436,6 +491,11 @@ export default function Captions() {
     <main className="relative h-full overflow-hidden bg-[radial-gradient(ellipse_at_top,#1c1917,#000_60%)]" onClick={toggleBar}>
       {camera && <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />}
       <AlertStack alerts={alerts} onAck={ack} />
+      {rearCar && (
+        <div className="absolute inset-x-0 bottom-28 z-20 mx-auto w-fit max-w-[90%] bg-black px-5 py-3 text-center text-2xl font-semibold tracking-wide text-white">
+          {rearCar.kind === 'truck' ? 'TRUCK' : 'CAR'} BEHIND YOU · {rearCar.mph} MPH
+        </div>
+      )}
 
       {/* Top-left: who you are and what mode. Always visible, quiet. */}
       <div className="absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-10 flex max-w-[33%] items-center gap-2 overflow-hidden whitespace-nowrap glass-dark rounded-full px-3 py-1.5 text-sm">

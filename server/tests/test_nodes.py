@@ -56,6 +56,43 @@ def test_demo_preview_is_forwarded_without_entering_memory_or_event_log(monkeypa
     assert not list(tmp_path.glob('*.jsonl'))
 
 
+def test_headset_audio_is_played_on_the_dashboard_only_while_preview_is_on(monkeypatch):
+    import numpy as np
+    pcm = np.zeros(32, dtype=np.float32).tobytes()
+    forwarded = []
+    real = main.hub.broadcast_bytes
+
+    async def grab(roles, data):
+        forwarded.append((roles, data))
+        await real(roles, data)
+
+    monkeypatch.setattr(main.hub, 'broadcast_bytes', grab)
+    monkeypatch.setenv('LUMEN_DEMO_PREVIEW', '1')
+    client = TestClient(main.app)
+    before = list(main.memory.entries)
+    with client.websocket_connect('/ws/dashboard') as dashboard:
+        dashboard.receive_json()
+        with client.websocket_connect('/ws/node/headset-a?zone=wearer') as node:
+            node.receive_json()
+            dashboard.receive_json()
+            node.send_bytes(pcm)
+            assert dashboard.receive_json()['type'] == 'state'
+            assert dashboard.receive_bytes() == pcm
+    assert forwarded == [(['dashboard'], pcm)]
+    assert main.memory.entries == before
+
+    forwarded.clear()
+    monkeypatch.delenv('LUMEN_DEMO_PREVIEW', raising=False)
+    with client.websocket_connect('/ws/dashboard') as dashboard:
+        dashboard.receive_json()
+        with client.websocket_connect('/ws/node/headset-b?zone=wearer') as node:
+            node.receive_json()
+            dashboard.receive_json()
+            node.send_bytes(pcm)
+            assert dashboard.receive_json()['type'] == 'state'
+    assert forwarded == []
+
+
 def test_preview_is_off_by_default(monkeypatch):
     monkeypatch.delenv('LUMEN_DEMO_PREVIEW', raising=False)
     sent = []

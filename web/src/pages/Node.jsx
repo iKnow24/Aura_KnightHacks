@@ -4,6 +4,7 @@ import { api, keepAwake } from '../lib/useBrain'
 import { BONES, detectPose, loadPose } from '../lib/pose'
 import { loadDetector } from '../lib/surroundings'
 import { createSpillWatch } from '../lib/spill'
+import { zoneLabel } from '../lib/zones'
 
 // A spare phone in a room. Streams 16 kHz mono audio and, unless ?pose=0, body keypoints
 // at 10 fps for fall detection. Unless ?items=0, it also sends one small still photo every
@@ -18,7 +19,7 @@ export default function Node() {
   const params = new URLSearchParams(location.search)
   const zone = params.get('zone') || 'living'
   const [nodeId] = useState(() => `${params.get('id') || zone}-${Math.random().toString(36).slice(2, 8)}`)
-  const [preview, setPreview] = useState(false)
+  const [preview, setPreview] = useState(params.get('preview') === '1')
   const usePose = params.get('pose') !== '0'
   const useItems = params.get('items') !== '0'
   const useSpill = params.get('spill') !== '0'
@@ -136,7 +137,8 @@ export default function Node() {
   const color = status === 'streaming' ? 'bg-green-700' : status === 'idle' ? 'bg-zinc-800' : 'bg-amber-600'
   return (
     <div className={`flex min-h-full w-full flex-col items-center justify-center gap-4 p-4 ${color}`}>
-      <div className="text-4xl font-bold">{zone}</div>
+      <div className="text-4xl font-bold">{zoneLabel(zone)}</div>
+      {zone === 'drone' && <div className="text-lg">or drone</div>}
       <div className="text-xl">{status === 'idle' ? 'Tap to start' : status}</div>
       <div className="text-sm">Device: {nodeId}</div>
       {status === 'idle' && <label className="flex items-center gap-2 text-sm">

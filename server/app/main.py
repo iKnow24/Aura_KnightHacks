@@ -75,6 +75,7 @@ latest_vision: dict[str, dict] = {}
 vision_ms: deque = deque(maxlen=500)
 last_pose: dict[str, tuple[float, list | None]] = {}
 last_phone_scene: dict[str, float] = {}
+last_headset_look: dict[str, float] = {}
 
 
 async def emit_detected(kind: str, zone: str, severity: str, source: str, confidence: float = 1.0):
@@ -555,11 +556,12 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
                 await hub.broadcast(["dashboard"], {"type": "state", **hub.state()})
             if msg.get("bytes"):
                 chunk = np.frombuffer(msg["bytes"], dtype=np.float32)
-                # The wearer's own mic: speech only, alarms are the room nodes' job. Except Outside,
-                # where there are no room nodes and this mic is what hears the car horn.
-                if zone == WEARER and hub.mode != "outside":
-                    feed_speech(node_id, zone, chunk)
-                    continue
+                # Headset demo: the dashboard plays this mic with the picture. Not saved.
+                if (zone == WEARER and os.environ.get("LUMEN_DEMO_PREVIEW") == "1"
+                        and 0 < chunk.size <= 16000):
+                    await hub.broadcast_bytes(["dashboard"], bytes(msg["bytes"]))
+                # The headset mic is analyzed here, on this machine: the beep detector (no model,
+                # no API), the local sound model, and local Whisper. Nothing in this block calls out.
                 buf = np.concatenate([audio_buffers.get(node_id, np.zeros(0, np.float32)), chunk])[-AUDIO_WINDOW:]
                 audio_buffers[node_id] = buf
                 if len(buf) == AUDIO_WINDOW and enabled("alarm_dsp") and alarm_dsp.is_alarm(buf):
@@ -582,6 +584,11 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
                         last_preview = time.monotonic()
                         await hub.broadcast(["dashboard"], {"type": "camera_preview", "node_id": node_id,
                                                             "zone": zone, "ts": time.time(), "jpeg": jpeg})
+                        # Same local vision pass as a room photo. The frame is dropped after; only labels stay.
+                        if (zone == WEARER and node_id not in items_busy and not item_finder._failed
+                                and time.monotonic() - last_headset_look.get(node_id, 0) >= 2):
+                            last_headset_look[node_id] = time.monotonic()
+                            asyncio.create_task(run_items(node_id, zone, jpeg))
                 elif data.get("type") == "pose":
                     last_pose[node_id] = (time.monotonic(), data.get("landmarks"))  # posture for the scene JSON
                     if not enabled("fall"):
@@ -616,5 +623,5 @@ async def node_socket(ws: WebSocket, node_id: str, zone: str = "unknown"):
         if await hub.unregister_node(ws, node_id):
             # Do not join audio or pose from before a disconnect to a new session.
             for cache in (audio_buffers, fall_detectors, ast_pending, segmenters, latest_vision, last_pose,
-                          last_phone_scene):
+                          last_phone_scene, last_headset_look):
                 cache.pop(node_id, None)
