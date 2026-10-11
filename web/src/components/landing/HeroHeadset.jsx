@@ -49,25 +49,24 @@ function loudness(t) {
 }
 const isBell = (t) => { t = ((t % LOOP) + LOOP) % LOOP; return t > BEATS[1].at - 0.2 && t < BEATS[1].at + 3 }
 
-// A rough, featureless head: a sphere pushed into shape (narrow jaw, fuller back, a nose under the lens).
+// A head built from a rounded box, not a stretched sphere: a box has real flat planes (forehead,
+// cheek, jaw) meeting at edges, which reads as "a face" at a glance in a way any sphere, however it's
+// squashed, keeps reading as "a ball". Nose, lips and a chin point are small bumps added on top.
+const HEAD = { w: 1.42, h: 1.82, d: 1.5, r: 0.46 }
 function headGeometry() {
-  const g = new THREE.SphereGeometry(1, 112, 84)
+  const g = new RoundedBoxGeometry(HEAD.w, HEAD.h, HEAD.d, 7, HEAD.r)
   const p = g.attributes.position
   const v = new THREE.Vector3()
   for (let i = 0; i < p.count; i++) {
     v.fromBufferAttribute(p, i)
-    const { x, y, z } = v
-    let sx = 0.78, sy = 0.98, sz = 0.95
-    // A sharper, narrower jaw than a plain sphere gives (less "balloon", more chin).
-    if (y < 0) { sx *= 1 - 0.34 * y * y; sz *= 1 - (z < 0 ? 0.25 : 0.1) * y * y }
-    if (z < 0 && y > -0.3) sz *= 1.07
-    sy *= 1 - 0.05 * smooth(0.3, 0.92, y) // flatten the crown a touch, less of a ball on top
-    let X = x * sx, Y = y * sy, Z = z * sz
-    const front = Math.max(0, z)
-    const noseW = 0.07 + 0.05 * smooth(-0.05, -0.32, y)
-    Z += 0.15 * front * Math.exp(-((x / noseW) ** 2)) * Math.exp(-(((y + 0.2) / 0.17) ** 2)) * (0.45 + 0.55 * smooth(0.05, -0.3, y))
-    Z += 0.035 * front * Math.exp(-((x / 0.17) ** 2)) * Math.exp(-(((y + 0.53) / 0.06) ** 2)) // lips
-    Z += 0.04 * front * Math.exp(-((x / 0.2) ** 2)) * Math.exp(-(((y + 0.78) / 0.1) ** 2)) // chin point
+    let { x: X, y: Y, z: Z } = v
+    // A jaw corner: full width through the cheekbones, then a hard taper down to the chin.
+    if (Y < -0.1) { const j = smooth(-0.1, -0.86, Y); X *= 1 - 0.56 * j; Z *= 1 - (Z < 0 ? 0.3 : 0.2) * j }
+    const front = Math.max(0, Z)
+    const noseW = 0.07 + 0.05 * smooth(-0.05, -0.32, Y)
+    Z += 0.16 * front * Math.exp(-((X / noseW) ** 2)) * Math.exp(-(((Y + 0.2) / 0.17) ** 2)) * (0.45 + 0.55 * smooth(0.05, -0.3, Y))
+    Z += 0.035 * front * Math.exp(-((X / 0.17) ** 2)) * Math.exp(-(((Y + 0.53) / 0.06) ** 2)) // lips
+    Z += 0.045 * front * Math.exp(-((X / 0.2) ** 2)) * Math.exp(-(((Y + 0.78) / 0.1) ** 2)) // chin point
     p.setXYZ(i, X, Y, Z)
   }
   g.deleteAttribute('normal')
@@ -76,17 +75,18 @@ function headGeometry() {
   m.computeVertexNormals()
   return m
 }
-// A short curly cap: a thinned sphere that sits just outside the skull, from the crown down to
-// just above the ears, with a per-vertex wobble so it reads as curls rather than a smooth helmet.
+// A short curly cap sitting just outside the skull, from the crown down to just above the ears,
+// with a per-vertex wobble so it reads as curls rather than a smooth helmet. A capped sphere dome
+// (not a filtered box) so the mesh stays a closed, intact shape with no stray triangles.
 function hairGeometry() {
-  const g = new THREE.SphereGeometry(1.03, 64, 48, 0, Math.PI * 2, 0, Math.PI * 0.56)
+  const g = new THREE.SphereGeometry(1, 64, 40, 0, Math.PI * 2, 0, Math.PI * 0.5)
   const p = g.attributes.position
   const v = new THREE.Vector3()
+  const sx = HEAD.w / 2 + 0.07, sy = HEAD.h / 2 + 0.09, sz = HEAD.d / 2 + 0.07
   for (let i = 0; i < p.count; i++) {
     v.fromBufferAttribute(p, i)
-    const sx = 0.78, sy = 0.98, sz = 0.95
-    const curl = 1 + 0.009 * (Math.sin(v.x * 34 + v.y * 15) + Math.sin(v.y * 26 - v.z * 19) + Math.sin(v.z * 30 + v.x * 11))
-    p.setXYZ(i, v.x * sx * curl, v.y * sy * curl + 0.01, v.z * sz * curl)
+    const curl = 1 + 0.012 * (Math.sin(v.x * 34 + v.y * 15) + Math.sin(v.y * 26 - v.z * 19) + Math.sin(v.z * 30 + v.x * 11))
+    p.setXYZ(i, v.x * sx * curl, v.y * sy * curl + 0.02, v.z * sz * curl)
   }
   g.computeVertexNormals()
   return g
