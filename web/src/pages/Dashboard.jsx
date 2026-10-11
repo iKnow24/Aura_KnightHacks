@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { api, useBrain } from '../lib/useBrain'
 import AlertIcon from '../lib/AlertIcon'
 import AskLumen from '../lib/AskLumen'
@@ -9,6 +9,7 @@ import Conversation, { useCaptions } from '../lib/Conversation'
 import QrPanel from '../lib/QrPanel'
 import { Wordmark } from '../lib/Logo'
 import { getUser, signOut } from '../lib/user'
+const Avatar3D = lazy(() => import('../lib/Avatar3D'))
 import { alertText, SEVERITY_COLOR, ZONES, zoneLabel } from '../lib/zones'
 
 const FAKES = [
@@ -103,7 +104,8 @@ export default function Dashboard() {
     )
   }
 
-  // Control center: main camera in the middle, a camera on the left, a camera and the house plan on the right.
+  // Control center: main camera in the middle, a camera on each side, the headset wearer in 3D
+  // bottom left, the house plan bottom right.
   return (
     <main className="min-h-full overflow-x-hidden p-4">
       {header}
@@ -111,8 +113,11 @@ export default function Dashboard() {
 
       <section className="grid gap-3 lg:h-[min(74vh,780px)] lg:grid-cols-[minmax(0,1fr)_minmax(0,2.3fr)_minmax(0,1fr)] lg:grid-rows-2">
         <div className="min-h-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">{wall.center}</div>
-        <div className="min-h-0 lg:col-start-1 lg:row-span-2 lg:row-start-1">{wall.left}</div>
+        <div className="min-h-0 lg:col-start-1 lg:row-start-1">{wall.left}</div>
         <div className="min-h-0 lg:col-start-3 lg:row-start-1">{wall.right}</div>
+        <div className="min-h-0 lg:col-start-1 lg:row-start-2">
+          <Suspense fallback={<div className="glass h-full min-h-[200px] rounded-xl" />}><Avatar3D cams={laptop.cams} /></Suspense>
+        </div>
         <div className="min-h-0 lg:col-start-3 lg:row-start-2">
           {/* Floor plan. Skeletons and zone status only: no live video, for privacy. */}
           <div className="glass relative aspect-[4/3] h-full overflow-hidden rounded-xl sm:aspect-[16/10] lg:aspect-auto">

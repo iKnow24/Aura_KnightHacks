@@ -10,24 +10,26 @@ Each round it uploads only the lines added since last time, as a new small file
 once, so each event lands in Bronze exactly once, within about a minute instead of after the hour ends.
 
 On the box, start the brain with:   EVENT_LOG_DIR=$HOME/lumen_events LUMEN_HOUSEHOLD=home LUMEN_SYNC_KEY=<any password>
-On your Mac (same password):
-    export DATABRICKS_HOST=https://<your-workspace>.cloud.databricks.com
-    export DATABRICKS_TOKEN=<Settings > Developer > Access tokens>   (never paste it in chat)
+On your Mac, sign in once (a browser opens; there is no token to copy):
+    databricks auth login --host https://<your-workspace>.cloud.databricks.com --profile lumen
+Then, with the same password the brain was started with:
     export LUMEN_SYNC_KEY=<the same password>
-    export DATABRICKS_JOB_ID=<optional: the job that runs the pipeline; we start it after each upload>
     python3 scripts/databricks_sync.py
+The script uses that saved login (WorkspaceClient profile "lumen"). It uploads to
+/Volumes/lumen/home/raw_events/ and starts job 1103380381835252 after each upload.
+Set DATABRICKS_JOB_ID only if the job was recreated and the id changed.
 
 LUMEN_URL defaults to http://localhost:5173 (the Jupyter bridge, or a laptop brain).
 Progress is kept in ~/.lumen_databricks_sync.json, so stopping and restarting never uploads twice.
 """
 import argparse
+import io
 import json
 import os
 import ssl
 import sys
 import time
 import urllib.error
-import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -39,6 +41,9 @@ except ImportError:
     SSL = ssl.create_default_context()
 
 STATE = Path.home() / ".lumen_databricks_sync.json"
+PROFILE = "lumen"
+# Jobs & Pipelines side panel. Override with DATABRICKS_JOB_ID if the job is recreated.
+DEFAULT_JOB_ID = "1103380381835252"
 
 
 def call(url, method="GET", data=None, headers=None):
@@ -50,22 +55,26 @@ def call(url, method="GET", data=None, headers=None):
 
 
 class Databricks:
-    def __init__(self, host, token):
-        self.host = host.rstrip("/") if host.startswith("http") else "https://" + host.rstrip("/")
-        self.auth = {"Authorization": f"Bearer {token}"}
+    """Signed-in Databricks user. The lumen profile lives in ~/.databrickscfg; no token is read."""
+
+    def __init__(self, profile=PROFILE):
+        from databricks.sdk import WorkspaceClient
+
+        self.profile = profile
+        self.w = WorkspaceClient(profile=profile)
+        self.host = (self.w.config.host or "").rstrip("/")
 
     def upload(self, volume_path, data: bytes):
-        url = f"{self.host}/api/2.0/fs/files{urllib.parse.quote(volume_path)}?overwrite=false"
-        call(url, "PUT", data, {**self.auth, "Content-Type": "application/octet-stream"})
+        # overwrite=False: Auto Loader reads each file name once, so a name is never reused.
+        self.w.files.upload(volume_path, io.BytesIO(data), overwrite=False)
 
     def run_job(self, job_id):
         """Start the pipeline job unless it's already running (a running one picks the files up next time)."""
-        q = urllib.parse.urlencode({"job_id": job_id, "active_only": "true"})
-        active = json.loads(call(f"{self.host}/api/2.1/jobs/runs/list?{q}", headers=self.auth)).get("runs")
+        active = list(self.w.jobs.list_runs(job_id=int(job_id), active_only=True, limit=1))
         if active:
             return False
-        call(f"{self.host}/api/2.1/jobs/run-now", "POST", json.dumps({"job_id": int(job_id)}).encode(),
-             {**self.auth, "Content-Type": "application/json"})
+        # run_now returns a waiter. Don't wait: the next 30 s round only needs the run to exist.
+        self.w.jobs.run_now(job_id=int(job_id))
         return True
 
 
@@ -85,8 +94,10 @@ def sync_once(lumen, key, db, volume, state):
         piece = f"{name[:-len('.jsonl')]}-{offset:06d}.jsonl"
         try:
             db.upload(f"{volume}/{piece}", chunk)
-        except urllib.error.HTTPError as e:
-            if e.code != 409:  # 409 = already there from a run that crashed before saving progress
+        except Exception as e:
+            # 409 = already there from a run that crashed before saving progress
+            code = getattr(e, "status_code", None) or getattr(e, "code", None)
+            if code != 409 and "already exists" not in str(e).lower():
                 raise
         state[name] = offset + len(chunk)
         STATE.write_text(json.dumps(state))
@@ -103,27 +114,32 @@ def main():
     p.add_argument("--volume", default="/Volumes/lumen/home/raw_events")
     args = p.parse_args()
 
-    missing = [k for k in ("DATABRICKS_HOST", "DATABRICKS_TOKEN", "LUMEN_SYNC_KEY") if not os.environ.get(k)]
-    if missing:
-        sys.exit("Set these first (see the top of this file): " + ", ".join(missing))
+    if not os.environ.get("LUMEN_SYNC_KEY"):
+        sys.exit("Set LUMEN_SYNC_KEY to the same password the brain was started with (see the top of this file).")
     lumen = os.environ.get("LUMEN_URL", "http://localhost:5173").rstrip("/")
-    db = Databricks(os.environ["DATABRICKS_HOST"], os.environ["DATABRICKS_TOKEN"])
-    job = os.environ.get("DATABRICKS_JOB_ID")
+    db = Databricks()
+    job = os.environ.get("DATABRICKS_JOB_ID") or DEFAULT_JOB_ID
     state = json.loads(STATE.read_text()) if STATE.exists() else {}
-    print(f"Syncing {lumen} -> {db.host}{args.volume}" + (f", then job {job}" if job else ""))
+    print(f"Syncing {lumen} -> {db.host}{args.volume} as profile {db.profile}, then job {job}")
 
     while True:
         try:
-            if sync_once(lumen, os.environ["LUMEN_SYNC_KEY"], db, args.volume, state) and job:
+            if sync_once(lumen, os.environ["LUMEN_SYNC_KEY"], db, args.volume, state):
                 if db.run_job(job):
                     print(f"{time.strftime('%H:%M:%S')}  started the pipeline job")
         except urllib.error.HTTPError as e:
-            hint = {401: "Databricks token is wrong or expired", 403: "LUMEN_SYNC_KEY doesn't match the brain's, "
-                    "or the brain wasn't started with EVENT_LOG_DIR and LUMEN_SYNC_KEY (or the token can't write the volume)",
+            hint = {403: "LUMEN_SYNC_KEY doesn't match the brain's, or the brain wasn't started with "
+                    "EVENT_LOG_DIR and LUMEN_SYNC_KEY",
                     404: "the volume doesn't exist yet: run the CREATE VOLUME line in databricks/README.md"}.get(e.code, "")
             print(f"{time.strftime('%H:%M:%S')}  {e.code} from {e.url.split('?')[0]}  {hint}")
         except (urllib.error.URLError, OSError) as e:
             print(f"{time.strftime('%H:%M:%S')}  can't reach {lumen} or Databricks ({e}); is the bridge running?")
+        except Exception as e:
+            code = getattr(e, "status_code", None)
+            hint = {401: "the lumen login expired. Run databricks auth login again (step 2).",
+                    403: "this account can't write the volume or run the job. It needs the GRANTs and Can manage run.",
+                    404: "the volume or job wasn't found"}.get(code, "")
+            print(f"{time.strftime('%H:%M:%S')}  {type(e).__name__}: {e}  {hint}")
         if args.once:
             return
         time.sleep(args.every)
