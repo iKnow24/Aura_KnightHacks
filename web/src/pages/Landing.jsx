@@ -1,11 +1,23 @@
 import { AnimatePresence, motion, useReducedMotion, useScroll, useTransform } from 'framer-motion'
 import { ArrowDown, ArrowRight, EyeOff, ScanFace, ShieldCheck } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { Component, lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import LiveMap from '../components/landing/LiveMap'
 import MemoryStack from '../components/landing/MemoryStack'
 import Timeline, { ECLIPSE } from '../components/ui/Timeline'
 import Logo, { Wordmark } from '../lib/Logo'
+
+// The 3D head is its own chunk (three.js), loaded after the page paints. Without WebGL, or with
+// reduced motion turned on, or if anything in it throws, the hero shows the logo instead.
+const HeroHeadset = lazy(() => import('../components/landing/HeroHeadset'))
+const hasWebGL = () => {
+  try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')) } catch { return false }
+}
+class Fallback extends Component {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  render() { return this.state.failed ? this.props.fallback : this.props.children }
+}
 
 // The front door: what Lumen is, how the data moves, then a hand-off into the live demo (/start).
 // Every claim here is something the code does; the one number (398 ms) was measured on the AMD box.
@@ -51,6 +63,13 @@ export default function Landing() {
   const [leaving, setLeaving] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const shot = useRef(null)
+  const [show3d] = useState(() => !still && hasWebGL())
+  const heroLogo = (
+    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 1.2, ease }}
+      className={show3d ? 'grid h-full place-items-center' : ''}>
+      <Logo size={88} live />
+    </motion.div>
+  )
   const { scrollYProgress } = useScroll({ target: shot, offset: ['start end', 'center center'] })
   const shotScale = useTransform(scrollYProgress, [0, 1], still ? [1, 1] : [0.86, 1])
   const shotTilt = useTransform(scrollYProgress, [0, 1], still ? [0, 0] : [14, 0])
@@ -82,11 +101,16 @@ export default function Landing() {
       {/* Hero */}
       <section className="relative flex min-h-[100svh] flex-col items-center justify-center px-6 text-center">
         <div aria-hidden className="pointer-events-none absolute left-1/2 top-[42%] h-[60vmin] w-[60vmin] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-25 blur-[90px]" style={{ background: ECLIPSE }} />
-        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 1.2, ease }}>
-          <Logo size={88} live />
-        </motion.div>
+        {show3d ? (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1.4, ease }}
+            className="relative mt-10 h-[clamp(280px,46svh,540px)] w-screen max-w-[1500px]">
+            <Fallback fallback={heroLogo}>
+              <Suspense fallback={heroLogo}><HeroHeadset /></Suspense>
+            </Fallback>
+          </motion.div>
+        ) : heroLogo}
         <motion.h1 initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25, duration: 1, ease }}
-          className="mt-10 max-w-[14ch] text-[clamp(2.75rem,8vw,6.5rem)] font-semibold leading-[0.95] tracking-[-0.04em]">
+          className={`${show3d ? 'mt-5 sm:-mt-4' : 'mt-10'} max-w-[14ch] text-[clamp(2.75rem,8vw,6.5rem)] font-semibold leading-[0.95] tracking-[-0.04em]`}>
           Sound you can <span style={gradientText}>see.</span>
         </motion.h1>
         <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45, duration: 1, ease }}
@@ -103,10 +127,10 @@ export default function Landing() {
             How it works
           </a>
         </motion.div>
-        <motion.a href="#how" aria-label="Scroll down" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.4, duration: 1 }}
+        {!show3d && <motion.a href="#how" aria-label="Scroll down" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.4, duration: 1 }}
           className="absolute bottom-8 text-zinc-600 hover:text-zinc-300">
           <ArrowDown size={18} className={still ? '' : 'animate-bounce'} />
-        </motion.a>
+        </motion.a>}
       </section>
 
       {/* Live path: the real demo kit, wired to the brain */}
