@@ -62,7 +62,7 @@ export default function Dashboard() {
   }, [])
   const laptop = useLaptopCameras()
   const wall = useCameraWall({ nodes: state.nodes, previews, now, connected, cams: laptop.cams, camError: laptop.error,
-    onAskCameras: () => laptop.refresh(true) })
+    onAskCameras: () => laptop.refresh(true), alert: ripples[ripples.length - 1] })
 
   const header = (
     <header className="mb-3 flex flex-wrap items-center gap-3">
@@ -110,6 +110,7 @@ export default function Dashboard() {
     <main className="min-h-full overflow-x-hidden p-4">
       {header}
       {showQr && <QrPanel />}
+      {wall.full}
 
       <section className="grid gap-3 lg:h-[min(74vh,780px)] lg:grid-cols-[minmax(0,1fr)_minmax(0,2.3fr)_minmax(0,1fr)] lg:grid-rows-2">
         <div className="min-h-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">{wall.center}</div>
