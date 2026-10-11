@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { chooseVoice } from '../src/lib/speak.js'
+import { chooseVoice, LUMA_VOICE } from '../src/lib/speak.js'
 
 const v = (name, lang) => ({ name, lang })
 
@@ -31,6 +31,10 @@ test('prefers an English voice over the first voice in the list', () => {
 
 test('uses whatever voice exists when none are English', () => {
   assert.equal(chooseVoice([v('Amelie', 'fr-FR')]).name, 'Amelie')
+})
+
+test('Luma is Kokoro\'s heart voice', () => {
+  assert.equal(LUMA_VOICE, 'af_heart')
 })
 
 test('returns null when the browser has no voices yet', () => {

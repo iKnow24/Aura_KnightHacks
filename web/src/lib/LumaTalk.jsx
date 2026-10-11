@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Mic, Send, Sparkles, Volume2, X } from 'lucide-react'
-import { useRef, useState } from 'react'
-import { prime, say, voiceSupported } from './speak'
+import { useEffect, useRef, useState } from 'react'
+import { prime, say, voiceSupported, warmup } from './speak'
 import { api } from './useBrain'
 
 // "Ask Luma" on the wearer's screen: tap, then talk or type. The answer comes from the house log
@@ -16,6 +16,11 @@ export default function LumaTalk({ liftBy = 0 }) {
   const [heard, setHeard] = useState(false)
   const [answer, setAnswer] = useState(null)
   const recRef = useRef()
+
+  // A laptop can load Luma's voice. A phone skips the download and keeps the captions light.
+  useEffect(() => {
+    if (window.matchMedia('(min-width: 900px)').matches) warmup()
+  }, [])
 
   const ask = async (text) => {
     const question = text.trim()

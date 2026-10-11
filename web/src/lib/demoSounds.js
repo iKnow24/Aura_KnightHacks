@@ -2,8 +2,6 @@
 // to every screen. This only plays a short noise from the laptop so the room hears it too.
 // Made with the browser's tone generator. No sound files.
 
-import { speakNow } from './speak'
-
 let ctx
 
 function audio() {
@@ -56,7 +54,13 @@ const PLAY = {
     tone(660, 0.4, 0.55, { gain: 0.2 })
   },
   name_called: (name) => {
-    speakNow(name ? `${name}` : 'Hey')
+    // This is someone calling a name, not Luma, and it has to start with the beep.
+    const line = new SpeechSynthesisUtterance(name ? `${name}` : 'Hey')
+    line.rate = 1
+    const synth = window.speechSynthesis
+    if (!synth) return
+    synth.cancel()
+    setTimeout(() => synth.speak(line), 60)
   },
   fall: () => noise(0, 0.35, { gain: 0.45, freq: 180 }),
   timer: () => {

@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { Mic, Send, Volume2, VolumeX } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { greet, prime, say, setVoice, voiceOn, voiceSupported } from './speak'
+import { greet, onVoiceStatus, prime, say, setVoice, voiceOn, voiceSupported, warmup } from './speak'
 import { ALERT_TEXT, ZONES } from './zones'
 
 const SUGGESTIONS = ['Where are my keys?', 'What was the last thing said?', 'What happened while I was asleep?']
@@ -21,19 +21,20 @@ export default function AskLumen({ className = '' }) {
   const [listening, setListening] = useState(false)
   const [thread, setThread] = useState(load)
   const [voice, setVoiceOn] = useState(voiceOn)
-  const [speaking, setSpeaking] = useState(false)
+  const [voiceStatus, setVoiceStatus] = useState({ status: 'idle', progress: 0 })
   const list = useRef()
-  const spoke = useRef()
 
   const hear = (text) => {
     setVoice(true)
     setVoiceOn(true)
-    const ok = text ? say(text, { force: true }) : greet()
-    if (!ok) return
-    setSpeaking(true)
-    clearTimeout(spoke.current)
-    spoke.current = setTimeout(() => setSpeaking(false), 2200)
+    prime()
+    warmup()
+    if (text) say(text, { force: true })
+    else greet()
   }
+
+  useEffect(() => onVoiceStatus(setVoiceStatus), [])
+  useEffect(() => { if (voice) warmup() }, [voice])
 
   useEffect(() => {
     if (list.current) list.current.scrollTop = list.current.scrollHeight
@@ -46,6 +47,7 @@ export default function AskLumen({ className = '' }) {
   const ask = async (question) => {
     if (!question.trim() || busy) return
     prime()
+    if (voiceOn()) warmup()
     setQ('')
     setBusy(true)
     setThread((t) => [...t, { from: 'you', text: question, ts: Date.now() / 1000 }])
@@ -56,11 +58,7 @@ export default function AskLumen({ className = '' }) {
     } catch {
       reply = { answer: "Can't reach the brain right now.", evidence: [] }
     }
-    if (say(reply.answer)) {
-      setSpeaking(true)
-      clearTimeout(spoke.current)
-      spoke.current = setTimeout(() => setSpeaking(false), 2200)
-    }
+    say(reply.answer)
     setThread((t) => [...t, { from: 'lumen', text: reply.answer, evidence: reply.evidence, brain: reply.brain, ts: Date.now() / 1000 }])
     setBusy(false)
   }
@@ -85,7 +83,11 @@ export default function AskLumen({ className = '' }) {
               <button type="button" onClick={() => hear()}
                 title="Play Luma's voice now"
                 className="flex items-center gap-1 text-xs text-zinc-300 hover:text-white">
-                <Volume2 size={14} /> {speaking ? 'Speaking…' : 'Hear Luma'}
+                <Volume2 size={14} /> {
+                  voiceStatus.status === 'speaking' ? 'Speaking…'
+                    : voiceStatus.status === 'loading' ? `Loading Luma${voiceStatus.progress ? ` ${voiceStatus.progress}%` : '…'}`
+                      : 'Hear Luma'
+                }
               </button>
               <button type="button" onClick={() => {
                 const next = !voice
@@ -103,7 +105,7 @@ export default function AskLumen({ className = '' }) {
       </div>
 
       <ol ref={list} className="mt-3 min-h-24 flex-1 space-y-3 overflow-y-auto pr-1" aria-live="polite">
-        {thread.length === 0 && <li className="text-sm text-zinc-500">Ask the house agent anything it heard or saw. Answers come from the house log.</li>}
+        {thread.length === 0 && <li className="text-sm text-zinc-500">Ask the house agent anything it heard or saw. Answers come from the house log. Tap Hear Luma to hear her. Her voice downloads once, then stays on this laptop.</li>}
         {thread.map((m, i) => (
           <motion.li key={`${m.ts}-${i}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
             className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 ${m.from === 'you' ? 'ml-auto bg-zinc-100 text-ink' : 'bg-zinc-900'}`}>
