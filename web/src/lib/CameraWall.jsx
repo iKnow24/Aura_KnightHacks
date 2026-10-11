@@ -1,6 +1,7 @@
 import { Maximize2, RefreshCw } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { assign, closeCameras, fillSlots, listCameras, localSource, openCamera, phoneSource } from './cameras'
+import TalkingHeads from './TalkingHeads'
 import { zoneLabel } from './zones'
 
 const STORE = 'lumen.wall'
@@ -122,6 +123,7 @@ function LaptopFeed({ deviceId, label, look }) {
   return <>
     <video ref={video} playsInline muted aria-label={`${label} camera`} className="absolute inset-0 h-full w-full object-contain" />
     {seen && <Highlights seen={seen} />}
+    {look && <TalkingHeads videoRef={video} />}
   </>
 }
 

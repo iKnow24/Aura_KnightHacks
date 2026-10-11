@@ -53,10 +53,10 @@ export function detectFaces(video, timestampMs) {
   })
 }
 
-// Where a 0-1 video point lands inside an element showing the video with object-fit: cover.
-export function toScreen(video, el, x, y) {
+// Where a 0-1 video point lands inside an element showing the video with object-fit: cover (or contain).
+export function toScreen(video, el, x, y, fit = 'cover') {
   const w = el.clientWidth, h = el.clientHeight
   const vw = video.videoWidth || w, vh = video.videoHeight || h
-  const scale = Math.max(w / vw, h / vh)
+  const scale = (fit === 'contain' ? Math.min : Math.max)(w / vw, h / vh)
   return { left: (w - vw * scale) / 2 + x * vw * scale, top: (h - vh * scale) / 2 + y * vh * scale }
 }
