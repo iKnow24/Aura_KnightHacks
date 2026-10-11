@@ -82,7 +82,7 @@ export default function AskLumen({ className = '' }) {
                 ))}
               </ul>
             )}
-            {m.from === 'lumen' && <div className="mt-1 text-[11px] text-zinc-600">{m.brain && m.brain !== 'rules' ? `${m.brain} · ` : ''}{time(m.ts)}</div>}
+            {m.from === 'lumen' && <div className="mt-1 text-[11px] text-zinc-600">{m.brain && m.brain !== 'rules' ? 'Lumen AI · ' : ''}{time(m.ts)}</div>}
           </motion.li>
         ))}
         {busy && <li className="w-fit rounded-2xl bg-zinc-900 px-3.5 py-2.5 text-zinc-400">…</li>}

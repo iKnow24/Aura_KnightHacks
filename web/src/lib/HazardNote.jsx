@@ -43,7 +43,7 @@ export default function HazardNote({ videoRef }) {
           body: JSON.stringify({ jpeg: c.toDataURL('image/jpeg', 0.6), zone: 'living' }),
         }).then((x) => x.json())
         if (dead) return
-        if (r.enabled === false) setStatus(r.error || 'Needs a Gemini key on the brain')
+        if (r.enabled === false) setStatus(r.error || 'Lumen hazard check is off on the brain')
         else if (r.error) setStatus(r.error)
         else if (!r.wait) {
           setStatus('')
@@ -69,9 +69,9 @@ export default function HazardNote({ videoRef }) {
         </div>
       )}
       {on && status && <span className="glass-dark rounded-full px-3 py-1 text-xs text-zinc-300">{status}</span>}
-      <button onClick={toggle} title="Sends a still from this camera to Google Gemini every few seconds"
+      <button onClick={toggle} title="Sends a still from this camera to Lumen's cloud AI every few seconds"
         className="glass-dark pointer-events-auto rounded-full px-3 py-1 text-xs text-zinc-200 hover:text-white">
-        AI hazard check: {on ? 'on' : 'off'}
+        Lumen hazard check: {on ? 'on' : 'off'}
       </button>
     </div>
   )

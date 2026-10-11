@@ -5,9 +5,11 @@ import { useState } from 'react'
 // and a quick quiz. People remember by place and time, so every branch says when it was said.
 const BRAIN = {
   local: 'Written by Lumen’s own model on our AMD GPU. Nothing left our server.',
-  groq: 'Written by an open model on Groq.',
-  xai: 'Written by Grok.',
-  claude: 'Written by Claude.',
+  groq: 'Written by Lumen AI.',
+  xai: 'Written by Lumen AI.',
+  claude: 'Written by Lumen AI.',
+  gemini: 'Written by Lumen AI.',
+  hf: 'Written by Lumen AI.',
   rules: 'Built offline from your transcript, no AI model needed.',
 }
 
