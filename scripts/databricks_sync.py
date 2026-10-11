@@ -1,4 +1,4 @@
-"""Send this home's real Lumen events to Databricks, every 30 seconds. Runs on your Mac.
+"""Send this home's real Lumen events to Databricks, every 5 seconds. Runs on your Mac.
 
 The AMD box can't reach databricks.com (its proxy blocks it), but your Mac can reach both:
 
@@ -7,7 +7,8 @@ The AMD box can't reach databricks.com (its proxy blocks it), but your Mac can r
 
 Each round it uploads only the lines added since last time, as a new small file
 (2026-10-10_14-000123.jsonl = hour 14, starting at byte 123). Auto Loader reads every file name
-once, so each event lands in Bronze exactly once, within about a minute instead of after the hour ends.
+once, so each event lands in Bronze exactly once, within seconds of the upload if the pipeline runs in
+Continuous mode (pass --continuous), or about a minute if each upload has to start the job.
 
 On the box, start the brain with:   EVENT_LOG_DIR=$HOME/lumen_events LUMEN_HOUSEHOLD=home LUMEN_SYNC_KEY=<any password>
 On your Mac, sign in once (a browser opens; there is no token to copy):
@@ -17,7 +18,8 @@ Then, with the same password the brain was started with:
     python3 scripts/databricks_sync.py
 The script uses that saved login (WorkspaceClient profile "lumen"). It uploads to
 /Volumes/lumen/home/raw_events/ and starts job 1103380381835252 after each upload.
-Set DATABRICKS_JOB_ID only if the job was recreated and the id changed.
+Set DATABRICKS_JOB_ID only if the job was recreated and the id changed. With the pipeline in Continuous
+mode, pass --continuous: it is already running, so the script only uploads.
 
 LUMEN_URL defaults to http://localhost:5173 (the Jupyter bridge, or a laptop brain).
 Progress is kept in ~/.lumen_databricks_sync.json, so stopping and restarting never uploads twice.
@@ -73,7 +75,7 @@ class Databricks:
         active = list(self.w.jobs.list_runs(job_id=int(job_id), active_only=True, limit=1))
         if active:
             return False
-        # run_now returns a waiter. Don't wait: the next 30 s round only needs the run to exist.
+        # run_now returns a waiter. Don't wait: the next round only needs the run to exist.
         self.w.jobs.run_now(job_id=int(job_id))
         return True
 
@@ -110,7 +112,9 @@ def sync_once(lumen, key, db, volume, state):
 def main():
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--once", action="store_true", help="upload what's new and stop")
-    p.add_argument("--every", type=int, default=30, help="seconds between rounds (default 30)")
+    p.add_argument("--every", type=int, default=5, help="seconds between rounds (default 5)")
+    p.add_argument("--continuous", action="store_true",
+                   help="the pipeline runs in Continuous mode, so only upload (never start the job)")
     p.add_argument("--volume", default="/Volumes/lumen/home/raw_events")
     args = p.parse_args()
 
@@ -120,12 +124,13 @@ def main():
     db = Databricks()
     job = os.environ.get("DATABRICKS_JOB_ID") or DEFAULT_JOB_ID
     state = json.loads(STATE.read_text()) if STATE.exists() else {}
-    print(f"Syncing {lumen} -> {db.host}{args.volume} as profile {db.profile}, then job {job}")
+    then = "(pipeline runs continuously)" if args.continuous else f"then job {job}"
+    print(f"Syncing {lumen} -> {db.host}{args.volume} as profile {db.profile}, {then}")
 
     while True:
         try:
             if sync_once(lumen, os.environ["LUMEN_SYNC_KEY"], db, args.volume, state):
-                if db.run_job(job):
+                if not args.continuous and db.run_job(job):
                     print(f"{time.strftime('%H:%M:%S')}  started the pipeline job")
         except urllib.error.HTTPError as e:
             hint = {403: "LUMEN_SYNC_KEY doesn't match the brain's, or the brain wasn't started with "
