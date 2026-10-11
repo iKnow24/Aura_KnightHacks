@@ -450,7 +450,29 @@ def enroll_voice(body: VoiceClip):
     name = " ".join(body.name.split())[:30].title()
     if not name:
         raise HTTPException(400, "Type a name first.")
-    voices.book.enroll(name, clip_vec(body))
+    try:
+        audio = np.frombuffer(base64.b64decode(body.audio), np.float32)
+        if len(audio) > 10 * 16000:  # the 60 s script: averaged over many pieces
+            voices.enroll_long(name, audio)
+        else:
+            voices.book.enroll(name, voices.embed_clip(audio))
+    except ValueError as e:
+        raise HTTPException(400, str(e) or "Couldn't read that recording.")
+    return voices.book.summary()
+
+
+@app.get("/api/voices/backup")
+def backup_voices():
+    """Download the team's saved voiceprints (named ones only), to restore on a rebuilt box."""
+    return voices.book.backup()
+
+
+@app.post("/api/voices/restore")
+def restore_voices(body: dict):
+    try:
+        voices.book.restore(body)
+    except (ValueError, KeyError, TypeError) as e:
+        raise HTTPException(400, str(e) or "That isn't a Lumen voices backup.")
     return voices.book.summary()
 
 

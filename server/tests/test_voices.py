@@ -128,3 +128,26 @@ def test_voices_page_enroll_who_remove(monkeypatch):
     assert client.post("/api/voices/enroll", json={"name": "", "audio": clip_b64}).status_code == 400
     left = client.post("/api/voices/remove", json={"name": "Kha"}).json()["people"]
     assert left == [{"name": "Sharan", "lines": 1}]
+
+
+def test_long_reading_and_backup_restore(monkeypatch, tmp_path):
+    import base64
+    sharan = person()
+    monkeypatch.setattr(main, "voices", Voices(embed=lambda audio: clip(sharan)))
+    main.voices.book.path = str(tmp_path / "v.json")
+    client = TestClient(main.app)
+    minute = np.full(16000 * 60, 0.05, np.float32)
+    minute[16000 * 20:16000 * 26] = 0  # a pause gets skipped
+    r = client.post("/api/voices/enroll", json={"name": "Sharan", "audio": base64.b64encode(minute.tobytes()).decode()})
+    assert r.json()["people"][0]["lines"] >= 8
+    saved = client.get("/api/voices/backup").json()
+    main.voices.book.guests.append({"label": "Person 2", "vec": unit_vec(), "n": 1})
+    assert "Person" not in str(client.get("/api/voices/backup").json())
+    main.voices.book.forget()
+    assert client.post("/api/voices/restore", json=saved).json()["people"][0]["name"] == "Sharan"
+    assert client.post("/api/voices/restore", json={"people": {"x": {"vec": [1, 2]}}}).status_code == 400
+
+
+def unit_vec():
+    v = person()
+    return v / np.linalg.norm(v)

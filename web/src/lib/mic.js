@@ -50,8 +50,9 @@ export async function streamMic(zone = 'wearer', onLevel) {
 }
 
 // Records `seconds` of this device's mic as 16 kHz mono float32 (for the Voices page).
-// onLevel gets the loudness while recording; returns the samples as base64.
-export async function recordClip(seconds, onLevel) {
+// onLevel gets the loudness while recording; returns the samples as base64. With pieceSeconds, returns
+// a list of base64 pieces instead (a long reading is sent in small requests, not one big one).
+export async function recordClip(seconds, onLevel, pieceSeconds) {
   const mic = await navigator.mediaDevices.getUserMedia({
     audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
   })
@@ -77,7 +78,15 @@ export async function recordClip(seconds, onLevel) {
   const all = new Float32Array(chunks.reduce((n, c) => n + c.length, 0))
   let at = 0
   for (const c of chunks) { all.set(c, at); at += c.length }
-  const bytes = new Uint8Array(all.buffer)
+  if (!pieceSeconds) return toBase64(all)
+  const step = pieceSeconds * 16000
+  const pieces = []
+  for (let i = 0; i + step / 2 <= all.length; i += step) pieces.push(toBase64(all.slice(i, i + step)))
+  return pieces
+}
+
+function toBase64(samples) {
+  const bytes = new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength)
   let bin = ''
   for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
   return btoa(bin)

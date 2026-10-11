@@ -57,7 +57,8 @@ function paintMesh(mesh) {
     color.set(paint(bone, p)).toArray(colors, i * 3)
   }
   mesh.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-  mesh.material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78 })
+  // Double-sided so the shirt and jeans stay solid when the view swings behind the figure.
+  mesh.material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, side: THREE.DoubleSide })
 }
 
 const mat = (color, roughness = 0.6) => new THREE.MeshStandardMaterial({ color, roughness })

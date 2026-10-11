@@ -112,12 +112,15 @@ def test_llm_brain_tool_loop(monkeypatch):
 def test_provider_choice(monkeypatch):
     from app.agent import pick_provider
 
-    for k in ("GROQ_API_KEY", "ANTHROPIC_API_KEY", "XAI_API_KEY", "HF_TOKEN", "LUMEN_LLM", "LUMEN_LLM_MODEL"):
+    for k in ("GROQ_API_KEY", "ANTHROPIC_API_KEY", "XAI_API_KEY", "GEMINI_API_KEY", "HF_TOKEN", "LUMEN_LLM", "LUMEN_LLM_MODEL"):
         monkeypatch.delenv(k, raising=False)
     assert pick_provider() is None
     monkeypatch.setenv("HF_TOKEN", "h")
     name, url, key, model = pick_provider()
     assert name == "hf" and "huggingface.co" in url and key == "h" and model == "openai/gpt-oss-20b"
+    monkeypatch.setenv("GEMINI_API_KEY", "m")
+    name, url, key, model = pick_provider()
+    assert name == "gemini" and "googleapis.com" in url and key == "m" and model == "gemini-2.5-flash"
     monkeypatch.setenv("XAI_API_KEY", "x")
     assert pick_provider()[0] == "xai"
     monkeypatch.setenv("GROQ_API_KEY", "g")
@@ -126,6 +129,8 @@ def test_provider_choice(monkeypatch):
     assert pick_provider()[0] == "xai"
     monkeypatch.setenv("LUMEN_LLM", "hf")
     assert pick_provider()[0] == "hf"
+    monkeypatch.setenv("LUMEN_LLM", "gemini")
+    assert pick_provider()[0] == "gemini"
     monkeypatch.setenv("LUMEN_LLM", "off")
     assert pick_provider() is None
 

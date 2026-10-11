@@ -1,4 +1,3 @@
-import { AnimatePresence, motion } from 'framer-motion'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { api, useBrain } from '../lib/useBrain'
 import AlertIcon from '../lib/AlertIcon'
@@ -10,8 +9,9 @@ import QrPanel from '../lib/QrPanel'
 import { Wordmark } from '../lib/Logo'
 import { getUser, signOut } from '../lib/user'
 const Avatar3D = lazy(() => import('../lib/Avatar3D'))
+const SoundField = lazy(() => import('../lib/SoundField'))
 import { playDemoSound } from '../lib/demoSounds'
-import { alertText, SEVERITY_COLOR, ZONES, zoneLabel } from '../lib/zones'
+import { alertText, SEVERITY_COLOR, zoneLabel } from '../lib/zones'
 
 const FAKES = [
   ['smoke_alarm', 'living', 'critical'],
@@ -25,16 +25,6 @@ const FAKES = [
   ['spill', 'kitchen', 'warning'],
 ]
 
-// Room outlines behind the zone labels, drawn in the same 0-100 space as ZONES x/y.
-const ROOMS = [
-  'M8 8 H92 V92 H8 Z', // living room (the one room phone for the demo)
-]
-const FloorPlan = () => (
-  <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden="true">
-    {ROOMS.map((d) => <path key={d} d={d} fill="none" stroke="rgb(255 255 255 / 0.12)" strokeWidth="1" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />)}
-  </svg>
-)
-
 export default function Dashboard() {
   const [ripples, setRipples] = useState([])
   const [showQr, setShowQr] = useState(false)
@@ -45,7 +35,7 @@ export default function Dashboard() {
   const captions = useCaptions()
   const { state, connected } = useBrain('dashboard', (alert) => {
     setRipples((r) => [...r, alert])
-    setTimeout(() => setRipples((r) => r.filter((x) => x.id !== alert.id)), 4000)
+    setTimeout(() => setRipples((r) => r.filter((x) => x.id !== alert.id)), 12000)
   }, (msg) => {
     if (msg.type === 'caption') captions.add(msg)
     // The main camera tile puts lines over the speaker's head (TalkingHeads.jsx).
@@ -106,7 +96,7 @@ export default function Dashboard() {
   }
 
   // Control center: main camera in the middle, a camera on each side, the headset wearer in 3D
-  // bottom left, the house plan bottom right.
+  // bottom left, and the 3D sound field bottom right.
   return (
     <main className="min-h-full overflow-x-hidden p-4">
       {header}
@@ -120,43 +110,10 @@ export default function Dashboard() {
           <Suspense fallback={<div className="glass h-full min-h-[200px] rounded-xl" />}><Avatar3D cams={laptop.cams} /></Suspense>
         </div>
         <div className="min-h-0 lg:col-start-3 lg:row-start-2">
-          {/* Floor plan. Skeletons and zone status only: no live video, for privacy. */}
-          <div className="glass relative aspect-[4/3] h-full overflow-hidden rounded-xl sm:aspect-[16/10] lg:aspect-auto">
-            <FloorPlan />
-            {Object.entries(ZONES).filter(([, z]) => z.map !== false).map(([id, z]) => {
-              const alive = Object.values(state.nodes).some((n) => n.zone === id && now - n.last_seen < 10)
-              const said = captions.lines.filter((l) => l.zone === id)
-              const latest = said[said.length - 1]
-              return (
-                <div key={id} className="absolute -translate-x-1/2 -translate-y-1/2 text-center" style={{ left: `${z.x}%`, top: `${z.y}%` }}>
-                  <div className={`mx-auto mb-2 h-2 w-2 rounded-full ${alive ? 'live-dot bg-emerald-400' : 'border border-zinc-600'}`} />
-                  <div className="text-sm font-medium">{z.label}</div>
-                  <div className={`text-xs ${alive ? 'text-emerald-300' : 'text-zinc-500'}`}>{alive ? 'node live' : 'no node'}</div>
-                  {latest && (
-                    <div className="mx-auto mt-1 max-w-[9rem] text-xs font-semibold leading-snug text-white">
-                      “{latest.text.length > 42 ? `${latest.text.slice(0, 41)}…` : latest.text}”
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-            <AnimatePresence>
-              {ripples.map((a) => {
-                const z = ZONES[a.zone]
-                if (!z || z.map === false) return null
-                return (
-                  <motion.div
-                    key={a.id}
-                    className="pointer-events-none absolute rounded-full border-4"
-                    style={{ left: `${z.x}%`, top: `${z.y}%`, borderColor: SEVERITY_COLOR[a.severity], width: 40, height: 40, marginLeft: -20, marginTop: -20 }}
-                    initial={{ scale: 0.5, opacity: 1 }}
-                    animate={{ scale: 6, opacity: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 1.5, repeat: 2 }}
-                  />
-                )
-              })}
-            </AnimatePresence>
+          <div className="glass relative h-full min-h-[200px] overflow-hidden rounded-xl">
+            <Suspense fallback={<div className="h-full min-h-[200px]" />}>
+              <SoundField nodes={state.nodes} now={now} alerts={ripples} vision={vision} />
+            </Suspense>
           </div>
         </div>
       </section>

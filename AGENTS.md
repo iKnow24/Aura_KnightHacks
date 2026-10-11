@@ -102,8 +102,8 @@ cd server && python -m pytest -q
 cd web && npm run build
 ```
 
-Env vars: `MODE`, `LUMEN_NAME`, `LUMEN_LLM` = `groq` (free default, keep it) | `claude` | `xai` | `hf` | `off` with
-`GROQ_API_KEY` / `ANTHROPIC_API_KEY` / `XAI_API_KEY` / `HF_TOKEN` (Hugging Face Inference Providers;
+Env vars: `MODE`, `LUMEN_NAME`, `LUMEN_LLM` = `groq` (free default, keep it) | `claude` | `xai` | `gemini` | `hf` | `off` with
+`GROQ_API_KEY` / `ANTHROPIC_API_KEY` / `XAI_API_KEY` / `GEMINI_API_KEY` / `HF_TOKEN` (Hugging Face Inference Providers;
 `LUMEN_LLM_MODEL` picks any HF chat model id); `WHISPER_PROVIDER=groq`; `VOICE_ID=0` turns voice labels off, `VOICE_MATCH` / `VOICE_NEW` tune them; `EVENT_LOG_DIR`, `LUMEN_HOUSEHOLD`,
 `LUMEN_SYNC_KEY`; `DATABRICKS_HOST`, `DATABRICKS_TOKEN`, `DATABRICKS_WAREHOUSE_ID` for the History tab.
 
