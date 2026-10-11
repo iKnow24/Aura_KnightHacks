@@ -57,7 +57,8 @@ function paintMesh(mesh) {
     color.set(paint(bone, p)).toArray(colors, i * 3)
   }
   mesh.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-  mesh.material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78 })
+  // Double-sided so the shirt and jeans stay solid when the view swings behind the figure.
+  mesh.material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, side: THREE.DoubleSide })
 }
 
 const mat = (color, roughness = 0.6) => new THREE.MeshStandardMaterial({ color, roughness })
@@ -107,6 +108,49 @@ function lanyard() {
   return g
 }
 
+// The walker mesh is open through the seat. A smooth jeans shape sits on the back of the hips
+// and closes that hole, with a waistband so the hem reads as clothing.
+function seat() {
+  const g = new THREE.Group()
+  const jeans = mat(C.jeans, 0.7)
+  const band = mat('#2a4064', 0.5)
+  for (const s of [1, -1]) {
+    const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.058, 28, 20), jeans)
+    cheek.scale.set(1.05, 0.82, 0.72)
+    cheek.position.set(s * 0.05, 0.945, -0.112)
+    g.add(cheek)
+  }
+  const fill = new THREE.Mesh(new THREE.SphereGeometry(0.04, 20, 14), jeans)
+  fill.scale.set(1.35, 0.7, 0.6)
+  fill.position.set(0, 0.95, -0.1)
+  g.add(fill)
+  const waist = new THREE.Mesh(new THREE.TorusGeometry(0.128, 0.015, 12, 48), band)
+  waist.rotation.x = Math.PI / 2
+  waist.position.set(0, 1.012, -0.015)
+  g.add(waist)
+  return g
+}
+
+// A smooth short sleeve over the low-poly upper arm, with a folded cuff at the elbow.
+function sleeve(sign) {
+  const g = new THREE.Group()
+  const cloth = mat(C.shirt, 0.62)
+  const cuffMat = mat('#5c4a3c', 0.45)
+  const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.064, 0.052, 0.28, 32, 1, true), cloth)
+  tube.rotation.z = Math.PI / 2
+  tube.position.set(sign * 0.31, 1.44, -0.05)
+  g.add(tube)
+  const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.054, 0.011, 14, 32), cuffMat)
+  cuff.rotation.y = Math.PI / 2
+  cuff.position.set(sign * 0.44, 1.438, -0.05)
+  g.add(cuff)
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.066, 28, 18), cloth)
+  cap.scale.set(0.85, 0.95, 0.82)
+  cap.position.set(sign * 0.175, 1.45, -0.048)
+  g.add(cap)
+  return g
+}
+
 function watch() {
   const g = new THREE.Group()
   const band = new THREE.Mesh(new THREE.TorusGeometry(0.036, 0.011, 8, 24), mat(C.watch, 0.5))
@@ -131,6 +175,9 @@ export function dressAsWearer(scene) {
     ['Head', headset()],
     ['Head', at(new THREE.Mesh(new THREE.CapsuleGeometry(0.009, 0.014, 4, 8), mat(C.watch, 0.4)), 0.092, 1.655, 0.02)], // earbud, left ear
     ['Spine2', lanyard()],
+    ['Hips', seat()],
+    ['LeftArm', sleeve(1)],
+    ['RightArm', sleeve(-1)],
     ['LeftForeArm', watch()],
   ]
   for (const [name, part] of parts) {

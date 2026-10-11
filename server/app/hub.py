@@ -57,6 +57,14 @@ class Hub:
                 except Exception:
                     self.disconnect(ws, role)
 
+    async def broadcast_bytes(self, roles: list[str], data: bytes):
+        for role in roles:
+            for ws in list(self.clients.get(role, set())):
+                try:
+                    await ws.send_bytes(data)
+                except Exception:
+                    self.disconnect(ws, role)
+
     async def emit_alert(self, kind: str, zone: str, severity: str, source: str, confidence: float = 1.0):
         event = {
             "type": "alert",

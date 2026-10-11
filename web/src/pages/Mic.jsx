@@ -24,7 +24,7 @@ export default function Mic() {
     return (
       <main className="grid h-full place-items-center p-6">
         <div className="w-full max-w-xs text-center">
-          <h1 className="text-2xl font-semibold">Speaker mic</h1>
+          <h1 className="text-2xl font-semibold">1 Mic</h1>
           <p className="mt-2 text-sm text-zinc-400">Put this phone in front of one person. Their name labels what they say.</p>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Their name"
             className="mt-6 w-full rounded-lg bg-zinc-900 px-3 py-3 text-center text-lg outline-none ring-amber-400 focus:ring-2" />

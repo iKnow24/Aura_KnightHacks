@@ -3,21 +3,20 @@
 // (car horns, sirens) on it. Returns a stop() function.
 const wsUrl = (path) => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${path}`
 
-export async function streamMic(zone = 'wearer', onLevel) {
+// Opens this device's mic and calls send(arrayBuffer) with 16 kHz mono float32.
+// The gain into the speakers is zero, so the phone does not play its own mic back.
+export async function attachMic(send, onLevel) {
   const mic = await navigator.mediaDevices.getUserMedia({
     audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
   })
   const ctx = new AudioContext({ sampleRate: 16000 })
   const src = ctx.createMediaStreamSource(mic)
   const proc = ctx.createScriptProcessor(4096, 1, 1)
-  let ws, closed = false
-  const open = () => {
-    ws = new WebSocket(wsUrl(`/ws/node/${zone}-${Math.random().toString(36).slice(2, 6)}?zone=${zone}`))
-    ws.onclose = () => { if (!closed) setTimeout(open, 1000) }
-  }
-  open()
+  const mute = ctx.createGain()
+  mute.gain.value = 0
   src.connect(proc)
-  proc.connect(ctx.destination)
+  proc.connect(mute)
+  mute.connect(ctx.destination)
   // iPhones can ignore the 16 kHz request and record at 48 kHz. The brain expects 16 kHz,
   // so average down if needed (otherwise Whisper hears everyone at triple speed).
   const ratio = ctx.sampleRate / 16000
@@ -38,14 +37,31 @@ export async function streamMic(zone = 'wearer', onLevel) {
       for (let i = 0; i < samples.length; i++) sum += samples[i] * samples[i]
       onLevel(Math.sqrt(sum / samples.length))
     }
-    if (ws.readyState === 1) ws.send(new Float32Array(samples).buffer)
+    send(new Float32Array(samples).buffer)
   }
   return () => {
-    closed = true
-    ws.close()
+    proc.onaudioprocess = null
     proc.disconnect()
+    mute.disconnect()
+    src.disconnect()
     mic.getTracks().forEach((t) => t.stop())
     ctx.close()
+  }
+}
+
+export async function streamMic(zone = 'wearer', onLevel) {
+  let ws, closed = false
+  const open = () => {
+    if (closed) return
+    ws = new WebSocket(wsUrl(`/ws/node/${zone}-${Math.random().toString(36).slice(2, 6)}?zone=${zone}`))
+    ws.onclose = () => { if (!closed) setTimeout(open, 1000) }
+  }
+  open()
+  const stopMic = await attachMic((buf) => { if (ws?.readyState === 1) ws.send(buf) }, onLevel)
+  return () => {
+    closed = true
+    ws?.close()
+    stopMic()
   }
 }
 

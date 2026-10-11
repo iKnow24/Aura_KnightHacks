@@ -16,11 +16,16 @@ export function useBrain(role, onAlert, onOther) {
     let ws, retry, ping, closed = false
     const open = (delay = 500) => {
       ws = new WebSocket(wsUrl(`/ws/${role}`))
+      ws.binaryType = 'arraybuffer'
       ws.onopen = () => {
         setConnected(true)
         ping = setInterval(() => ws.readyState === 1 && ws.send('ping'), 10000)
       }
       ws.onmessage = (e) => {
+        if (typeof e.data !== 'string') {
+          window.dispatchEvent(new CustomEvent('lumen:headset-audio', { detail: e.data }))
+          return
+        }
         const msg = JSON.parse(e.data)
         if (msg.type === 'state') setState(msg)
         if (msg.type === 'alert') {

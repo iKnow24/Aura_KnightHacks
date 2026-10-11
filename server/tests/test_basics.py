@@ -48,6 +48,18 @@ def test_node_audio_triggers_real_alarm_alert():
         assert msg["source"] == "alarm_dsp" and msg["zone"] == "kitchen"
 
 
+def test_headset_mic_triggers_alarm_with_no_model_and_no_api():
+    client = TestClient(app)
+    client.post("/api/mode", json={"mode": "night"})
+    with client.websocket_connect("/ws/strobe") as strobe, client.websocket_connect("/ws/node/headset-z?zone=wearer") as node:
+        strobe.receive_json(); node.receive_json()
+        audio = t3_alarm()
+        for i in range(0, len(audio), SR // 2):
+            node.send_bytes(audio[i : i + SR // 2].tobytes())
+        msg = strobe.receive_json()
+        assert msg["source"] == "alarm_dsp" and msg["zone"] == "wearer" and msg["kind"] == "smoke_alarm"
+
+
 def test_rear_scene_reaches_wearer_phone_as_rear_side():
     client = TestClient(app)
     with client.websocket_connect("/ws/hud") as hud, client.websocket_connect("/ws/node/rear-t?zone=behind") as node:

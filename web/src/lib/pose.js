@@ -12,7 +12,7 @@ export async function loadPose() {
   const options = (delegate) => ({
     baseOptions: { modelAssetPath: `${import.meta.env.BASE_URL}mediapipe/pose_landmarker_lite.task`, delegate },
     runningMode: 'VIDEO',
-    numPoses: 1,
+    numPoses: 3,
   })
   try {
     landmarker = await PoseLandmarker.createFromOptions(files, options('GPU'))
@@ -37,6 +37,20 @@ export function detectPoseWorld(video, timestampMs) {
   if (!landmarker || video.readyState < 2) return null
   const person = landmarker.detectForVideo(video, timestampMs).worldLandmarks?.[0]
   return person ? person.map((p) => [p.x, p.y, p.z, p.visibility ?? 1]) : null
+}
+
+// Every person in the laptop frame, closest to center first. World points stay in this tab.
+// imageX is 0–1 across the picture, so a person standing to the side can be drawn beside the wearer.
+export function detectPeople(video, timestampMs) {
+  if (!landmarker || video.readyState < 2) return []
+  const result = landmarker.detectForVideo(video, timestampMs)
+  const worlds = result.worldLandmarks ?? []
+  const images = result.landmarks ?? []
+  return worlds.map((person, i) => ({
+    world: person.map((p) => [p.x, p.y, p.z, p.visibility ?? 1]),
+    x: images[i]?.[23]?.x ?? images[i]?.[0]?.x ?? 0.5,
+  })).filter((p) => p.world.some((q) => q[3] > 0.5))
+    .sort((a, b) => Math.abs(a.x - 0.5) - Math.abs(b.x - 0.5))
 }
 
 const round = (n) =>Math.round(n * 1000) / 1000

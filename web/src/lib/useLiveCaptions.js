@@ -16,7 +16,7 @@ export const instantSupported = !!SR
 const KEY = 'lumen_transcript'
 const loadSaved = () => { try { return JSON.parse(localStorage.getItem(KEY)) || [] } catch { return [] } }
 
-export function useLiveCaptions({ engine, active, onFinal }) {
+export function useLiveCaptions({ engine, active, onFinal, externalMic = false }) {
   const [lines, setLines] = useState(loadSaved)
   const [interim, setInterim] = useState('')
   const [listening, setListening] = useState(false)
@@ -70,11 +70,14 @@ export function useLiveCaptions({ engine, active, onFinal }) {
       try { rec.start() } catch { /* already started */ }
       return () => { wanted = false; rec.abort() }
     }
+    // The headset page already streams this mic (picture and sound together). A second
+    // open would steal the microphone on some phones.
+    if (externalMic) { setListening(true); return () => setListening(false) }
     let stop
     streamMic('wearer', setLevel).then((s) => { stop = s; setListening(true) })
       .catch(() => setError('Microphone blocked. Allow it in the browser settings.'))
     return () => { stop?.(); setListening(false) }
-  }, [engine, active, addLine])
+  }, [engine, active, addLine, externalMic])
 
   // Captions the brain sends back (Whisper): our own mic in private mode, speaker mics, room nodes.
   // `replaces`: a louder phone heard the same sentence, so it takes over the label.
@@ -93,5 +96,5 @@ export function useLiveCaptions({ engine, active, onFinal }) {
     setInterim(msg.text)
   }, [engine])
 
-  return { lines, interim, listening, error, level, addRemote, addPartial, clear: () => setLines([]), addLine }
+  return { lines, interim, listening, error, level, setLevel, addRemote, addPartial, clear: () => setLines([]), addLine }
 }

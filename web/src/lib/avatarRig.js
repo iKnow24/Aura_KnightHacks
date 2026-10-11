@@ -92,10 +92,50 @@ export function idlePose(t) {
   return lm
 }
 
-// Real webcam points where MediaPipe is sure of them, the relaxed pose everywhere else.
-export function withIdle(lm, t) {
-  const idle = idlePose(t)
+// A walk cycle in the same point space, used where the camera cannot see the legs.
+export function walkPose(t) {
+  const lm = idlePose(t)
+  const s = Math.sin(t * 6.2)
+  const swing = (ankle, knee, sign) => {
+    const lift = Math.max(0, sign * s)
+    lm[ankle][2] = sign * s * 0.2
+    lm[ankle][1] = 0.85 - lift * 0.14
+    lm[knee][2] = sign * s * 0.1
+    lm[knee][1] = 0.43 - lift * 0.1
+  }
+  swing(27, 25, 1)
+  swing(28, 26, -1)
+  lm[15][2] = -s * 0.14
+  lm[16][2] = s * 0.14
+  return lm
+}
+
+// Real webcam points where MediaPipe is sure of them. Missing points stand, or walk when `walking`.
+export function withIdle(lm, t, walking = false) {
+  const idle = walking ? walkPose(t) : idlePose(t)
   return lm ? lm.map((p, i) => (p[3] > 0.5 ? p : idle[i])) : idle
+}
+
+// True once the legs are stepping, or the shoulders are bouncing like a walk. `state` is a small object
+// the caller keeps so a single frame of noise does not flip the gait.
+export function isWalking(lm, state, dt) {
+  if (!lm) { state.walk = 0; return false }
+  let moving = 0
+  if (lm[27][3] > 0.45 && lm[28][3] > 0.45) {
+    const lift = Math.abs(lm[27][1] - lm[28][1])
+    const spread = Math.abs((lm[27][2] || 0) - (lm[28][2] || 0))
+    moving = lift > 0.05 || spread > 0.08 ? 1 : 0
+  } else if (lm[11][3] > 0.5 && lm[12][3] > 0.5) {
+    const y = (lm[11][1] + lm[12][1]) / 2
+    if (state.shoulder != null) {
+      const v = Math.abs(y - state.shoulder) / Math.max(dt, 0.02)
+      state.bounce = (state.bounce || 0) * 0.8 + v * 0.2
+      moving = state.bounce > 0.25 ? 1 : 0
+    }
+    state.shoulder = y
+  }
+  state.walk = (state.walk || 0) + ((moving - (state.walk || 0)) * Math.min(1, dt * 4))
+  return state.walk > 0.4
 }
 
 // Models without an idle clip: start each frame from the rest pose.

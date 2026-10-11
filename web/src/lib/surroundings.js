@@ -64,20 +64,41 @@ export function measure(detection, w, h) {
   }
 }
 
+const VEHICLE = new Set(['car', 'truck', 'bus', 'motorcycle'])
+
+// How fast the box is growing, in mph, over the last half second. Positive means closing.
+// Distance from a box is rough, so slow drift and wild jumps are left blank.
+export function closingMph(samples, now) {
+  if (!samples || samples.length < 3) return null
+  const cur = samples[samples.length - 1]
+  const ref = samples.find((s) => now - s.t <= 900)
+  if (!ref || ref === cur) return null
+  const dt = (cur.t - ref.t) / 1000
+  if (dt < 0.45) return null
+  const mps = (ref.dist - cur.dist) / dt
+  if (mps < 1.2 || mps > 25) return null
+  return Math.round(mps * 2.237)
+}
+
 // samples: [{t, dist, area}] oldest first, only the last ~2 s of one object.
 // True when it is getting closer, or it just showed up already close.
+// Cars use a shorter window than people: a vehicle covers the gap while a person is still a few steps away.
 export function isApproaching(label, samples, now, { allowSudden = true } = {}) {
   const rule = APPROACH_RULES[label]
   if (!rule || samples.length < 2) return false
   const cur = samples[samples.length - 1]
   const age = now - samples[0].t
+  const fast = VEHICLE.has(label)
+  const suddenAfter = fast ? 250 : 400
   // "Just appeared already close" — only after the camera has been watching,
   // so a parked car that was there when you tapped start does not warn by itself.
-  if (allowSudden && age >= 400 && age <= 1600 && cur.dist <= rule.sudden && samples[0].dist <= rule.sudden + 0.5) return true
-  const ref = [...samples].reverse().find((s) => now - s.t >= 600)
+  if (allowSudden && age >= suddenAfter && age <= 1600 && cur.dist <= rule.sudden && samples[0].dist <= rule.sudden + 0.5) return true
+  const ref = [...samples].reverse().find((s) => now - s.t >= (fast ? 320 : 600))
   if (!ref || ref === cur) return false
-  const closing = cur.dist <= rule.close && cur.dist <= ref.dist * 0.82 && ref.dist - cur.dist >= 0.4
-  const grew = cur.area >= 0.015 && ref.area > 0 && cur.area / ref.area >= 1.35 && cur.dist <= rule.close
+  const drop = fast ? 0.25 : 0.4
+  const ratio = fast ? 0.9 : 0.82
+  const closing = cur.dist <= rule.close && cur.dist <= ref.dist * ratio && ref.dist - cur.dist >= drop
+  const grew = cur.area >= 0.015 && ref.area > 0 && cur.area / ref.area >= (fast ? 1.22 : 1.35) && cur.dist <= rule.close
   return closing || grew
 }
 
