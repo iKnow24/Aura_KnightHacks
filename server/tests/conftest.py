@@ -1,3 +1,7 @@
+import os
+
+os.environ["LUMEN_TESTING"] = "1"
+
 import pytest
 
 from app import main

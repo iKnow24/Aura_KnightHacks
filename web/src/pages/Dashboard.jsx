@@ -18,6 +18,8 @@ const FAKES = [
   ['timer', 'kitchen', 'warning'],
   ['car_horn', 'wearer', 'critical'],
   ['person_behind', 'behind', 'warning'],
+  ['vehicle_behind', 'behind', 'critical'],
+  ['spill', 'kitchen', 'warning'],
 ]
 
 // Room outlines behind the zone labels, drawn in the same 0-100 space as ZONES x/y.
@@ -98,14 +100,27 @@ export default function Dashboard() {
           {Object.entries(ZONES).filter(([, z]) => z.map !== false).map(([id, z]) => {
             const node = Object.values(state.nodes).find((n) => n.zone === id)
             const alive = node && now - node.last_seen < 10
+            const said = captions.lines.filter((l) => l.zone === id)
+            const latest = said[said.length - 1]
             return (
               <div key={id} className="absolute -translate-x-1/2 -translate-y-1/2 text-center" style={{ left: `${z.x}%`, top: `${z.y}%` }}>
                 <div className={`mx-auto mb-2 h-2 w-2 rounded-full ${alive ? 'live-dot bg-emerald-400' : 'border border-zinc-600'}`} />
                 <div className="text-sm font-medium">{z.label}</div>
                 <div className={`text-xs ${alive ? 'text-emerald-300' : 'text-zinc-500'}`}>{alive ? 'node live' : 'no node'}</div>
+                {latest && (
+                  <div className="mx-auto mt-1 max-w-[9rem] text-sm font-semibold leading-snug text-white">
+                    “{latest.text.length > 42 ? `${latest.text.slice(0, 41)}…` : latest.text}”
+                    {said.length > 1 && <div className="text-xs font-medium text-zinc-300">{said.length} lines saved</div>}
+                  </div>
+                )}
               </div>
             )
           })}
+          {captions.lines.some((l) => !l.zone || l.zone === 'wearer') && (
+            <div className="absolute inset-x-3 bottom-2 rounded-lg bg-black/80 px-3 py-2 text-left text-sm font-semibold text-white">
+              Near you: “{captions.lines.filter((l) => !l.zone || l.zone === 'wearer').at(-1).text}”
+            </div>
+          )}
           <AnimatePresence>
             {ripples.map((a) => {
               const z = ZONES[a.zone]

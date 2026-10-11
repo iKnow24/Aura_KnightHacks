@@ -45,6 +45,20 @@ def test_ack_reaches_every_screen_and_marks_event():
     assert client.get("/api/state").json()["events"][-1]["acked"]["by"] == "wearer"
 
 
+def test_spill_alerts_at_home_not_at_night():
+    client = TestClient(app)
+    for mode, expect in (("wearer", True), ("night", False)):
+        client.post("/api/mode", json={"mode": mode})
+        before = len(client.get("/api/state").json()["events"])
+        with client.websocket_connect("/ws/node/kitchen-spill?zone=kitchen") as node:
+            node.receive_json()
+            node.send_json({"type": "spill", "score": 0.8, "area": 0.05})
+            node.send_json({"type": "pose", "ts": 0, "landmarks": None})
+        events = client.get("/api/state").json()["events"]
+        assert (len(events) > before) == expect
+    assert events[-1]["kind"] == "spill" and events[-1]["zone"] == "kitchen"
+
+
 def test_rear_camera_approach_alerts_only_outside():
     client = TestClient(app)
     for mode, expect in (("night", False), ("outside", True)):

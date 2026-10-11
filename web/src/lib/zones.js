@@ -37,6 +37,7 @@ export const ALERT_TEXT = {
   reversing: { icon: '🚛', text: 'Vehicle reversing' },
   person_behind: { icon: '🚶', text: 'Someone walking up behind you' },
   vehicle_behind: { icon: '🚗', text: 'Vehicle coming up behind you' },
+  spill: { icon: '💧', text: 'Something spilled' },
   bike_behind: { icon: '🚲', text: 'Bike coming up behind you' },
 }
 

@@ -139,6 +139,23 @@ def test_said_to_me_prefers_lines_facing_the_wearer():
     assert "Dinner" in answer_rules("what was the last thing said", m, [])["answer"]
 
 
+def test_conversations_reload_from_disk_without_photos(tmp_path):
+    path = tmp_path / "conversations.jsonl"
+    m = Memory(path)
+    m.add_speech("kitchen", "Dinner is ready")
+    m.add_sighting("living", "keys", 0.4, thumb="data:image/jpeg;base64,xx")
+    saved = path.read_text()
+    assert "Dinner is ready" in saved and "base64" not in saved
+    again = Memory(path)
+    assert len(again.entries) == 1 and again.entries[0]["zone"] == "kitchen"
+    e = again.entries[0]
+    again.tag_speech(e["ts"], 1, True)
+    tagged = Memory(path)
+    assert tagged.entries[0]["speaker"] == 1 and tagged.entries[0]["to_you"] is True
+    tagged.clear()
+    assert Memory(path).entries == []
+
+
 def test_headset_speech_skips_alarm_detectors_and_takes_caption_meta(monkeypatch):
     client = TestClient(main.app)
     client.delete("/api/memory")

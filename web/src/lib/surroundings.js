@@ -22,7 +22,7 @@ export function loadDetector() {
     const files = await FilesetResolver.forVisionTasks(`${import.meta.env.BASE_URL}mediapipe/wasm`)
     const options = (delegate) => ({
       baseOptions: { modelAssetPath: `${import.meta.env.BASE_URL}mediapipe/efficientdet_lite0.tflite`, delegate },
-      runningMode: 'VIDEO', scoreThreshold: 0.45, maxResults: 8,
+      runningMode: 'VIDEO', scoreThreshold: 0.35, maxResults: 8,
     })
     try { return await ObjectDetector.createFromOptions(files, options('GPU')) } catch { return ObjectDetector.createFromOptions(files, options('CPU')) }
   })()
@@ -33,6 +33,53 @@ const focal = (w, h) => Math.hypot(w, h) / 2 / Math.tan((DIAGONAL_FOV / 2) * Mat
 
 // Horizontal field of view in degrees, for drawing the camera's cone.
 export const cameraFov = (w, h) => 2 * Math.atan(w / 2 / focal(w, h)) * 180 / Math.PI
+
+// How close is "close enough to warn". `close` = already near and still coming in.
+// `sudden` = they appeared this close (someone ran into frame, or a car is right there).
+export const APPROACH_RULES = {
+  person: { close: 5, sudden: 3.2 },
+  bicycle: { close: 6, sudden: 4 },
+  motorcycle: { close: 8, sudden: 5 },
+  car: { close: 14, sudden: 8 },
+  truck: { close: 16, sudden: 9 },
+  bus: { close: 18, sudden: 10 },
+}
+
+// One detection -> distance in meters and how much of the frame it fills.
+export function measure(detection, w, h) {
+  const name = detection.categories?.[0]?.categoryName
+  const k = KINDS[name]
+  if (!k || !w || !h) return null
+  const b = detection.boundingBox
+  const f = focal(w, h)
+  const cut = b.originY + b.height > h * 0.97
+  const raw = cut ? Math.min(2.5, (f * k.height) / Math.max(b.height, 1)) : (f * k.height) / Math.max(b.height, 1)
+  return {
+    label: name,
+    kind: k.kind,
+    dist: Math.round(Math.min(30, Math.max(0.5, raw)) * 10) / 10,
+    area: (b.width * b.height) / (w * h),
+    score: detection.categories[0].score,
+    box: b,
+  }
+}
+
+// samples: [{t, dist, area}] oldest first, only the last ~2 s of one object.
+// True when it is getting closer, or it just showed up already close.
+export function isApproaching(label, samples, now, { allowSudden = true } = {}) {
+  const rule = APPROACH_RULES[label]
+  if (!rule || samples.length < 2) return false
+  const cur = samples[samples.length - 1]
+  const age = now - samples[0].t
+  // "Just appeared already close" — only after the camera has been watching,
+  // so a parked car that was there when you tapped start does not warn by itself.
+  if (allowSudden && age >= 400 && age <= 1600 && cur.dist <= rule.sudden && samples[0].dist <= rule.sudden + 0.5) return true
+  const ref = [...samples].reverse().find((s) => now - s.t >= 600)
+  if (!ref || ref === cur) return false
+  const closing = cur.dist <= rule.close && cur.dist <= ref.dist * 0.82 && ref.dist - cur.dist >= 0.4
+  const grew = cur.area >= 0.015 && ref.area > 0 && cur.area / ref.area >= 1.35 && cur.dist <= rule.close
+  return closing || grew
+}
 
 // Detections -> [{ kind, bearing (deg, + is right of the camera), dist (m) }]
 export function toObjects(detections, w, h) {

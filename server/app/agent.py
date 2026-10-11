@@ -38,7 +38,8 @@ ALERT_NAMES = {"smoke_alarm": "a smoke alarm", "doorbell": "the doorbell", "name
                "timer": "a timer go off", "kettle": "the kettle", "phone_ring": "the phone ring", "knock": "a knock",
                "alarm_clock": "an alarm clock", "water_running": "water left running", "dog_bark": "the dog bark",
                "car_horn": "a car horn", "siren": "a siren", "vehicle": "a car approaching",
-               "person_behind": "someone come up behind you", "vehicle_behind": "a vehicle come up behind you"}
+               "person_behind": "someone come up behind you", "vehicle_behind": "a vehicle come up behind you",
+               "spill": "something spill"}
 
 ZONE_NAMES = {"living": "living room", "wearer": "room with you"}
 

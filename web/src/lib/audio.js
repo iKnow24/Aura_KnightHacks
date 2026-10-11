@@ -22,13 +22,14 @@ export async function streamMic(send, onLevel, { cleanup = false } = {}) {
 }
 
 // A node socket that reconnects on its own. Returns { send, close }.
-export function nodeSocket(nodeId, zone, onStatus) {
+export function nodeSocket(nodeId, zone, onStatus, onMessage) {
   let ws, closed = false
   const connect = () => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
     ws = new WebSocket(`${proto}://${location.host}/ws/node/${nodeId}?zone=${zone}`)
     ws.binaryType = 'arraybuffer'
     ws.onopen = () => onStatus?.('streaming')
+    ws.onmessage = (e) => { try { onMessage?.(JSON.parse(e.data)) } catch { /* not json */ } }
     ws.onclose = () => { if (closed) return; onStatus?.('reconnecting'); setTimeout(connect, 1000) }
   }
   connect()
