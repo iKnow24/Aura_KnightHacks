@@ -10,6 +10,7 @@ paths, current state. This file is the short version; keep the two in sync.
 - The alert JSON in docs/agent-line.md is a contract. Don't change it without being told to.
 - Modes are config in server/app/modes.py, not separate code paths.
 - No LLM decides whether a safety alert fires. Detectors are deterministic or classifier + threshold.
+- Sound direction is `server/app/direction.py`: headset at the center, back cam behind, phone on the chest. SAID and PSELDNets are the reference models. Do not feed the three phone streams into their checkpoints; those weights expect four mics on one puck. Retrain with `python -m app.direction_train`. Direction never fires an alert.
 - No live video leaves a phone. Nodes send audio, pose keypoints, and one still photo every 5 s for item
   memory; the brain keeps only a small crop of each item it finds and never stores full frames.
 - No face recognition. Names only come from someone saying "my name is ...".

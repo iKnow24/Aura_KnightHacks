@@ -9,7 +9,7 @@ import { openCamera } from './cameras'
 import { isWalking, makeRig, poseRig, resetRig, withIdle } from './avatarRig'
 import { dressAsWearer } from './outfit'
 import { detectPeople, loadPose } from './pose'
-import { ZONES, zoneLabel } from './zones'
+import { ZONES } from './zones'
 
 // Bottom-left of the control center: the person in the headset, as a 3D figure that copies their
 // pose. The laptop webcam faces them; MediaPipe finds 33 body points on this laptop and the figure's
@@ -195,10 +195,34 @@ function Figure({ poseRef, onReady, onGait }) {
   return fig ? <primitive object={fig.scene} /> : null
 }
 
-function Heard({ bearing }) {
+function BodyMics() {
+  return (
+    <group>
+      <mesh position={[0.14, 1.12, 0.18]}>
+        <boxGeometry args={[0.07, 0.13, 0.016]} />
+        <meshStandardMaterial color="#f4f4f5" roughness={0.35} />
+      </mesh>
+      <mesh position={[0, 1.28, -0.24]}>
+        <boxGeometry args={[0.1, 0.045, 0.04]} />
+        <meshStandardMaterial color="#d4d4d8" roughness={0.45} />
+      </mesh>
+    </group>
+  )
+}
+
+function Heard({ bearing, atCenter }) {
+  if (atCenter) {
+    return (
+      <mesh position={[0, 1.05, 0]}>
+        <sphereGeometry args={[0.16, 16, 12]} />
+        <meshBasicMaterial color="#f4f4f5" transparent opacity={0.35} />
+      </mesh>
+    )
+  }
   if (bearing == null) return null
   const a = (bearing * Math.PI) / 180
-  const from = new THREE.Vector3(Math.sin(a) * 1.35, 1.15, Math.cos(a) * 1.35)
+  const dist = Math.abs(bearing) < 1 ? 0.55 : 0.85
+  const from = new THREE.Vector3(Math.sin(a) * dist, 1.15, Math.cos(a) * dist)
   const to = new THREE.Vector3(0, 1.05, 0)
   const mid = from.clone().add(to).multiplyScalar(0.5)
   const dir = to.clone().sub(from)
@@ -222,7 +246,9 @@ export default function Avatar3D({ cams, direction = null }) {
   const peopleRef = useRef([])
   const cam = cams.find((c) => c.id === deviceId) ?? cams[0]
   const fresh = direction && Date.now() / 1000 - direction.ts < 1.8 && ZONES[direction.zone]
-  const bearing = fresh ? ZONES[direction.zone].bearing : null
+  const atCenter = fresh && direction.zone === 'wearer'
+  const bearing = fresh && !atCenter ? ZONES[direction.zone].bearing : null
+  const sideName = !fresh ? '' : direction.zone === 'wearer' ? 'Headset' : direction.zone === 'drone' ? 'Phone' : 'Back cam'
 
   useEffect(() => {
     if (!on || !cam) return
@@ -266,7 +292,8 @@ export default function Avatar3D({ cams, direction = null }) {
         <directionalLight position={[2, 4, 3]} intensity={1.6} />
         <Figure poseRef={poseRef} onReady={() => setFigureReady(true)} onGait={(walking) => setStatus(walking ? 'Walking' : 'Tracking')} />
         <Bystanders peopleRef={peopleRef} />
-        <Heard bearing={bearing} />
+        <BodyMics />
+        <Heard bearing={bearing} atCenter={atCenter} />
         <mesh rotation-x={-Math.PI / 2}><circleGeometry args={[0.9, 48]} /><meshBasicMaterial color="#18181b" /></mesh>
       </Canvas>
       {/* Small self-view so the person can see they're in frame. */}
@@ -285,7 +312,7 @@ export default function Avatar3D({ cams, direction = null }) {
           {on ? 'Stop' : 'Start'}
         </button>
       </figcaption>
-      {fresh && <p className="pointer-events-none absolute left-0 right-0 top-12 text-center text-sm font-semibold">{zoneLabel(direction.zone)}</p>}
+      {fresh && <p className="pointer-events-none absolute left-0 right-0 top-12 text-center text-sm font-semibold">{sideName}</p>}
       <p className="pointer-events-none absolute bottom-7 left-0 right-0 text-center text-xs text-zinc-500">{hint}</p>
       <p className="absolute bottom-2 left-3 text-xs text-zinc-400" aria-live="polite">{cam ? status : 'No laptop camera found'}</p>
     </figure>

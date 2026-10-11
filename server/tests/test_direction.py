@@ -19,6 +19,11 @@ def test_the_loud_mic_is_the_side():
     assert found["zone"] == "behind"
 
 
+def test_headset_hears_it_first_so_the_sound_stays_at_the_center():
+    found = locate({"wearer": _click(80), "behind": _click(500)})
+    assert found["zone"] == "wearer"
+
+
 def test_same_bump_keeps_the_mic_that_heard_it_first():
     # Same click, equally loud. The back mic's copy starts earlier, so the sound is behind.
     found = locate({"wearer": _click(500), "behind": _click(120)})

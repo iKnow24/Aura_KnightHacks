@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { KINDS, cameraFov, closingMph, isApproaching, loadDetector, measure, toObjects } from '../lib/surroundings'
+import { attachMic } from '../lib/mic'
 import { api, keepAwake } from '../lib/useBrain'
 
 // Outside mode: a second phone clipped to the back of a bag, camera facing behind you.
@@ -37,7 +38,10 @@ export default function Rear() {
     }
     let cam
     try {
-      cam = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: 640, height: 480 } })
+      cam = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: 640, height: 480 },
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      })
     } catch (e) {
       setStatus(`camera blocked: ${e.message || e}`)
       return
@@ -46,13 +50,16 @@ export default function Rear() {
     await videoRef.current.play()
 
     let ws, closed = false
+    const sock = { current: null }
     const open = () => {
       ws = new WebSocket(wsUrl(`/ws/node/rear-${Math.random().toString(36).slice(2, 6)}?zone=behind`))
+      sock.current = ws
       ws.onopen = () => setLink('connected')
       ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.type === 'state') setMode(m.mode) }
       ws.onclose = () => { if (!closed) { setLink('reconnecting'); setTimeout(open, 1000) } }
     }
     open()
+    const stopMic = await attachMic((buf) => { if (sock.current?.readyState === 1) sock.current.send(buf) }, null, cam)
     setStatus('watching behind you')
 
     const tracks = {} // label -> [{t, dist, area}]
@@ -109,7 +116,7 @@ export default function Rear() {
       setSeen(live)
     }, 1000 / FPS)
 
-    stopRef.current = () => { closed = true; clearInterval(timer); ws?.close(); cam.getTracks().forEach((t) => t.stop()) }
+    stopRef.current = () => { closed = true; clearInterval(timer); stopMic(); ws?.close(); cam.getTracks().forEach((t) => t.stop()) }
   }
 
   return (
@@ -120,7 +127,7 @@ export default function Rear() {
         <button onClick={start} className="absolute inset-0 grid place-items-center bg-black p-6 text-center">
           <div>
             <div className="text-3xl font-semibold">Back cam</div>
-            <p className="mx-auto mt-3 max-w-sm text-lg text-zinc-300">Clip this phone to the back of the bag, camera facing behind you. Tap to start.</p>
+            <p className="mx-auto mt-3 max-w-sm text-lg text-zinc-300">Clip this phone to the back of the bag, camera facing behind you. Its mic is on too, so a sound back there can be placed. Tap to start.</p>
           </div>
         </button>
       ) : (

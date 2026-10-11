@@ -66,7 +66,7 @@ These message types go out on the same sockets. They are not alerts, so screens 
 {"type": "direction", "zone": "behind", "level": 0.04, "ts": 1728540000.1}            // dashboard only
 ```
 
-`direction` is not an alert. It names which live mic heard the latest sound, after the streams are lined up. Screens can ignore it. It is not stored.
+`direction` is not an alert. It names which live mic heard the latest sound. The headset is the clock, the back cam is behind the person, and the security phone is on the chest. The guess comes from `server/app/direction.py` (weights trained on those positions). SAID and PSELDNets checkpoints are not loaded: they expect four mics on one puck. Screens can ignore this message. It is not stored.
 
 The headset streams its own mic as node zone `"wearer"` (speech only, no alarm detectors). When a caption
 for it arrives, the headset works out who said it from lip movement and sends back

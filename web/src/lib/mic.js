@@ -5,8 +5,9 @@ const wsUrl = (path) => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${lo
 
 // Opens this device's mic and calls send(arrayBuffer) with 16 kHz mono float32.
 // The gain into the speakers is zero, so the phone does not play its own mic back.
-export async function attachMic(send, onLevel) {
-  const mic = await navigator.mediaDevices.getUserMedia({
+export async function attachMic(send, onLevel, stream) {
+  const own = !stream
+  const mic = stream || await navigator.mediaDevices.getUserMedia({
     audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
   })
   const ctx = new AudioContext({ sampleRate: 16000 })
@@ -44,7 +45,7 @@ export async function attachMic(send, onLevel) {
     proc.disconnect()
     mute.disconnect()
     src.disconnect()
-    mic.getTracks().forEach((t) => t.stop())
+    if (own) mic.getTracks().forEach((t) => t.stop())
     ctx.close()
   }
 }
