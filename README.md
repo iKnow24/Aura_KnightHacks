@@ -63,7 +63,7 @@ flowchart LR
     C["Your phone<br/>captions + face/lip tracking"]
     R["Back phone<br/>what's behind you"]
   end
-  subgraph Brain["Brain · FastAPI on AMD GPU"]
+  subgraph Brain["Brain · FastAPI on one laptop or GPU box"]
     D1["Smoke alarm<br/>3 kHz beep pattern"]
     D2["Sound AI<br/>AST"]
     D3["Speech<br/>Whisper"]
@@ -131,14 +131,20 @@ setup, including the "a new week arrives" live demo, is in [`databricks/README.m
 
 | Layer | What |
 |---|---|
-| Compute | **AMD Radeon Cloud** GPU (PyTorch on ROCm) runs the brain and the models |
-| Models | **Hugging Face** `MIT/ast-finetuned-audioset` (sounds), `openai/whisper` (speech), `google/owlv2` (where things are) |
-| On the phone | MediaPipe Tasks: face landmarks (lip movement), pose, EfficientDet object detection |
-| Server | Python, FastAPI, WebSockets |
-| Web | React, Vite, Tailwind, Framer Motion, three.js (react-three-fiber) |
-| Ask Lumen | Groq by default, swappable to Claude or xAI with one env var |
-| History | **Databricks**: Lakeflow declarative pipeline (Bronze/Silver/Gold), AI/BI dashboard, Genie |
-| Phones over HTTPS | Cloudflare Tunnel |
+| Brain | Python, FastAPI, WebSockets. For the live demo it runs on our MacBook; we also ran it on an **AMD Radeon Cloud** GPU (PyTorch on ROCm), where one OWLv2 pass over a room photo took a median 398 ms |
+| Sound | Smoke alarm: plain signal processing (3 kHz beep pattern), no AI. Other sounds: **Hugging Face** `MIT/ast-finetuned-audioset` |
+| Speech | **Whisper** large-v3-turbo through **Groq**'s API (local `openai/whisper` also supported) |
+| Who is talking | **WavLM** speaker embeddings (`microsoft/wavlm-base-plus-sv`), enrolled at `/voices`, kept in RAM only |
+| Where things are | **OWLv2** (`google/owlv2`) on a still every 5 s; only a small crop of each item is kept |
+| On the phone | **MediaPipe** Tasks: face landmarks (lip movement), pose, object detection |
+| Luma (Ask Lumen + hazard notes) | **Google Gemini**, falling back to Groq when Gemini is busy. Shown in the app as "Luma". Answers are spoken with **Kokoro** (open voice that runs in the browser) or the browser's own voice |
+| Web | React, Vite, Tailwind, Framer Motion, gsap, three.js (react-three-fiber) |
+| History | **Databricks**: Lakeflow declarative pipeline (Bronze/Silver/Gold), AI/BI dashboard, Genie. See the honest status below |
+| Phones over HTTPS | Cloudflare Tunnel (quick tunnel) |
+| How we built it | **Claude Code**, **Codex** and **Cursor** wrote much of the code with us; we reviewed, tested on our phones and decided what shipped |
+
+Safety rule we kept all weekend: no AI model decides whether a safety alert fires. Luma only reads what the
+house already logged, and its hazard note is advice on the dashboard, never an alert.
 
 ## What's built vs. what's tested
 
@@ -149,7 +155,10 @@ We'd rather you hear the limits from us.
 | Smoke alarm detector, fall rules, mode routing, memory, event log | ✅ | ✅ 49 automated tests, run by CI on every PR |
 | Dashboard, captions, strobe, alerts, Ask Lumen | ✅ | ✅ in the browser, with demo alert buttons |
 | Clean UI with calm motion (page fade, panel rise, live pulses) | ✅ | ✅ in the browser |
-| AST sound AI, Whisper, OWLv2 on the AMD GPU | ✅ | ⚠️ written against the real models, not yet run end to end on the AMD box |
+| OWLv2 on the AMD GPU | ✅ | ✅ measured on the AMD box (median 398 ms per photo, 26 labels in one pass) |
+| AST sound AI | ✅ | ⚠️ written against the real model, not checked against real household sounds |
+| Whisper (Groq), WavLM voice ID, Luma | ✅ | ✅ on our laptop and phones; ⚠️ voice ID needs each person to enroll first and is unreliable in a loud room |
+| Sound direction on the dashboard | ✅ loudest-mic per device | ⚠️ the corner glow can also be set by the presenter with keys 1-4, and it says so on screen |
 | 3D walking view, back-phone detection | ✅ | ⚠️ not yet on a real phone; distance is a rough estimate, about ±30% |
 | History tab | ✅ | ✅ on the sample data, offline; ⚠️ the live Databricks read is not yet tested |
 | Databricks pipeline, dashboard datasets, Genie setup | ✅ | ⚠️ not yet run on a Databricks workspace |
@@ -206,8 +215,12 @@ cd web && npm run build
 | `docs/shipping.md`, `scripts/` | How PRs get tested and merged into main |
 | `AGENTS.md` | Rules for AI coding agents (Codex, Cursor) working in this repo; `CLAUDE.md` for Claude Code |
 
-## Team 
+## Team
 
+Built in one weekend at KnightHacks IX by:
 
-Built in one weekend at KnightHacks IX bySharan ([@iKnow24](https://github.com/iKnow24)), Jonel([@joverboost]),Khalid([@kha07].
+- **Sharan Santharam** ([@iKnow24](https://github.com/iKnow24))
+- **Jonel** ([@joverboost](https://github.com/joverboost))
+- **Khalid** ([@kha07](https://github.com/kha07))
+
 MIT licensed.
