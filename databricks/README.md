@@ -104,8 +104,29 @@ Then **Settings → Enable Genie → Link existing Genie agent**, paste your age
    15 missed vs 5 (7 vs 2 at night).
 5. Ask Genie on the dashboard: *"Is Mom doing okay this week?"*
 
-## Stretch: Ask Lumen calls Genie
+## Ask Lumen calls Genie
 
-Genie has a Conversation API (`POST /api/2.0/genie/spaces/{space_id}/start-conversation`).
-Ask Lumen could send history questions ("this week", "this month") there and keep "what did she
-just say" local. Check with the Databricks team whether Free Edition allows it before building.
+Week-long questions ("Is Mom doing okay this week?") can go to the Genie space. Gemini (or whichever
+`LUMEN_LLM` is on) picks a tool named `ask_genie`. What was just said, and where the keys are, stay
+on the local log.
+
+Set these in the same terminal that starts the brain, next to `GEMINI_API_KEY` and `LUMEN_LLM=gemini`:
+
+```bash
+export DATABRICKS_HOST=https://<workspace>.cloud.databricks.com
+export DATABRICKS_TOKEN=<personal access token>
+export GENIE_SPACE_ID=<the Genie space id, from the space URL>
+```
+
+The AMD box's proxy blocks databricks.com, so leave those three unset there. `ask_genie` stays
+hidden and Ask Lumen behaves as before. If they are set and the call fails, Ask Lumen says it
+couldn't get the home's history and does not invent counts.
+
+A laptop can reach Databricks. Check the wording without a real space:
+
+```bash
+GEMINI_API_KEY=... python3 scripts/try_ask_genie.py --stub "Is Mom doing okay this week?"
+```
+
+`--stub` feeds Gemini a fixed reply (15 missed vs 5, 7 at night, worth a call). Drop `--stub`,
+with the three variables set, to call the real space.
