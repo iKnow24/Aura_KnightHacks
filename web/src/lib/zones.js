@@ -52,3 +52,7 @@ export const SEVERITY_COLOR = { critical: '#ef4444', warning: '#f59e0b', info: '
 
 // One color per person in the headset view (speech bubbles and the dashboard conversation).
 export const SPEAKER_COLORS = ['#fbbf24', '#38bdf8', '#f472b6']
+
+// What to call the device that heard a sound, on the direction views. The Mac webcam is /node?zone=living.
+export const MIC_NAME = { wearer: 'Headset', drone: 'Phone', behind: 'Back cam', living: 'Mac (front)' }
+export const micName = (zone) => MIC_NAME[zone] ?? zoneLabel(zone)

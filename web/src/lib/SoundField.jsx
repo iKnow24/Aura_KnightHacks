@@ -1,7 +1,7 @@
 import { Canvas } from '@react-three/fiber'
 import { useMemo } from 'react'
 import * as THREE from 'three'
-import { alertText, SEVERITY_COLOR, ZONES, zoneLabel } from './zones'
+import { alertText, micName, SEVERITY_COLOR, ZONES, zoneLabel } from './zones'
 
 // The panel to the right of the headset figure. A small 3D room around the wearer:
 // each live camera sits on its compass bearing, and a sound (a drop, a voice, something
@@ -124,7 +124,7 @@ export default function SoundField({ nodes, now, alerts, vision, direction }) {
         )
       })}
       {cameras.filter((n) => n.zone !== 'wearer' && n.zone !== 'behind' && n.zone !== 'drone').map((n) => <CameraMark key={n.zone} bearing={ZONES[n.zone].bearing} />)}
-      {side && !atCenter && <Beam bearing={ZONES[side.zone].bearing} color="#f4f4f5" text={side.zone === 'drone' ? 'Phone' : 'Back cam'} />}
+      {side && !atCenter && <Beam bearing={ZONES[side.zone].bearing} color="#f4f4f5" text={`Heard loudest: ${micName(side.zone)}`} />}
       {people.map((v) => Array.from({ length: Math.min(v.people, 3) }, (_, i) => (
         <PersonMark key={`${v.node_id}-${i}`} bearing={ZONES[v.zone].bearing} slot={i - 1} />
       )))}

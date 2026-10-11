@@ -9,7 +9,7 @@ import { openCamera } from './cameras'
 import { isWalking, makeRig, poseRig, resetRig, withIdle } from './avatarRig'
 import { dressAsWearer } from './outfit'
 import { detectPeople, loadPose } from './pose'
-import { ZONES } from './zones'
+import { micName, ZONES } from './zones'
 
 // Bottom-left of the control center: the person in the headset, as a 3D figure that copies their
 // pose. The laptop webcam faces them; MediaPipe finds 33 body points on this laptop and the figure's
@@ -248,7 +248,7 @@ export default function Avatar3D({ cams, direction = null }) {
   const fresh = direction && Date.now() / 1000 - direction.ts < 1.8 && ZONES[direction.zone]
   const atCenter = fresh && direction.zone === 'wearer'
   const bearing = fresh && !atCenter ? ZONES[direction.zone].bearing : null
-  const sideName = !fresh ? '' : direction.zone === 'wearer' ? 'Headset' : direction.zone === 'drone' ? 'Phone' : 'Back cam'
+  const sideName = !fresh ? '' : micName(direction.zone)
 
   useEffect(() => {
     if (!on || !cam) return
@@ -312,7 +312,7 @@ export default function Avatar3D({ cams, direction = null }) {
           {on ? 'Stop' : 'Start'}
         </button>
       </figcaption>
-      {fresh && <p className="pointer-events-none absolute left-0 right-0 top-12 text-center text-sm font-semibold">{sideName}</p>}
+      {fresh && <p className="pointer-events-none absolute left-0 right-0 top-12 text-center text-sm font-semibold">Heard loudest: {sideName}</p>}
       <p className="pointer-events-none absolute bottom-7 left-0 right-0 text-center text-xs text-zinc-500">{hint}</p>
       <p className="absolute bottom-2 left-3 text-xs text-zinc-400" aria-live="polite">{cam ? status : 'No laptop camera found'}</p>
     </figure>
