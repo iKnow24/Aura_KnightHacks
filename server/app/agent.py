@@ -150,7 +150,7 @@ PROVIDERS = {
     "claude": ("https://api.anthropic.com/v1/", "ANTHROPIC_API_KEY", "claude-haiku-5-5"),
     "xai": ("https://api.x.ai/v1", "XAI_API_KEY", "grok-4.7"),
     # Google Gemini through its OpenAI-compatible endpoint (key from aistudio.google.com).
-    "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai/", "GEMINI_API_KEY", "gemini-2.5-flash"),
+    "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai/", "GEMINI_API_KEY", "gemini-3.8-flash"),
     # Hugging Face Inference Providers: one HF token, many open models. Last, so it never
     # takes over from Groq when both keys are set; pick it with LUMEN_LLM=hf.
     "hf": ("https://router.huggingface.co/v1", "HF_TOKEN", "openai/gpt-oss-20b"),
@@ -201,7 +201,12 @@ SYSTEM = ("You are Lumen, the memory of a home. You help a deaf or hard-of-heari
           "return nothing, say you haven't seen or heard it. Say times as relative ('12 minutes ago'). "
           "Zone 'living' is the living room; zone 'wearer' means said in the same room as the user, and "
           "said_to_you=true means the speaker was facing them. voice is who said it, when known (a name, or "
-          "'Person 4' for someone whose name we don't know).")
+          "'Person 4' for someone whose name we don't know). "
+          "If there is no history yet, say there isn't enough history yet; never say everything is fine without "
+          "data. Never diagnose a condition or guess "
+          "why someone is behaving differently; if a week is flagged or they ask about health, suggest a check-in "
+          "call. Never mention SQL, tables, queries or Databricks. Live captions are on their phone; for anything "
+          "unrelated to this home (weather, news) say you only help with what happened at home.")
 
 
 def llm_tools() -> list[dict]:
@@ -239,8 +244,11 @@ def answer_llm(question: str, memory: Memory, events: list[dict]) -> dict | None
                                                  messages=messages).choices[0].message
             if not msg.tool_calls:
                 return {"answer": (msg.content or "").strip(), "evidence": evidence, "brain": name}
+            # Gemini tags each tool call with a thought signature (extra_content) and rejects the
+            # next request if it isn't sent back, so keep it when present.
             messages.append({"role": "assistant", "content": msg.content or "", "tool_calls": [
-                {"id": c.id, "type": "function", "function": {"name": c.function.name, "arguments": c.function.arguments}}
+                {"id": c.id, "type": "function", "function": {"name": c.function.name, "arguments": c.function.arguments},
+                 **({"extra_content": c.extra_content} if getattr(c, "extra_content", None) else {})}
                 for c in msg.tool_calls]})
             for c in msg.tool_calls:
                 r = run_tool(c.function.name, json.loads(c.function.arguments or "{}"), memory, events)
