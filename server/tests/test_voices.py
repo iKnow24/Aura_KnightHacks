@@ -32,16 +32,16 @@ def test_enrolled_teammate_is_named_and_judges_get_letters():
     book.enroll("Sharan", clip(sharan))
     assert book.identify(clip(sharan))["voice"] == "Sharan"
     a = book.identify(clip(judge1))
-    assert a == {**a, "voice": "Speaker A", "voice_known": False}
-    assert book.identify(clip(judge2))["voice"] == "Speaker B"
-    assert book.identify(clip(judge1))["voice"] == "Speaker A"
+    assert a == {**a, "voice": "Person 2", "voice_known": False}
+    assert book.identify(clip(judge2))["voice"] == "Person 3"
+    assert book.identify(clip(judge1))["voice"] == "Person 2"
     assert book.identify(clip(sharan))["voice"] == "Sharan"
 
 
 def test_enrolling_a_speaker_letter_merges_it():
     book = VoiceBook()
     kha = person()
-    assert book.identify(clip(kha))["voice"] == "Speaker A"
+    assert book.identify(clip(kha))["voice"] == "Person 1"
     book.enroll("Kha", clip(kha))
     assert book.guests == []
     assert book.identify(clip(kha))["voice"] == "Kha"
@@ -70,7 +70,7 @@ def test_summary_never_includes_voiceprints():
 def test_short_lines_are_not_labeled():
     voices = Voices(embed=lambda audio: np.ones(512))
     assert voices.label(np.zeros(16000, np.float32), "yeah") is None
-    assert voices.label(np.zeros(24000, np.float32), "how does it work?")["voice"] == "Speaker A"
+    assert voices.label(np.zeros(24000, np.float32), "how does it work?")["voice"] == "Person 1"
 
 
 def test_caption_carries_the_voice(monkeypatch):
@@ -92,3 +92,20 @@ def test_caption_carries_the_voice(monkeypatch):
     assert client.get("/api/voices").json()["people"] == [{"name": "Sharan", "lines": 2}]
     client.post("/api/voices/forget")
     assert client.get("/api/voices").json()["people"] == []
+
+
+def test_teammates_are_saved_and_judges_are_not(tmp_path):
+    path = str(tmp_path / "voices.json")
+    book = VoiceBook(path)
+    team = {name: person() for name in ("Sharan", "Kha", "Dana")}
+    for name, voice in team.items():
+        book.enroll(name, clip(voice))
+    judge = person()
+    assert book.identify(clip(judge))["voice"] == "Person 4"
+    # Brain restarts: the team is remembered, the judge is not.
+    again = VoiceBook(path)
+    assert sorted(again.people) == ["Dana", "Kha", "Sharan"]
+    assert again.identify(clip(team["Kha"]))["voice"] == "Kha"
+    assert again.guests == [] and "Person" not in open(path).read()
+    again.forget()
+    assert not (tmp_path / "voices.json").exists()

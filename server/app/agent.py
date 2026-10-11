@@ -186,7 +186,7 @@ SYSTEM = ("You are Lumen, the memory of a home. You help a deaf or hard-of-heari
           "return nothing, say you haven't seen or heard it. Say times as relative ('12 minutes ago'). "
           "Zone 'living' is the living room; zone 'wearer' means said in the same room as the user, and "
           "said_to_you=true means the speaker was facing them. voice is who said it, when known (a name, or "
-          "'Speaker A' for someone whose name we don't know).")
+          "'Person 4' for someone whose name we don't know).")
 
 
 def run_tool(name: str, args: dict, memory: Memory, events: list[dict]) -> dict:

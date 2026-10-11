@@ -1,4 +1,4 @@
-"""Who's talking, by voice: teammates by name, everyone else as Speaker A, Speaker B, ...
+"""Who's talking, by voice: teammates by name, everyone else as Person 4, Person 5, ...
 
 Model: microsoft/wavlm-base-plus-sv from Hugging Face. It turns a stretch of speech into a
 512-number "voiceprint"; two clips from the same person point the same way (cosine similarity
@@ -6,15 +6,19 @@ near 1). It's ungated and runs through transformers, which the AMD box already h
 
 How a name gets attached: someone says "my name is Sharan". That sentence's audio becomes Sharan's
 voiceprint (CLAUDE.md: names only come from "my name is ..."). Everyone else is grouped by voice
-into Speaker A, B, ... without a name.
+by voice, numbered after the named people (three teammates enrolled -> the next voice is Person 4).
 
-Privacy: voiceprints live in RAM only. Restart the brain, or POST /api/voices/forget, and they're gone.
+Privacy: named voiceprints (people who said "my name is", i.e. opted in) are saved to VOICE_FILE
+(default ~/lumen_voices.json) so a brain restart doesn't make the team re-enroll. Unnamed voices
+(Person 4, 5: judges, visitors) stay in RAM only and are never written anywhere.
+POST /api/voices/forget wipes both, file included.
 Nothing here looks at faces.
 
 Accuracy, honestly: under ~1 s of speech ("yeah", "ok") a voiceprint is close to a guess, so those
 lines get no label. When a voice is in between (not clearly a match, not clearly new) it also gets no
 label: a blank is better than the wrong name on a judge's sentence.
 """
+import json
 import logging
 import os
 import re
@@ -34,7 +38,8 @@ MAX_S = 8.0  # only the last 8 s of a long line are used
 # Cosine similarity cut-offs. The model card uses 0.86 on clean audio; phone mics in a loud room score
 # the same person lower, so we start a bit under. Tune on the box with GET /api/voices (recent scores).
 MATCH = float(os.environ.get("VOICE_MATCH", "0.80"))  # at or above: same person
-NEW = float(os.environ.get("VOICE_NEW", "0.70"))  # below this for everyone: a new Speaker letter
+NEW = float(os.environ.get("VOICE_NEW", "0.70"))  # below this for everyone: a new Person number
+VOICE_FILE = os.environ.get("VOICE_FILE", os.path.expanduser("~/lumen_voices.json"))  # "" = never save
 MARGIN = 0.03  # the best name must beat the second best by this much
 MAX_GUESTS = 8
 KEEP = 20  # a voiceprint is the average of up to this many lines; later lines nudge it
@@ -58,11 +63,32 @@ def unit(v: np.ndarray) -> np.ndarray:
 class VoiceBook:
     """The voiceprints, and the rules for matching a new line against them. Pure numpy, so it's testable."""
 
-    def __init__(self):
+    def __init__(self, path: str | None = None):
         self.lock = threading.Lock()
+        self.path = path  # where named voiceprints are saved; None = RAM only
         self.people: dict[str, dict] = {}  # name -> {"vec", "n"}
-        self.guests: list[dict] = []  # {"label", "vec", "n"}
+        self.guests: list[dict] = []  # {"label", "vec", "n"}, RAM only
+        self.next_person = 1
         self.scores: deque = deque(maxlen=30)  # recent best scores, for tuning thresholds on the box
+        self._read()
+
+    def _read(self):
+        try:
+            with open(self.path) as f:
+                saved = json.load(f)
+            self.people = {k: {"vec": unit(np.array(v["vec"], np.float32)), "n": v["n"]} for k, v in saved.items()}
+            log.info("Voice ID: remembered %s", ", ".join(self.people))
+        except (TypeError, OSError, ValueError, KeyError):
+            pass  # no file yet (or saving is off)
+
+    def _save(self):
+        if not self.path:
+            return
+        try:
+            with open(self.path, "w") as f:
+                json.dump({k: {"vec": v["vec"].tolist(), "n": v["n"]} for k, v in self.people.items()}, f)
+        except OSError as e:
+            log.warning("Voice ID: couldn't save voices (%s)", e)
 
     @staticmethod
     def _blend(entry: dict, vec: np.ndarray):
@@ -77,10 +103,11 @@ class VoiceBook:
                 self._blend(self.people[name], vec)
             else:
                 self.people[name] = {"vec": vec, "n": 1}
-            # If this voice was already a Speaker letter, that was this person all along: merge it in.
+            # If this voice was already a Person number, that was this person all along: merge it in.
             for g in list(self.guests):
                 if float(g["vec"] @ vec) >= MATCH:
                     self.guests.remove(g)
+            self._save()
             return {"voice": name, "voice_known": True, "voice_score": 1.0, "enrolled": True}
 
     def identify(self, vec: np.ndarray) -> dict | None:
@@ -103,7 +130,9 @@ class VoiceBook:
                 return {"voice": self.guests[i]["label"], "voice_known": False, "voice_score": round(score, 3)}
             if best >= NEW or len(self.guests) >= MAX_GUESTS:
                 return None  # in between: not clearly anyone we know, not clearly someone new
-            label = f"Speaker {chr(ord('A') + len(self.guests))}"
+            number = max(self.next_person, len(self.people) + 1)
+            self.next_person = number + 1
+            label = f"Person {number}"
             self.guests.append({"label": label, "vec": vec, "n": 1})
             return {"voice": label, "voice_known": False, "voice_score": round(max(best, 0.0), 3)}
 
@@ -112,6 +141,9 @@ class VoiceBook:
             self.people.clear()
             self.guests.clear()
             self.scores.clear()
+            self.next_person = 1
+            if self.path and os.path.exists(self.path):
+                os.remove(self.path)
 
     def summary(self) -> dict:
         """Names and line counts only; the voiceprints themselves never leave this object."""
@@ -125,7 +157,7 @@ class Voices:
     """Loads the model lazily (like Whisper) and labels finished lines. Switches itself off if it can't load."""
 
     def __init__(self, embed=None):
-        self.book = VoiceBook()
+        self.book = VoiceBook(VOICE_FILE or None)
         self._pipe = embed  # the embedding function; tests pass a fake
         self._failed = os.environ.get("VOICE_ID", "1") == "0"
         self._lock = threading.Lock()
@@ -161,7 +193,7 @@ class Voices:
         return self._pipe
 
     def label(self, audio: np.ndarray, text: str) -> dict | None:
-        """{"voice": "Sharan" | "Speaker A", "voice_known": bool, "voice_score": float}, or None."""
+        """{"voice": "Sharan" | "Person 4", "voice_known": bool, "voice_score": float}, or None."""
         seconds = len(audio) / SAMPLE_RATE
         name = name_in(text)
         if seconds < (ENROLL_MIN_S if name else MIN_S):

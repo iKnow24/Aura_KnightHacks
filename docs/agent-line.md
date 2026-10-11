@@ -80,9 +80,9 @@ The dashboard's main laptop camera calls `POST /api/look {"jpeg", "zone"}` about
 Node sockets also accept `{"type": "heartbeat"}`; dashboard state updates include current node connection status.
 Captions carry `"id"` and, when a louder speaker mic heard the same sentence, `"replaces": old_id`
 (see `server/app/speakers.py`). Browser captions are saved with `POST /api/speech {"text"}`.
-Whisper captions may also carry `"voice": "Sharan"` (a teammate who said "my name is Sharan") or `"Speaker A"`
+Whisper captions may also carry `"voice": "Sharan"` (a teammate who said "my name is Sharan") or `"Person 4"`
 (someone we only know by voice), plus `"voice_known"` and `"voice_score"` (see `server/app/detectors/voices.py`).
-Voiceprints are RAM only. `GET /api/voices` lists known names and recent scores; `POST /api/voices/forget` wipes them.
+Named voiceprints are saved to `VOICE_FILE` (default `~/lumen_voices.json`, never in the repo); unnamed ones stay in RAM. `GET /api/voices` lists known names and recent scores; `POST /api/voices/forget` wipes them.
 Voice "add a new mode": `POST /api/modes {"description"}` builds a mode, switches to it, returns `{"key", "label", "sound_kinds", ...}`.
 Acknowledging: any screen calls `POST /api/ack {"id": alert_id, "by": "wearer"}`; every screen gets
 `{"type": "ack", "id", "ts", "by"}` and drops the alert, and the dashboard timeline shows "seen at".

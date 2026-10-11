@@ -81,7 +81,7 @@ export function useLiveCaptions({ engine, active, onFinal }) {
   const addRemote = useCallback((msg) => {
     if (msg.zone === 'wearer' && engine !== 'private') return
     setInterim('')
-    // voice: who said it by voiceprint ("Sharan", or "Speaker A" when we don't know their name).
+    // voice: who said it by voiceprint ("Sharan", or "Person 4" when we don't know their name).
     addLine(msg.text, { id: msg.id ?? `${msg.ts}-${msg.zone}`, zone: msg.zone === 'wearer' ? null : msg.zone, ts: msg.ts, replaces: msg.replaces,
       ...(msg.voice && { voice: msg.voice, voiceKnown: !!msg.voice_known }) })
   }, [engine, addLine])

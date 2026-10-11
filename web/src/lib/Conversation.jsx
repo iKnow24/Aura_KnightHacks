@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { SPEAKER_COLORS, ZONES } from './zones'
 
-// voice: who said it by voiceprint ("Sharan", or "Speaker A"), from the brain.
+// voice: who said it by voiceprint ("Sharan", or "Person 4"), from the brain.
 const who = (c) => c.voice ?? (c.speaker ? `Person ${c.speaker}` : c.zone === 'wearer' ? 'Nearby' : ZONES[c.zone]?.label ?? c.zone)
 const hue = (s) => [...s].reduce((h, ch) => h + ch.charCodeAt(0), 0)
 const color = (c) => (c.voice ? SPEAKER_COLORS[hue(c.voice) % SPEAKER_COLORS.length]
