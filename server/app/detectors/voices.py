@@ -161,6 +161,21 @@ class VoiceBook:
             if self.path and os.path.exists(self.path):
                 os.remove(self.path)
 
+    def backup(self) -> dict:
+        """The named voiceprints, for the Voices page's backup file. Never includes unnamed voices."""
+        with self.lock:
+            return {"lumen_voices": 1, "people": {k: {"vec": v["vec"].tolist(), "n": v["n"]} for k, v in self.people.items()}}
+
+    def restore(self, data: dict) -> list[str]:
+        with self.lock:
+            for name, v in data.get("people", {}).items():
+                vec = unit(np.array(v["vec"], np.float32))
+                if vec.shape != (512,):
+                    raise ValueError("That isn't a Lumen voices backup.")
+                self.people[str(name)[:30]] = {"vec": vec, "n": int(v.get("n", 1))}
+            self._save()
+            return list(self.people)
+
     def summary(self) -> dict:
         """Names and line counts only; the voiceprints themselves never leave this object."""
         with self.lock:
@@ -219,6 +234,22 @@ class Voices:
             raise ValueError("The voice model isn't loaded on the brain.")
         with self._lock:
             return embed(audio[-int(MAX_S * SAMPLE_RATE):].astype(np.float32))
+
+    def enroll_long(self, name: str, audio: np.ndarray) -> int:
+        """A long reading (up to a minute): voiceprint each ~6 s piece and fold them all in. Returns pieces used."""
+        step = int(MAX_S * 0.75 * SAMPLE_RATE)
+        used = 0
+        for start in range(0, len(audio), step):
+            piece = audio[start:start + step]
+            try:
+                vec = self.embed_clip(piece)
+            except ValueError:
+                continue  # a pause or a too-short tail
+            self.book.enroll(name, vec)
+            used += 1
+        if not used:
+            raise ValueError("Couldn't hear any talking in that recording.")
+        return used
 
     def label(self, audio: np.ndarray, text: str) -> dict | None:
         """{"voice": "Sharan" | "Person 4", "voice_known": bool, "voice_score": float}, or None."""
