@@ -8,7 +8,9 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { Line2 } from 'three/examples/jsm/lines/Line2.js'
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js'
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { idlePose, makeRig, poseRig, resetRig } from '../../lib/avatarRig'
 import { ECLIPSE } from '../ui/Timeline'
 
 // Landing hero: a head in a headset. Sound travels in from the left as a waveform, enters the headset
@@ -49,23 +51,24 @@ function loudness(t) {
 }
 const isBell = (t) => { t = ((t % LOOP) + LOOP) % LOOP; return t > BEATS[1].at - 0.2 && t < BEATS[1].at + 3 }
 
-// A rough, featureless head: a sphere pushed into shape (narrow jaw, fuller back, a nose under the lens).
+// A head built from a rounded box, not a stretched sphere: a box has real flat planes (forehead,
+// cheek, jaw) meeting at edges, which reads as "a face" at a glance in a way any sphere, however it's
+// squashed, keeps reading as "a ball". Nose, lips and a chin point are small bumps added on top.
+const HEAD = { w: 1.42, h: 1.82, d: 1.5, r: 0.46 }
 function headGeometry() {
-  const g = new THREE.SphereGeometry(1, 112, 84)
+  const g = new RoundedBoxGeometry(HEAD.w, HEAD.h, HEAD.d, 7, HEAD.r)
   const p = g.attributes.position
   const v = new THREE.Vector3()
   for (let i = 0; i < p.count; i++) {
     v.fromBufferAttribute(p, i)
-    const { x, y, z } = v
-    let sx = 0.8, sy = 0.98, sz = 0.95
-    if (y < 0) { sx *= 1 - 0.3 * y * y; sz *= 1 - (z < 0 ? 0.25 : 0.1) * y * y }
-    if (z < 0 && y > -0.3) sz *= 1.07
-    let X = x * sx, Y = y * sy, Z = z * sz
-    const front = Math.max(0, z)
-    const noseW = 0.07 + 0.05 * smooth(-0.05, -0.32, y)
-    Z += 0.15 * front * Math.exp(-((x / noseW) ** 2)) * Math.exp(-(((y + 0.2) / 0.17) ** 2)) * (0.45 + 0.55 * smooth(0.05, -0.3, y))
-    Z += 0.035 * front * Math.exp(-((x / 0.17) ** 2)) * Math.exp(-(((y + 0.53) / 0.06) ** 2)) // lips
-    Z += 0.05 * front * Math.exp(-((x / 0.2) ** 2)) * Math.exp(-(((y + 0.78) / 0.1) ** 2)) // chin
+    let { x: X, y: Y, z: Z } = v
+    // A jaw corner: full width through the cheekbones, then a hard taper down to the chin.
+    if (Y < -0.1) { const j = smooth(-0.1, -0.86, Y); X *= 1 - 0.56 * j; Z *= 1 - (Z < 0 ? 0.3 : 0.2) * j }
+    const front = Math.max(0, Z)
+    const noseW = 0.07 + 0.05 * smooth(-0.05, -0.32, Y)
+    Z += 0.16 * front * Math.exp(-((X / noseW) ** 2)) * Math.exp(-(((Y + 0.2) / 0.17) ** 2)) * (0.45 + 0.55 * smooth(0.05, -0.3, Y))
+    Z += 0.035 * front * Math.exp(-((X / 0.17) ** 2)) * Math.exp(-(((Y + 0.53) / 0.06) ** 2)) // lips
+    Z += 0.045 * front * Math.exp(-((X / 0.2) ** 2)) * Math.exp(-(((Y + 0.78) / 0.1) ** 2)) // chin point
     p.setXYZ(i, X, Y, Z)
   }
   g.deleteAttribute('normal')
@@ -73,6 +76,31 @@ function headGeometry() {
   const m = mergeVertices(g)
   m.computeVertexNormals()
   return m
+}
+// A short curly cap sitting just outside the skull, from the crown down to just above the ears,
+// with a per-vertex wobble so it reads as curls rather than a smooth helmet. A capped sphere dome
+// (not a filtered box) so the mesh stays a closed, intact shape with no stray triangles.
+function hairGeometry() {
+  const g = new THREE.SphereGeometry(1, 64, 40, 0, Math.PI * 2, 0, Math.PI * 0.5)
+  const p = g.attributes.position
+  const v = new THREE.Vector3()
+  const sx = HEAD.w / 2 + 0.07, sy = HEAD.h / 2 + 0.09, sz = HEAD.d / 2 + 0.07
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i)
+    const curl = 1 + 0.012 * (Math.sin(v.x * 34 + v.y * 15) + Math.sin(v.y * 26 - v.z * 19) + Math.sin(v.z * 30 + v.x * 11))
+    p.setXYZ(i, v.x * sx * curl, v.y * sy * curl + 0.02, v.z * sz * curl)
+  }
+  g.computeVertexNormals()
+  return g
+}
+
+// A thin mustache, sitting between the nose and the upper lip.
+function mustacheGeometry() {
+  const g = new THREE.SphereGeometry(1, 28, 10, 0, Math.PI, 0, Math.PI * 0.4)
+  g.scale(0.185, 0.034, 0.05)
+  g.translate(0, -0.455, 1.03)
+  g.computeVertexNormals()
+  return g
 }
 
 // A rounded box bent around the vertical axis, so it wraps the face like a visor. Built from a finely
@@ -151,6 +179,44 @@ function addOnto(m) {
 }
 const PARTICLES = 60
 
+// The real face: the Blender (MPFB) person from the dashboard, already wearing the white headset.
+// It is a 4 MB file, so the code-built head shows until it arrives, then swaps out.
+const AVATAR = `${import.meta.env.BASE_URL}models/avatar.glb`
+const SCALE = 6.2 // meters -> scene units, so the head is about the size of the placeholder
+
+function loadAvatar() {
+  return new GLTFLoader().loadAsync(AVATAR).then((gltf) => {
+    const scene = gltf.scene
+    scene.traverse((o) => {
+      if (!o.isMesh) return
+      o.frustumCulled = false
+      for (const m of [o.material].flat()) {
+        if (!m) continue
+        if (/hair|afro|eyebrow|eyelash/i.test(m.name)) Object.assign(m, { alphaTest: 0.45, transparent: false, depthWrite: true, side: THREE.DoubleSide })
+        else if (!/high-poly|cornea/i.test(m.name)) m.transparent = false
+        if (/high-poly/i.test(m.name)) o.visible = false // eye-wetness shell, would show as a grey film
+      }
+    })
+    // Arms down and relaxed (the file is in a T-pose), then measure where the headset ended up.
+    scene.scale.setScalar(SCALE)
+    const rig = makeRig(scene)
+    for (let i = 0; i < 6; i++) { resetRig(rig); poseRig(rig, scene, idlePose(0), 5) }
+    scene.updateMatrixWorld(true)
+    const box = new THREE.Box3()
+    scene.traverse((o) => { if (o.isMesh && /^headset_Cube$/.test(o.name)) box.expandByObject(o) })
+    if (box.isEmpty()) scene.traverse((o) => { if (o.isMesh && /headset/i.test(o.name)) box.expandByObject(o) })
+    const c = box.getCenter(new THREE.Vector3())
+    // Put the headset where the placeholder's visor sits, so the waves and the caption line up.
+    scene.position.set(-c.x, 0.12 - c.y, 0.98 - box.max.z + 0.1)
+    const off = scene.position
+    const anchors = {
+      temple: new THREE.Vector3(box.min.x + off.x - 0.02, c.y + off.y, c.z + off.z - (box.max.z - box.min.z) * 0.15),
+      lens: new THREE.Vector3(c.x + off.x, c.y + off.y, box.max.z + off.z + 0.03),
+    }
+    return { scene, rig, anchors }
+  })
+}
+
 function Scene({ onBeat, overlay, narrow }) {
   const { gl, scene, camera, size } = useThree()
   const head = useRef()
@@ -158,22 +224,35 @@ function Scene({ onBeat, overlay, narrow }) {
   const last = useRef('')
   const glow = useRef(0)
   const pointer = useRef({ x: 0, y: 0 })
+  const [avatar, setAvatar] = useState(null)
+  const anchors = useRef({ temple: new THREE.Vector3(-0.74, 0.12, 0.5), lens: new THREE.Vector3(0.15, 0.1, 1.05) })
+
+  useEffect(() => {
+    let live = true
+    loadAvatar().then((a) => { if (!live) return; anchors.current = a.anchors; setAvatar(a) })
+      .catch((e) => console.warn('Hero avatar failed to load; keeping the built-in head', e))
+    return () => { live = false }
+  }, [])
 
   const parts = useMemo(() => {
-    const skin = new THREE.MeshPhysicalMaterial({ color: '#2b2b30', roughness: 0.45, clearcoat: 0.35, clearcoatRoughness: 0.5 })
+    const skin = new THREE.MeshPhysicalMaterial({ color: '#c99068', roughness: 0.55, clearcoat: 0.18, clearcoatRoughness: 0.5 })
+    const hair = new THREE.MeshPhysicalMaterial({ color: '#19130f', roughness: 0.85, clearcoat: 0.06 })
     const alu = new THREE.MeshPhysicalMaterial({ color: '#e6e6ea', metalness: 0.15, roughness: 0.28, clearcoat: 0.6, envMapIntensity: 1.4 })
     const glass = new THREE.MeshPhysicalMaterial({ color: '#0d0d11', metalness: 0.3, roughness: 0.06, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 3 })
     const sheen = addOnto(new THREE.MeshBasicMaterial({ map: sheenTexture(), toneMapped: false, opacity: 0.5 }))
     const fabric = new THREE.MeshStandardMaterial({ color: '#18181b', roughness: 1 })
     const strip = addOnto(new THREE.MeshBasicMaterial({ map: gradientTexture(), toneMapped: false, opacity: 0.4 }))
-    return { skin, alu, glass, fabric, strip, sheen }
+    return { skin, alu, glass, fabric, strip, sheen, hair }
   }, [])
 
   const geo = useMemo(() => {
     const band = new THREE.TorusGeometry(1, 0.06, 18, 120, Math.PI) // around the back only
     const ear = new THREE.SphereGeometry(1, 32, 24)
+    const hairCap = hairGeometry()
+    const mustache = mustacheGeometry()
     return {
       head: headGeometry(),
+      hairCap, mustache,
       neck: new THREE.CylinderGeometry(0.4, 0.5, 1.3, 64, 1, true),
       frame: bentBox(1.52, 0.5, 0.2, 0.09, 0.72),
       glass: bentBox(1.38, 0.38, 0.06, 0.03, 0.72, 0.1),
@@ -240,6 +319,7 @@ function Scene({ onBeat, overlay, narrow }) {
 
   useFrame((_, dt) => {
     const t = (clock.current += Math.min(dt, 0.25))
+    if (avatar) { resetRig(avatar.rig); poseRig(avatar.rig, avatar.scene, idlePose(t), Math.min(dt, 0.1)) }
     const lt = t % LOOP
     const h = head.current
     if (!h) return
@@ -252,7 +332,7 @@ function Scene({ onBeat, overlay, narrow }) {
     h.updateMatrixWorld()
 
     // Sound: each line runs from off-screen left to the pod on the headset's near temple.
-    h.localToWorld(tmp.p1.set(-0.74, 0.12, 0.5))
+    h.localToWorld(tmp.p1.copy(anchors.current.temple))
     const bell = isBell(t - TRAVEL * 0.5)
     for (const w of waves) {
       tmp.p0.set(-7.5, -0.5 + w.dy * 3, -2 + w.dz * 4)
@@ -284,8 +364,8 @@ function Scene({ onBeat, overlay, narrow }) {
     parts.strip.opacity = 0.25 + glow.current * 0.75
 
     // Caption anchor: in front of the lens, out where the wearer is looking.
-    h.localToWorld(tmp.lens.set(0.15, 0.1, 1.05))
-    h.localToWorld(tmp.anchor.set(0.4, 0.2, 1.75))
+    h.localToWorld(tmp.lens.copy(anchors.current.lens))
+    h.localToWorld(tmp.anchor.copy(anchors.current.lens).add(tmp.v.set(0.25, 0.1, 0.7)))
     const pos = sparks.pts.geometry.attributes.position.array
     const col = sparks.pts.geometry.attributes.color.array
     sparks.seeds.forEach(([seed, ph, sp], i) => {
@@ -320,12 +400,16 @@ function Scene({ onBeat, overlay, narrow }) {
   return (
     <>
       <ambientLight intensity={0.08} />
-      <directionalLight position={[3, 4, 5]} intensity={1.1} />
+      <directionalLight position={[3, 4, 5]} intensity={1.7} />
       <directionalLight position={[-5, 1.5, -3]} intensity={5} color="#FF8A3D" />
       <directionalLight position={[5, 2.5, -4]} intensity={5} color="#8B6CFF" />
       <directionalLight position={[0, -3, 2]} intensity={0.6} color="#FF4F7B" />
       <group ref={head} position={[narrow ? 0.2 : -0.5, 0, 0]} rotation={[0, 0.62, 0]}>
+        {avatar && <primitive object={avatar.scene} />}
+        {!avatar && <>
         <mesh geometry={geo.head} material={parts.skin} />
+        <mesh geometry={geo.hairCap} material={parts.hair} />
+        <mesh geometry={geo.mustache} material={parts.hair} />
         <mesh geometry={geo.neck} material={parts.skin} position={[0, -1.12, -0.12]} rotation={[0.16, 0, 0]} />
         {[-1, 1].map((s) => (
           <mesh key={s} geometry={geo.ear} material={parts.skin} position={[s * 0.79, -0.06, -0.06]} scale={[0.07, 0.2, 0.13]} />
@@ -340,6 +424,7 @@ function Scene({ onBeat, overlay, narrow }) {
           <mesh key={s} geometry={geo.pod} material={parts.alu} position={[s * 0.7, 0.12, 0.5]} rotation={[0, s * -0.55, 0]} />
         ))}
         <mesh geometry={geo.band} material={parts.fabric} position={[0, 0.14, -0.02]} rotation={[-Math.PI / 2 + 0.18, 0, 0]} scale={[0.84, 1.0, 1]} />
+        </>}
       </group>
       {waves.map((w, i) => <primitive key={i} object={w.line} />)}
       <primitive object={sparks.pts} />
