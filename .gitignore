@@ -20,3 +20,4 @@ models/
 .idea/
 web/public/mediapipe/wasm/
 event_log/
+lumen_voices.json

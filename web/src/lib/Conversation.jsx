@@ -2,8 +2,11 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { SPEAKER_COLORS, ZONES } from './zones'
 
-const who = (c) => (c.speaker ? `Person ${c.speaker}` : c.zone === 'wearer' ? 'Nearby' : ZONES[c.zone]?.label ?? c.zone)
-const color = (c) => (c.speaker ? SPEAKER_COLORS[(c.speaker - 1) % SPEAKER_COLORS.length] : '#71717a')
+// voice: who said it by voiceprint ("Sharan", or "Person 4"), from the brain.
+const who = (c) => c.voice ?? (c.speaker ? `Person ${c.speaker}` : c.zone === 'wearer' ? 'Nearby' : ZONES[c.zone]?.label ?? c.zone)
+const hue = (s) => [...s].reduce((h, ch) => h + ch.charCodeAt(0), 0)
+const color = (c) => (c.voice ? SPEAKER_COLORS[hue(c.voice) % SPEAKER_COLORS.length]
+  : c.speaker ? SPEAKER_COLORS[(c.speaker - 1) % SPEAKER_COLORS.length] : '#71717a')
 
 // Live transcript of everything the house heard, newest at the bottom, in big readable text.
 export function useCaptions() {

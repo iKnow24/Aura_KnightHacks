@@ -45,6 +45,14 @@ export function nameIn(text) {
   return NOT_NAMES.has(name) ? null : name
 }
 
+// Two transcripts of one sentence (Google on this phone, Whisper on the room phone): most words in common.
+function sameWords(a, b) {
+  const words = (t) => new Set(t.toLowerCase().match(/[a-z']+/g) ?? [])
+  const x = words(a), y = words(b)
+  const common = [...x].filter((w) => y.has(w)).length
+  return common >= 3 && common / Math.max(x.size, y.size) >= 0.5
+}
+
 // Movie captions: how cinemas and streaming subtitles for deaf viewers (SDH) look. White sans,
 // soft black outline, centered at the bottom, two lines at most, NAME: when we know who's talking,
 // and [SOUNDS IN BRACKETS] for what you can't hear.
@@ -76,7 +84,7 @@ function CinemaCaptions({ lines, live, names, recent }) {
   useEffect(() => { const t = setInterval(() => tick((n) => n + 1), 1000); return () => clearInterval(t) }, [])
   const last = lines[lines.length - 1]
   const fresh = last && Date.now() / 1000 - last.ts < CINEMA_HOLD_S
-  const who = (l) => (l?.speaker ? names[l.speaker.id] : l?.zone && !ZONES[l.zone] ? l.zone : null)
+  const who = (l) => (l?.speaker && names[l.speaker.id]) || l?.voice || (l?.zone && !ZONES[l.zone] ? l.zone : null)
   const text = live || (fresh ? last.text : '')
   const speaker = live ? null : who(last)
   // About 2 lines' worth for this screen width, keeping the newest words.
@@ -190,14 +198,14 @@ function spatialLayout({ lines, live, liveSpeaker, visible, names, events }) {
   const now = Date.now() / 1000
   const perLine = Math.max(24, Math.floor(Math.min(window.innerWidth * 0.78, 384) / 10.5))
   const fresh = lines.filter((l) => now - l.ts < HOLD_S)
-  const label = (l) => (l.speaker ? names[l.speaker.id] : l.zone ? (ZONES[l.zone] ? zoneLabel(l.zone) : l.zone) : null)
+  const label = (l) => (l.speaker && names[l.speaker.id]) || l.voice || (l.zone ? (ZONES[l.zone] ? zoneLabel(l.zone) : l.zone) : null)
   const bubbles = []
   for (const id of visible) {
     const talkingNow = !!live && liveSpeaker === id
     const own = fresh.findLast((l) => l.speaker?.id === id && !l.zone)
     const text = talkingNow ? live : own?.text
     if (!text) continue
-    bubbles.push({ trackId: id, key: id, text: lastTwoLines(text, perLine), live: talkingNow, name: names[id],
+    bubbles.push({ trackId: id, key: id, text: lastTwoLines(text, perLine), live: talkingNow, name: names[id] ?? own?.voice,
       color: own?.speaker.color ?? '#f4f4f5', toYou: !talkingNow && own?.speaker.toYou })
   }
   const placed = new Set(bubbles.map((b) => b.trackId))
@@ -259,7 +267,8 @@ export default function Captions() {
   const hideTimer = useRef()
   const lookingDown = useLookingDown(started)
   const lastInterim = useRef(0)
-  const [names, setNames] = useState({}) // face track id -> name they said ("I'm Dana")
+  const [names, setNames] = useState({}) // face track id -> name they said ("I'm Dana") or their voice is known by
+  const linesRef = useRef([])
   // 'spatial' (captions over heads) or 'cinema' (movie subtitles). The old side panel is gone.
   const [look, setLook] = useState(() => { try { return localStorage.getItem('lumen_look') === 'cinema' ? 'cinema' : 'spatial' } catch { return 'spatial' } })
   const [, tick] = useState(0) // spatial captions expire on their own, so re-check twice a second
@@ -320,12 +329,19 @@ export default function Captions() {
     active: started,
     onFinal: (line) => {
       if (!line.zone && command(line.text)) return true
-      if (line.zone && ZONES[line.zone]) return false // a room node: shown, but not part of the lecture
+      if (line.zone && ZONES[line.zone]) { // a room node: shown, but not part of the lecture
+        // Instant mode: the brain never hears this phone's mic, but the room phone heard the same sentence and
+        // knows the voice. Put that name on the face whose lips moved for it.
+        const mine = line.voiceKnown && linesRef.current.findLast((l) => !l.zone && l.speaker && line.ts - l.ts < 8 && sameWords(l.text, line.text))
+        if (mine && names[mine.speaker.id] !== line.voice) { setNames((n) => ({ ...n, [mine.speaker.id]: line.voice })); flash(`👋 That's ${line.voice}`) }
+        return false
+      }
       if (!line.zone && camera) {
         const who = faces.claim()
         if (who) {
           line.speaker = who
-          const said = nameIn(line.text)
+          // A name they said ("my name is Dana"), else the name the brain knows their voice by.
+          const said = nameIn(line.text) ?? (line.voiceKnown ? line.voice : null)
           if (said && names[who.id] !== said) {
             setNames((n) => ({ ...n, [who.id]: said }))
             flash(`👋 Met ${said}`)
@@ -340,6 +356,7 @@ export default function Captions() {
     },
   })
 
+  linesRef.current = captions.lines
   useEffect(() => { if (captions.interim) lastInterim.current = Date.now() }, [captions.interim])
   useEffect(() => { levelRef.current = captions.level }, [captions.level])
 

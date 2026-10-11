@@ -49,7 +49,7 @@ server/                 FastAPI brain (Python), port 8000
   app/hub.py            sends alerts/captions to every screen
   app/modes.py          modes (watch, wearer, lecture, outside, night) are CONFIG here, not separate code
   app/detectors/        alarm_dsp (smoke alarm beeps), ast_sound (sound classifier), fall (pose rules),
-                        speech (Whisper), items + scene JSON (one OWLv2 pass per still, detectors/scene.py)
+                        speech (Whisper) + who said it (WavLM voiceprints, detectors/voices.py), items + scene JSON (one OWLv2 pass per still, detectors/scene.py)
   app/agent.py, llm.py  "Ask Lumen" memory agent; LLM provider picked by env var
   app/memory.py         what was said / seen, for Ask Lumen
   app/eventlog.py       JSONL event log, one file per hour (feeds databricks/)
@@ -103,7 +103,7 @@ cd web && npm run build
 
 Env vars: `MODE`, `LUMEN_NAME`, `LUMEN_LLM` = `groq` (free default, keep it) | `claude` | `xai` | `hf` | `off` with
 `GROQ_API_KEY` / `ANTHROPIC_API_KEY` / `XAI_API_KEY` / `HF_TOKEN` (Hugging Face Inference Providers;
-`LUMEN_LLM_MODEL` picks any HF chat model id); `WHISPER_PROVIDER=groq`; `EVENT_LOG_DIR`, `LUMEN_HOUSEHOLD`,
+`LUMEN_LLM_MODEL` picks any HF chat model id); `WHISPER_PROVIDER=groq`; `VOICE_ID=0` turns voice labels off, `VOICE_MATCH` / `VOICE_NEW` tune them; `EVENT_LOG_DIR`, `LUMEN_HOUSEHOLD`,
 `LUMEN_SYNC_KEY`; `DATABRICKS_HOST`, `DATABRICKS_TOKEN`, `DATABRICKS_WAREHOUSE_ID` for the History tab.
 
 ## Databricks (real data path)

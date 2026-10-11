@@ -5,7 +5,7 @@ the "Ask Lumen" agent needs:
 
   {"type": "speech",   "ts": 1728540000.1, "zone": "kitchen", "text": "dinner's ready"}
       (lines heard by the headset have zone "wearer", plus "speaker": 1 and "to_you": true
-       once the headset works out who said it)
+       once the headset works out who said it; "voice": "Sharan" / "Person 4" when the voice is known)
   {"type": "sighting", "ts": 1728540000.1, "zone": "living",  "item": "keys",
    "confidence": 0.41, "thumb": "data:image/jpeg;base64,..."}
 
@@ -29,8 +29,11 @@ class Memory:
         del self.entries[:-MAX_ENTRIES]
         return entry
 
-    def add_speech(self, zone: str, text: str, ts: float | None = None) -> dict:
-        return self.add({"type": "speech", "zone": zone, "text": text.strip(), "ts": ts or time.time()})
+    def add_speech(self, zone: str, text: str, ts: float | None = None, voice: str | None = None) -> dict:
+        entry = {"type": "speech", "zone": zone, "text": text.strip(), "ts": ts or time.time()}
+        if voice:  # "Sharan" or "Person 4", from detectors/voices.py
+            entry["voice"] = voice
+        return self.add(entry)
 
     def add_sighting(self, zone: str, item: str, confidence: float, thumb: str | None = None,
                      ts: float | None = None) -> dict:

@@ -71,7 +71,8 @@ def tool_last_seen(memory: Memory, item: str) -> dict:
 def tool_transcript(memory: Memory, zone: str | None = None, minutes: float = 60, limit: int = 10) -> dict:
     lines = memory.speech(zone=zone, since=time.time() - minutes * 60, limit=limit)
     return {"lines": [{"zone": e["zone"], "text": e["text"], "ago": ago(e["ts"]),
-                       "said_to_you": e.get("to_you", False), "speaker": e.get("speaker")} for e in lines],
+                       "said_to_you": e.get("to_you", False), "speaker": e.get("speaker"),
+                       "voice": e.get("voice")} for e in lines],
             "entries": lines}
 
 
@@ -184,7 +185,8 @@ SYSTEM = ("You are Lumen, the memory of a home. You help a deaf or hard-of-heari
           "do (a time, a pill, an appointment), say that clearly first. Only state what the tools return; if they "
           "return nothing, say you haven't seen or heard it. Say times as relative ('12 minutes ago'). "
           "Zone 'living' is the living room; zone 'wearer' means said in the same room as the user, and "
-          "said_to_you=true means the speaker was facing them.")
+          "said_to_you=true means the speaker was facing them. voice is who said it, when known (a name, or "
+          "'Person 4' for someone whose name we don't know).")
 
 
 def run_tool(name: str, args: dict, memory: Memory, events: list[dict]) -> dict:

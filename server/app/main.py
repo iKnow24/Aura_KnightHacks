@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 from collections import deque
 import os
@@ -16,6 +17,7 @@ from .detectors.fall import FallDetector
 from .detectors import scene
 from .detectors.items import ItemFinder, decode, items_from_hits
 from .detectors.speech import Segmenter, Transcriber, mentions_name
+from .detectors.voices import Voices
 from .agent import answer
 from .llm import local as local_llm
 from .recap import recap
@@ -32,7 +34,7 @@ async def lifespan(app):
     # One after another, sound model first: transformers' lazy imports aren't thread-safe, and loading
     # all four in parallel threads made Whisper and the item finder fail on the AMD box with
     # "cannot import name 'pipeline' from 'transformers'".
-    models = (sound_model, transcriber, item_finder, local_llm)
+    models = (sound_model, transcriber, voices, item_finder, local_llm)
     asyncio.get_running_loop().run_in_executor(None, lambda: [m.available() for m in models])
     yield
 
@@ -59,6 +61,7 @@ last_alert: dict[tuple[str, str], float] = {}
 memory = Memory()
 profile = {"name": os.environ.get("LUMEN_NAME", "")}  # set at login; used for name calling
 transcriber = Transcriber()
+voices = Voices()  # who's talking, by voiceprint (named ones saved to VOICE_FILE)
 segmenters: dict[str, Segmenter] = {}
 item_finder = ItemFinder()
 items_busy: set[str] = set()
@@ -139,8 +142,9 @@ async def run_speech(zone: str, audio: np.ndarray):
     keep, replaced = crosstalk.check(zone, text, float(np.sqrt(np.mean(audio ** 2))))
     if not keep:
         return  # a louder phone already captioned this sentence
-    entry = memory.add_speech(zone, text)
-    msg = {**entry, "type": "caption", "id": caption_id(entry)}
+    voice = await asyncio.to_thread(voices.label, audio, text)
+    entry = memory.add_speech(zone, text, voice=voice["voice"] if voice else None)
+    msg = {**entry, "type": "caption", "id": caption_id(entry), **(voice or {})}
     if replaced:
         old = next((e for e in reversed(memory.entries) if e.get("type") == "speech"
                     and e["zone"] == replaced["zone"] and e["text"] == replaced["text"]), None)
@@ -410,10 +414,61 @@ async def ask(body: Question):
     return await asyncio.to_thread(answer, body.question, memory, hub.events)
 
 
+@app.get("/api/voices")
+def get_voices():
+    """Whose voices the brain knows (names and line counts, never the voiceprints) and recent match scores."""
+    return {"model": model_status(voices), **voices.book.summary()}
+
+
+class VoiceClip(BaseModel):
+    audio: str  # base64 of 16 kHz mono float32, from the Voices page
+    name: str = ""
+
+
+def clip_vec(body: VoiceClip):
+    try:
+        audio = np.frombuffer(base64.b64decode(body.audio), np.float32)
+        return voices.embed_clip(audio)
+    except ValueError as e:
+        raise HTTPException(400, str(e) or "Couldn't read that recording.")
+
+
+@app.post("/api/voices/enroll")
+def enroll_voice(body: VoiceClip):
+    """Voices page: save this person's voice (each extra recording makes it more reliable)."""
+    name = " ".join(body.name.split())[:30].title()
+    if not name:
+        raise HTTPException(400, "Type a name first.")
+    voices.book.enroll(name, clip_vec(body))
+    return voices.book.summary()
+
+
+@app.post("/api/voices/who")
+def who_is_this(body: VoiceClip):
+    """Voices page test: which saved voice does this recording match?"""
+    return voices.book.who(clip_vec(body))
+
+
+class VoiceName(BaseModel):
+    name: str
+
+
+@app.post("/api/voices/remove")
+def remove_voice(body: VoiceName):
+    voices.book.remove(body.name)
+    return voices.book.summary()
+
+
+@app.post("/api/voices/forget")
+def forget_voices():
+    voices.book.forget()
+    return {"ok": True}
+
+
 @app.get("/api/memory")
 def get_memory():
     return {"entries": [{k: v for k, v in e.items() if k != "thumb"} for e in memory.entries[-100:]],
-            "models": {"whisper": model_status(transcriber), "items": model_status(item_finder),
+            "models": {"whisper": model_status(transcriber), "voices": model_status(voices), "items": model_status(item_finder),
                        "llm": model_status(local_llm)}}
 
 
