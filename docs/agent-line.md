@@ -150,3 +150,7 @@ write server/app/detectors/fall.py with the rules in the analysis doc. Plan firs
 **C, screens:** "Read CLAUDE.md and docs/agent-line.md. I own Dashboard.jsx, Headset.jsx and Strobe.jsx.
 Make the headset glow look great and test it on a real phone through the tunnel. Use the fake-alert
 buttons only; don't touch server/. Plan first."
+
+Hazard notes (`server/app/hazard.py`, `POST /api/hazard`): opt-in, dashboard camera only. A still goes to Gemini and the reply is a plain-words
+"watch out" (a cup at a table edge, something near a flame). It is advice, not an alert: it never fires the strobe or an alert card.
+Only the note text is logged: `{"type": "hazard_note", "zone", "notes": [{"label", "where", "why"}], "model", "advisory": true, "ts"}`. The photo is dropped.
