@@ -2,6 +2,8 @@
 // to every screen. This only plays a short noise from the laptop so the room hears it too.
 // Made with the browser's tone generator. No sound files.
 
+import { speakNow } from './speak'
+
 let ctx
 
 function audio() {
@@ -54,10 +56,7 @@ const PLAY = {
     tone(660, 0.4, 0.55, { gain: 0.2 })
   },
   name_called: (name) => {
-    const line = new SpeechSynthesisUtterance(name ? `${name}` : 'Hey')
-    line.rate = 1
-    window.speechSynthesis?.cancel()
-    window.speechSynthesis?.speak(line)
+    speakNow(name ? `${name}` : 'Hey')
   },
   fall: () => noise(0, 0.35, { gain: 0.45, freq: 180 }),
   timer: () => {
